@@ -1,0 +1,46 @@
+# Flutter
+.dart_tool/
+.packages
+build/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Dart
+.pub/
+.pub-cache/
+*.g.dart
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Supabase
+supabase/.temp/
+
+# Keys & secrets
+*.key
+*.pem
+*.cert
+
+# Android
+local.properties
+*.apk
+*.aab
+*.keystore
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+
+# Linux
+linux/flutter/ephemeral/
+
+# Web
+build/web/

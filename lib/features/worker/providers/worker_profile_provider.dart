@@ -1,0 +1,299 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/constants/app_constants.dart';
+import 'package:local_services_marketplace/core/services/ai_service_provider.dart';
+import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
+
+/// State holder for the worker profile editing flow.
+/// Manages form fields, availability, portfolio, and AI generation state.
+class WorkerProfileState {
+  final WorkerProfile profile;
+  final bool isSaving;
+  final bool isGeneratingBio;
+  final String? errorMessage;
+  final String? aiSuggestionText;
+  final List<String>? aiSuggestedCategories;
+  final String tempBioInput; // raw user input for AI generation
+
+  const WorkerProfileState({
+    required this.profile,
+    this.isSaving = false,
+    this.isGeneratingBio = false,
+    this.errorMessage,
+    this.aiSuggestionText,
+    this.aiSuggestedCategories,
+    this.tempBioInput = '',
+  });
+
+  WorkerProfileState copyWith({
+    WorkerProfile? profile,
+    bool? isSaving,
+    bool? isGeneratingBio,
+    String? errorMessage,
+    String? aiSuggestionText,
+    List<String>? aiSuggestedCategories,
+    String? tempBioInput,
+    bool clearError = false,
+    bool clearAiSuggestion = false,
+  }) {
+    return WorkerProfileState(
+      profile: profile ?? this.profile,
+      isSaving: isSaving ?? this.isSaving,
+      isGeneratingBio: isGeneratingBio ?? this.isGeneratingBio,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      aiSuggestionText: clearAiSuggestion
+          ? null
+          : (aiSuggestionText ?? this.aiSuggestionText),
+      aiSuggestedCategories: clearAiSuggestion
+          ? null
+          : (aiSuggestedCategories ?? this.aiSuggestedCategories),
+      tempBioInput: tempBioInput ?? this.tempBioInput,
+    );
+  }
+}
+
+class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
+  @override
+  WorkerProfileState build() {
+    return WorkerProfileState(
+      profile: const WorkerProfile(
+        userId: 'user-placeholder',
+        fullName: 'Ahmed Khan',
+        headline: 'Experienced Plumber & Electrician',
+        bio:
+            'I have been working in home maintenance for over 8 years. Specializing in plumbing, electrical repairs, and general home improvement.',
+        yearsExperience: 8,
+        hourlyRatePkr: 500,
+        availabilityStatus: AvailabilityStatus.today,
+        serviceRadiusKm: 15,
+        averageRating: 4.5,
+        totalJobsCompleted: 127,
+        responseTimeAvgMinutes: 12,
+        categories: ['Plumbing', 'Electrical', 'Painting'],
+        isVerified: true,
+      ),
+    );
+  }
+
+  // ─── Field updaters ──────────────────────────────────────────
+
+  void updateHeadline(String value) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(headline: value),
+    );
+  }
+
+  void updateBio(String value) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(bio: value),
+    );
+  }
+
+  void updateYearsExperience(int years) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(yearsExperience: years),
+    );
+  }
+
+  void updateHourlyRate(int? rate) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(hourlyRatePkr: rate),
+    );
+  }
+
+  void updateServiceRadius(int km) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(serviceRadiusKm: km),
+    );
+  }
+
+  void updateAvailability(AvailabilityStatus status) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(availabilityStatus: status),
+    );
+  }
+
+  void toggleCategory(String category) {
+    final current = state.profile.categories;
+    final updated = current.contains(category)
+        ? current.where((c) => c != category).toList()
+        : [...current, category];
+    state = state.copyWith(
+      profile: state.profile.copyWith(categories: updated),
+    );
+  }
+
+  void setProfilePhotoUrl(String url) {
+    state = state.copyWith(
+      profile: state.profile.copyWith(profilePhotoUrl: url),
+    );
+  }
+
+  // ─── Portfolio ────────────────────────────────────────────────
+
+  void addPortfolioImage(String url) {
+    final updated = [...state.profile.portfolioMediaUrls, url];
+    state = state.copyWith(
+      profile: state.profile.copyWith(portfolioMediaUrls: updated),
+    );
+  }
+
+  void removePortfolioImage(int index) {
+    if (index < 0 || index >= state.profile.portfolioMediaUrls.length) return;
+    final updated = List<String>.from(state.profile.portfolioMediaUrls)
+      ..removeAt(index);
+    state = state.copyWith(
+      profile: state.profile.copyWith(portfolioMediaUrls: updated),
+    );
+  }
+
+  // ─── AI Bio Generation ────────────────────────────────────────
+
+  void setTempBioInput(String input) {
+    state = state.copyWith(tempBioInput: input);
+  }
+
+  Future<void> generateAiBio() async {
+    final rawInput = state.tempBioInput.trim();
+    if (rawInput.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Please describe your experience first',
+        clearAiSuggestion: true,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      isGeneratingBio: true,
+      errorMessage: null,
+      clearAiSuggestion: true,
+    );
+
+    try {
+      String generatedBio;
+      List<String> suggestedCategories;
+
+      if (AppConstants.enableAiProfileGeneration && !AppConstants.useMockAi) {
+        // Real OpenRouter API call
+        final aiService = ref.read(aiServiceProvider);
+        final systemPrompt = 'You are a professional profile writer for a '
+            'local services marketplace in Pakistan. Write a 2-3 sentence '
+            'professional bio based on the user\'s description. Keep it '
+            'concise, positive, and focused on skills. Also suggest relevant '
+            'service categories from this list: Plumbing, Electrical, Painting, '
+            'Carpentry, Masonry, Mechanic, Bike Repair, Car Wash, Labor, '
+            'Welding, Steel Fixing, Tutor, Language Teacher, Laptop Repair, '
+            'Mobile Repair, Web Developer, Photographer, DJ, Cook, Cleaning, '
+            'Moving, Healthcare, Beauty, Pet Care, General Labor. ';
+
+        final result = await aiService.generateJson(
+          prompt: 'Generate a professional bio and suggest categories for '
+              'someone with this experience: "$rawInput"\n\n'
+              'Return JSON with format: {"bio": "...", "categories": ["..."]}',
+          systemPrompt: systemPrompt,
+        );
+        generatedBio = result['bio'] as String? ?? _mockTextResponse(rawInput);
+        suggestedCategories =
+            (result['categories'] as List?)?.cast<String>() ??
+                _inferCategories(rawInput);
+      } else {
+        // Demo/mock mode
+        await Future.delayed(const Duration(milliseconds: 800));
+        generatedBio = _mockTextResponse(rawInput);
+        suggestedCategories = _inferCategories(rawInput);
+      }
+
+      state = state.copyWith(
+        isGeneratingBio: false,
+        aiSuggestionText: generatedBio,
+        aiSuggestedCategories: suggestedCategories,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isGeneratingBio: false,
+        errorMessage: 'Failed to generate profile. Please try again.',
+      );
+    }
+  }
+
+  /// Mock text response for demo mode
+  String _mockTextResponse(String input) {
+    return 'Professional with $input. Dedicated to providing high-quality '
+        'service with attention to detail and customer satisfaction. '
+        'Available for projects of all sizes.';
+  }
+
+  void applyAiBioSuggestion() {
+    final bio = state.aiSuggestionText;
+    final categories = state.aiSuggestedCategories;
+    if (bio == null) return;
+    state = state.copyWith(
+      profile: state.profile.copyWith(bio: bio, categories: categories),
+      clearAiSuggestion: true,
+    );
+  }
+
+  void dismissAiSuggestion() {
+    state = state.copyWith(clearAiSuggestion: true);
+  }
+
+  // ─── Save ─────────────────────────────────────────────────────
+
+  Future<void> saveProfile() async {
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      // TODO: Persist to Supabase
+      await Future.delayed(const Duration(milliseconds: 500));
+      state = state.copyWith(isSaving: false);
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'Failed to save profile. Please try again.',
+      );
+    }
+  }
+
+  /// Simple rule-based category inference for demo purposes.
+  /// In production this is replaced by the Claude API call.
+  List<String> _inferCategories(String input) {
+    final lower = input.toLowerCase();
+    final matched = <String>[];
+    const keywordMap = {
+      'plumb': 'Plumbing',
+      'electr': 'Electrical',
+      'paint': 'Painting',
+      'carpent': 'Carpentry',
+      'mason': 'Masonry',
+      'mechanic': 'Mechanic',
+      'bike': 'Bike Repair',
+      'car wash': 'Car Wash',
+      'labor': 'Labor',
+      'weld': 'Welding',
+      'steel': 'Steel Fixing',
+      'tutor': 'Tutor',
+      'teach': 'Language Teacher',
+      'laptop': 'Laptop Repair',
+      'mobile': 'Mobile Repair',
+      'web': 'Web Developer',
+      'photo': 'Photographer',
+      'dj': 'DJ',
+      'cook': 'Cook',
+      'clean': 'Cleaning',
+      'move': 'Moving',
+      'health': 'Healthcare',
+      'beauty': 'Beauty',
+      'pet': 'Pet Care',
+      'general': 'General Labor',
+    };
+    for (final entry in keywordMap.entries) {
+      if (lower.contains(entry.key)) {
+        matched.add(entry.value);
+      }
+    }
+    return matched.take(3).toList();
+  }
+}
+
+final workerProfileProvider =
+    NotifierProvider<WorkerProfileNotifier, WorkerProfileState>(() {
+  return WorkerProfileNotifier();
+});
