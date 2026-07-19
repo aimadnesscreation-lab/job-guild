@@ -5,14 +5,16 @@ import 'package:local_services_marketplace/core/constants/app_constants.dart';
 /// Service for calling OpenRouter AI models (replaces Claude).
 /// Supports JSON extraction and text generation using free models.
 class OpenRouterService {
-  final String apiKey;
-  final String baseUrl;
+  final String _apiKey;
+  final String _baseUrl;
   final HttpClient _httpClient;
 
   OpenRouterService({
-    this.apiKey = AppConstants.openRouterApiKey,
-    this.baseUrl = AppConstants.openRouterBaseUrl,
-  }) : _httpClient = HttpClient();
+    String? apiKey,
+    String? baseUrl,
+  })  : _apiKey = apiKey ?? AppConstants.openRouterApiKey,
+        _baseUrl = baseUrl ?? AppConstants.openRouterBaseUrl,
+        _httpClient = HttpClient();
 
   /// Generate text response (e.g., bio writing).
   /// Uses the text model by default.
@@ -23,7 +25,7 @@ class OpenRouterService {
     double temperature = 0.7,
     int maxTokens = 500,
   }) async {
-    if (AppConstants.useMockAi) {
+    if (AppConstants.useMockAi || !AppConstants.isOpenRouterConfigured) {
       return _mockTextResponse(prompt);
     }
 
@@ -61,7 +63,7 @@ class OpenRouterService {
     double temperature = 0.1, // Low temp for deterministic JSON
     int maxTokens = 500,
   }) async {
-    if (AppConstants.useMockAi) {
+    if (AppConstants.useMockAi || !AppConstants.isOpenRouterConfigured) {
       return _mockJsonResponse(prompt);
     }
 
@@ -109,12 +111,12 @@ class OpenRouterService {
 
   /// Make HTTP POST request to OpenRouter API
   Future<String> _postRequest(String path, String body) async {
-    final uri = Uri.parse('$baseUrl$path');
+    final uri = Uri.parse('$_baseUrl$path');
     final request = await _httpClient.postUrl(uri);
 
     // OpenRouter required headers
     request.headers.set('Content-Type', 'application/json');
-    request.headers.set('Authorization', 'Bearer $apiKey');
+    request.headers.set('Authorization', 'Bearer $_apiKey');
     request.headers.set('HTTP-Referer', 'https://localservices.app');
     request.headers.set('X-Title', 'Local Services Marketplace');
 

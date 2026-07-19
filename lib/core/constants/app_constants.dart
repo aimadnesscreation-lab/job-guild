@@ -1,13 +1,49 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConstants {
   AppConstants._();
 
-  // Supabase configuration — replace with your actual project values
-  static const String supabaseUrl = 'https://izjfugswuwyinaeauhvz.supabase.co';
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6amZ1Z3N3dXd5aW5hZWF1aHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTE5MjQsImV4cCI6MjA5OTk2NzkyNH0.BJMENZ9Q8IvUIegjXmaDMVK9NYZHUkJ3-8ovHLJShP0';
+  // ─── Secrets (override via .env; see .env.example) ─────────────
+  // The anon key is designed to be public (RLS protects data). The OpenRouter
+  // key is a real secret and should always come from .env, never be committed.
 
-  // Google Maps
-  static const String googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
+  /// Reads an env var without throwing. `dotenv.env` throws
+  /// [NotInitializedError] if `dotenv.load()` was never called (e.g. in tests,
+  /// or when no `.env` file exists and the app falls back to defaults). This
+  /// helper returns null in that case so the `??` fallbacks below actually
+  /// apply — otherwise the app would crash at startup instead of using
+  /// source-controlled defaults.
+  static String? _env(String key) =>
+      dotenv.isInitialized ? dotenv.env[key] : null;
+
+  static String get supabaseUrl => _env('SUPABASE_URL') ?? _supabaseUrl;
+
+  static String get supabaseAnonKey =>
+      _env('SUPABASE_ANON_KEY') ?? _supabaseAnonKey;
+
+  static String get openRouterApiKey {
+    final value = _env('OPENROUTER_API_KEY');
+    return value != null && value.isNotEmpty
+        ? value
+        : _openRouterApiKeyPlaceholder;
+  }
+
+  static String get googleMapsApiKey =>
+      _env('GOOGLE_MAPS_API_KEY') ?? _googleMapsApiKey;
+
+  /// True only when a real OpenRouter key (not the placeholder) is configured.
+  /// Used to short-circuit the client-side AI tier instead of firing a
+  /// doomed request that would always 401.
+  static bool get isOpenRouterConfigured =>
+      openRouterApiKey.trim().isNotEmpty &&
+      openRouterApiKey != _openRouterApiKeyPlaceholder;
+
+  // Source-controlled fallbacks (safe defaults so the app still runs without a .env)
+  static const String _supabaseUrl = 'https://izjfugswuwyinaeauhvz.supabase.co';
+  static const String _supabaseAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6amZ1Z3N3dXd5aW5hZWF1aHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTE5MjQsImV4cCI6MjA5OTk2NzkyNH0.BJMENZ9Q8IvUIegjXmaDMVK9NYZHUkJ3-8ovHLJShP0';
+  static const String _openRouterApiKeyPlaceholder = 'YOUR_OPENROUTER_API_KEY';
+  static const String _googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
 
   // App metadata
   static const String appName = 'Local Services Marketplace';
@@ -26,7 +62,6 @@ class AppConstants {
   static const int maxJobTitleLength = 100;
 
   // OpenRouter AI (replaces Claude — free models via OpenRouter)
-  static const String openRouterApiKey = 'YOUR_OPENROUTER_API_KEY';
   static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
   // Free models — routes to any available free model
   static const String openRouterFreeModel = 'openrouter/free';

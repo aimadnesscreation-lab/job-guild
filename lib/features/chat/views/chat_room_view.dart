@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/message_model.dart';
 import '../providers/chat_provider.dart';
+import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 
 class ChatRoomView extends ConsumerStatefulWidget {
@@ -29,7 +30,7 @@ class _ChatRoomViewState extends ConsumerState<ChatRoomView> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
@@ -37,27 +38,34 @@ class _ChatRoomViewState extends ConsumerState<ChatRoomView> {
     if (user == null) return;
 
     final message = Message(
-      id: '', // Supabase will generate this
       jobId: widget.jobId,
       senderId: user.id,
-      contentType: 'text',
+      contentType: MessageContentType.text,
       content: text,
-      sentAt: DateTime.now(),
     );
 
-    ref.read(chatRepositoryProvider).sendMessage(message);
-    _messageController.clear();
-    
-    // Scroll to bottom
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+    try {
+      await ref.read(chatRepositoryProvider).sendMessage(message);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
         );
       }
-    });
+      return;
+    }
+
+    _messageController.clear();
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override

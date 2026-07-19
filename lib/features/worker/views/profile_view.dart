@@ -18,7 +18,7 @@ class ProfileView extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            onPressed: () => ref.read(authProvider.notifier).signOut(),
           ),
         ],
       ),

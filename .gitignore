@@ -28,6 +28,8 @@ supabase/.temp/
 *.key
 *.pem
 *.cert
+.env
+!.env.example
 
 # Android
 local.properties

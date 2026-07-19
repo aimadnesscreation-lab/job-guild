@@ -18,7 +18,7 @@ class _PhoneLoginViewState extends ConsumerState<PhoneLoginView> {
     setState(() => _isLoading = true);
     try {
       final phone = _phoneController.text.trim();
-      await ref.read(authRepositoryProvider).signInWithOtp(phone);
+      await ref.read(authProvider.notifier).sendOtp(phone: phone);
       if (mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(

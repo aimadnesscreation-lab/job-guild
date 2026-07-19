@@ -29,19 +29,15 @@ class AuthNotifier extends Notifier<void> {
 
   /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx)
   static String normalizePhone(String phone) {
-    // Strip all non-digit characters
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    // If starts with 92, use as-is (but ensure it's exactly 92xxxxxxxxx)
     if (digits.startsWith('92')) {
       if (digits.length == 12) return '+$digits';
-      if (digits.length == 13) return '+$digits'; // Already has leading 0+92
+      if (digits.length == 11) return '+$digits';
     }
-    // If starts with 0 (e.g., 03001234567), strip the leading 0 and add 92
     if (digits.startsWith('0')) {
       final withoutLeading = digits.substring(1);
       return '+92$withoutLeading';
     }
-    // Otherwise, prepend +92
     return '+92$digits';
   }
 

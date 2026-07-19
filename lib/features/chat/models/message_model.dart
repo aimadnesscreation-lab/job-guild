@@ -1,7 +1,7 @@
 /// A single message in a conversation
 class Message {
   final String id;
-  final String conversationId;
+  final String jobId;
   final String senderId;
   final String senderName;
   final String? senderPhotoUrl;
@@ -12,7 +12,7 @@ class Message {
 
   Message({
     this.id = '',
-    this.conversationId = '',
+    this.jobId = '',
     this.senderId = '',
     this.senderName = '',
     this.senderPhotoUrl,
@@ -23,9 +23,49 @@ class Message {
   }) : sentAt = sentAt ?? DateTime.now();
 
   bool get isRead => readAt != null;
-  bool get isMine => senderId == currentUserId; // set dynamically
+  bool get isMine => senderId == currentUserId;
 
   static String currentUserId = '';
+
+  factory Message.fromJson(Map<String, dynamic> json) {
+    final sender = json['sender'] as Map<String, dynamic>?;
+    return Message(
+      id: json['id'] as String? ?? '',
+      jobId: json['job_id'] as String? ?? '',
+      senderId: json['sender_id'] as String? ?? '',
+      senderName: sender?['full_name'] as String? ?? json['sender_name'] as String? ?? '',
+      senderPhotoUrl: sender?['profile_photo_url'] as String? ?? json['sender_photo_url'] as String?,
+      contentType: _parseContentType(json['content_type'] as String?),
+      content: json['content'] as String? ?? '',
+      sentAt: json['sent_at'] != null ? DateTime.parse(json['sent_at'] as String) : DateTime.now(),
+      readAt: json['read_at'] != null ? DateTime.parse(json['read_at'] as String) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (id.isNotEmpty) 'id': id,
+        'job_id': jobId,
+        'sender_id': senderId,
+        'content_type': contentType.name,
+        'content': content,
+        'sent_at': sentAt.toIso8601String(),
+        if (readAt != null) 'read_at': readAt!.toIso8601String(),
+      };
+
+  static MessageContentType _parseContentType(String? type) {
+    switch (type) {
+      case 'image':
+        return MessageContentType.image;
+      case 'voice':
+        return MessageContentType.voice;
+      case 'location':
+        return MessageContentType.location;
+      case 'file':
+        return MessageContentType.file;
+      default:
+        return MessageContentType.text;
+    }
+  }
 }
 
 enum MessageContentType { text, image, voice, location, file }

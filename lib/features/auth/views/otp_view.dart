@@ -18,9 +18,11 @@ class _OtpViewState extends ConsumerState<OtpView> {
     setState(() => _isLoading = true);
     try {
       final otp = _otpController.text.trim();
-      await ref.read(authRepositoryProvider).verifyOtp(widget.phoneNumber, otp);
+      await ref.read(authProvider.notifier).verifyOtp(
+        phone: widget.phoneNumber,
+        otp: otp,
+      );
       if (mounted) {
-        // Auth state changes will handle navigation via main.dart listener or similar
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {

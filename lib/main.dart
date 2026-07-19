@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,14 @@ import 'features/home/views/home_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment overrides. A missing .env file is fine — AppConstants
+  // falls back to safe defaults so the app still runs in development.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env not present — defaults in AppConstants are used.
+  }
 
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,

@@ -53,7 +53,11 @@ class SupabaseRepository {
   Future<void> postJob(Job job) async {
     if (!_isConnected) return; // silently succeed for mock
 
-    await _client!.from('jobs').insert(job.toJson());
+    final userId = _client!.auth.currentUser?.id;
+    final json = job.toJson();
+    // The draft job has an empty employerId; stamp it with the authenticated user.
+    if (userId != null) json['employer_id'] = userId;
+    await _client!.from('jobs').insert(json);
   }
 
   Future<void> updateJobStatus(String jobId, JobStatus status) async {
@@ -259,8 +263,8 @@ class SupabaseRepository {
       budgetType: BudgetType.negotiable,
       urgency: Urgency.instant,
       locationText: 'Lahore, Gulberg',
-      locationLat: 31.5204,
-      locationLng: 74.3587,
+      lat: 31.5204,
+      lng: 74.3587,
     ),
     Job(
       id: 'job-2',

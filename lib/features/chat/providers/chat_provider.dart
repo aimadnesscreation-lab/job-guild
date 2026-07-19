@@ -1,6 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/features/chat/models/message_model.dart';
+import 'package:local_services_marketplace/features/chat/repositories/chat_repository.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
+
+final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return ChatRepository(client);
+});
+
+final jobMessagesProvider = StreamProvider.family<List<Message>, String>((ref, jobId) {
+  final repo = ref.watch(chatRepositoryProvider);
+  return repo.watchMessages(jobId);
+});
 
 /// State for the chat feature
 class ChatState {
@@ -48,6 +60,11 @@ class ChatState {
 class ChatNotifier extends Notifier<ChatState> {
   /// Active Realtime subscription channel for the current conversation
   RealtimeChannel? _messagesChannel;
+
+  /// Cache of sender profiles keyed by user id, so realtime inserts can be
+  /// enriched without refetching the whole thread (realtime payloads don't
+  /// include joined relation data).
+  final Map<String, Map<String, dynamic>> _senderCache = {};
 
   @override
   ChatState build() {
@@ -136,57 +153,124 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// Subscribe to a live stream of messages for the given job/conversation
+  /// Subscribe to live changes for the given job/conversation and apply them
+  /// as deltas (insert/update/delete) instead of refetching the whole thread.
   void _subscribeToMessages(String conversationId) {
     // Unsubscribe from previous channel
     _messagesChannel?.unsubscribe();
 
     final client = Supabase.instance.client;
 
-    // Subscribe to realtime changes on the messages table for this job
     _messagesChannel = client.channel('messages:$conversationId');
     _messagesChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'job_id',
+        value: conversationId,
+      ),
       callback: (payload) async {
-        // On any change, re-fetch the full message list
-        await _fetchMessages(conversationId);
+        await _applyRealtimeChange(payload, conversationId);
       },
     );
     _messagesChannel!.subscribe();
 
-    // Also set up the initial stream
+    // Initial load of the full thread
     _fetchMessages(conversationId);
+  }
+
+  /// Apply a single realtime change to the in-memory message list.
+  Future<void> _applyRealtimeChange(
+    PostgresChangePayload payload,
+    String conversationId,
+  ) async {
+    switch (payload.eventType) {
+      case PostgresChangeEvent.insert:
+      case PostgresChangeEvent.update:
+        final msg = await _messageFromRecord(payload.newRecord, conversationId);
+        _upsertMessage(msg);
+      case PostgresChangeEvent.delete:
+        final id = payload.oldRecord['id'] as String?;
+        if (id != null) _removeMessage(id);
+      case PostgresChangeEvent.all:
+        // Fallback: rebuild from the database
+        await _fetchMessages(conversationId);
+    }
+  }
+
+  /// Build a [Message] from a raw realtime row, enriching sender info with a
+  /// cached lookup (or a single targeted fetch) since realtime payloads don't
+  /// include joined relation data.
+  Future<Message> _messageFromRecord(
+    Map<String, dynamic> record,
+    String conversationId,
+  ) async {
+    final senderId = record['sender_id'] as String? ?? '';
+    Map<String, dynamic>? sender = _senderCache[senderId];
+    if (senderId.isNotEmpty && sender == null) {
+      try {
+        sender = await Supabase.instance.client
+            .from('users')
+            .select('full_name, profile_photo_url')
+            .eq('id', senderId)
+            .single();
+        _senderCache[senderId] = sender;
+      } catch (_) {
+        sender = null;
+      }
+    }
+
+    final enriched = <String, dynamic>{...record};
+    if (sender != null) enriched['sender'] = sender;
+    return Message.fromJson(enriched);
+  }
+
+  void _upsertMessage(Message msg) {
+    if (msg.id.isEmpty) return;
+    final list = List<Message>.from(state.currentMessages);
+    final idx = list.indexWhere((m) => m.id == msg.id);
+    if (idx >= 0) {
+      list[idx] = msg;
+    } else {
+      list.add(msg);
+    }
+    list.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    state = state.copyWith(currentMessages: list, isLoading: false);
+  }
+
+  void _removeMessage(String id) {
+    final list = state.currentMessages.where((m) => m.id != id).toList();
+    state = state.copyWith(currentMessages: list);
   }
 
   /// Fetch the full message list for a conversation via the Supabase stream API
   Future<void> _fetchMessages(String conversationId) async {
     try {
       final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      Message.currentUserId = userId ?? '';
+
       final messages = await client
           .from('messages')
-          .select('*, sender:sender_id(full_name)')
+          .select('*, sender:sender_id(full_name, profile_photo_url)')
           .eq('job_id', conversationId)
           .order('sent_at');
 
-      final parsed = (messages as List).map((json) {
-        final sender = json['sender'] as Map<String, dynamic>?;
-        return Message(
-          id: json['id'] as String? ?? '',
-          conversationId: conversationId,
-          senderId: json['sender_id'] as String? ?? '',
-          senderName: sender?['full_name'] as String? ?? 'User',
-          content: json['content'] as String? ?? '',
-          contentType: _parseContentType(json['content_type'] as String?),
-          sentAt: json['sent_at'] != null
-              ? DateTime.parse(json['sent_at'] as String)
-              : DateTime.now(),
-          readAt: json['read_at'] != null
-              ? DateTime.parse(json['read_at'] as String)
-              : null,
-        );
-      }).toList();
+      final parsed = (messages as List)
+          .map((json) => Message.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // Warm the sender cache so realtime inserts can be enriched cheaply.
+      for (final m in parsed) {
+        if (m.senderId.isNotEmpty && !_senderCache.containsKey(m.senderId)) {
+          _senderCache[m.senderId] = {
+            'full_name': m.senderName,
+            'profile_photo_url': m.senderPhotoUrl,
+          };
+        }
+      }
 
       state = state.copyWith(
         currentMessages: parsed,

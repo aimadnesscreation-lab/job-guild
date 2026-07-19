@@ -3,6 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/services/ai_service_provider.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
+
+final nearbyJobsProvider = FutureProvider<List<Job>>((ref) async {
+  final repo = ref.watch(supabaseRepositoryProvider);
+  return repo.getNearbyJobs();
+});
 
 /// State for the job posting form
 class PostJobState {
@@ -99,25 +105,30 @@ class PostJobNotifier extends Notifier<PostJobState> {
           final result = await _callEdgeFunction(text);
           metadata = JobAiMetadata.fromJson(result);
         } catch (edgeError) {
-          print('[AI] Edge Function failed: $edgeError — falling back to direct API');
-          try {
-            // Fall back to direct OpenRouter call from client
-            final aiService = ref.read(aiServiceProvider);
-            final result = await aiService.generateJson(
-              prompt: 'Parse this job request: "$text"\n\n'
-                  'Return JSON with exactly: {\n'
-                  '  "category": string,\n'
-                  '  "urgency": "instant"|"today"|"scheduled",\n'
-                  '  "suggested_budget_pkr": number,\n'
-                  '  "estimated_duration_hours": number,\n'
-                  '  "required_skills": string[]\n'
-                  '}',
-            );
-            metadata = JobAiMetadata.fromJson(result);
-          } catch (directError) {
-            print('[AI] Direct API also failed: $directError — using keyword mock');
-            // Last resort: keyword-based mock
+          print('[AI] Edge Function failed: $edgeError');
+          if (!AppConstants.isOpenRouterConfigured) {
+            print('[AI] No client OpenRouter key configured — using keyword mock');
             metadata = _mockParse(text);
+          } else {
+            try {
+              // Fall back to direct OpenRouter call from client
+              final aiService = ref.read(aiServiceProvider);
+              final result = await aiService.generateJson(
+                prompt: 'Parse this job request: "$text"\n\n'
+                    'Return JSON with exactly: {\n'
+                    '  "category": string,\n'
+                    '  "urgency": "instant"|"today"|"scheduled",\n'
+                    '  "suggested_budget_pkr": number,\n'
+                    '  "estimated_duration_hours": number,\n'
+                    '  "required_skills": string[]\n'
+                    '}',
+              );
+              metadata = JobAiMetadata.fromJson(result);
+            } catch (directError) {
+              print('[AI] Direct API also failed: $directError — using keyword mock');
+              // Last resort: keyword-based mock
+              metadata = _mockParse(text);
+            }
           }
         }
       } else {
@@ -219,23 +230,8 @@ class PostJobNotifier extends Notifier<PostJobState> {
     state = state.copyWith(isPosting: true, errorMessage: null);
 
     try {
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-
-      await client.from('jobs').insert({
-        if (userId != null) 'employer_id': userId,
-        'category_id': job.categoryId,
-        'title': job.title,
-        'description': job.description,
-        if (job.aiExtractedMetadata != null)
-          'ai_extracted_metadata': job.aiExtractedMetadata!.toJson(),
-        if (job.budgetAmount != null) 'budget_amount': job.budgetAmount,
-        'budget_type': job.budgetType.name,
-        'urgency': job.urgency.name,
-        if (job.locationText != null) 'location_text': job.locationText,
-        'location_coords': 'POINT(${job.lng} ${job.lat})',
-        'status': 'open',
-      });
+      final repo = ref.read(supabaseRepositoryProvider);
+      await repo.postJob(job);
 
       // Reset form on success
       state = PostJobState();
@@ -291,10 +287,11 @@ class PostJobNotifier extends Notifier<PostJobState> {
             : 'today';
 
     int budget = 2000;
-    final budgetMatch = RegExp(r'(\d+)\s*(k|k|rs|pkr)?').firstMatch(lower);
+    final budgetMatch = RegExp(r'(\d+)\s*(k|rs|pkr)?').firstMatch(lower);
     if (budgetMatch != null) {
       final num = int.parse(budgetMatch.group(1)!);
-      budget = lower.contains('k') ? num * 1000 : num;
+      final suffix = budgetMatch.group(2) ?? '';
+      budget = suffix == 'k' ? num * 1000 : num;
     }
 
     return JobAiMetadata(

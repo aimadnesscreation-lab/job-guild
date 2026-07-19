@@ -107,6 +107,56 @@ class WorkerProfile {
     }
   }
 
+  factory WorkerProfile.fromJson(Map<String, dynamic> json) {
+    final user = json['users'] as Map<String, dynamic>?;
+    return WorkerProfile(
+      userId: json['id'] as String? ?? '',
+      fullName: user?['full_name'] as String? ?? json['full_name'] as String? ?? '',
+      profilePhotoUrl: user?['profile_photo_url'] as String? ?? json['profile_photo_url'] as String?,
+      headline: json['headline'] as String?,
+      bio: json['bio'] as String?,
+      yearsExperience: json['years_experience'] as int? ?? 0,
+      hourlyRatePkr: json['hourly_rate_pkr'] as int?,
+      fixedRateNote: json['fixed_rate_note'] as String?,
+      availabilityStatus: AvailabilityStatus.values.firstWhere(
+        (s) => s.name == json['availability_status'],
+        orElse: () => AvailabilityStatus.offline,
+      ),
+      serviceRadiusKm: json['service_radius_km'] as int? ?? 10,
+      averageRating: (json['average_rating'] as num?)?.toDouble() ?? 0,
+      totalJobsCompleted: json['total_jobs_completed'] as int? ?? 0,
+      responseTimeAvgMinutes: json['response_time_avg_minutes'] as int? ?? 0,
+      portfolioMediaUrls: (json['portfolio_media'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      categories: (json['categories'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      isVerified: json['is_verified'] as bool? ?? false,
+      isFeatured: json['is_featured'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': userId,
+        'headline': headline,
+        'bio': bio,
+        'years_experience': yearsExperience,
+        'hourly_rate_pkr': hourlyRatePkr,
+        'fixed_rate_note': fixedRateNote,
+        'availability_status': availabilityStatus.name,
+        'service_radius_km': serviceRadiusKm,
+        'average_rating': averageRating,
+        'total_jobs_completed': totalJobsCompleted,
+        'response_time_avg_minutes': responseTimeAvgMinutes,
+        'portfolio_media': portfolioMediaUrls,
+        if (categories.isNotEmpty) 'categories': categories,
+        'is_verified': isVerified,
+        'is_featured': isFeatured,
+      };
+
   /// Display a star rating string (e.g. "4.5 ⭐")
   String get ratingDisplay {
     if (averageRating == 0) return 'No ratings yet';

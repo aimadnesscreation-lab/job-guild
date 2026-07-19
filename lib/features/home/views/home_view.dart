@@ -12,6 +12,7 @@ import 'package:local_services_marketplace/features/notifications/views/notifica
 import 'package:local_services_marketplace/features/settings/views/settings_view.dart';
 import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
 import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
+import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
 
 /// Main home screen — entry point after authentication.
 /// Connects all real screens: feed, search, post job, messages, dashboard.
@@ -523,39 +524,65 @@ class _RealtimeJobCard extends StatelessWidget {
   }
 }
 
-/// Dashboard tab toggles between employer and worker view
-class _DashboardContainer extends StatelessWidget {
+/// Dashboard tab toggles between employer and worker view, defaulting to the
+/// tab that matches the current user's role (a worker profile present means
+/// the user is acting as a worker).
+class _DashboardContainer extends ConsumerStatefulWidget {
   const _DashboardContainer();
 
   @override
+  ConsumerState<_DashboardContainer> createState() => _DashboardContainerState();
+}
+
+class _DashboardContainerState extends ConsumerState<_DashboardContainer>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // Once the worker profile resolves, switch to the matching dashboard tab.
+    ref.listenManual(myWorkerProfileProvider, (_, next) {
+      final isWorker = next.value != null;
+      final target = isWorker ? 1 : 0;
+      if (_tabController.index != target) _tabController.index = target;
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // TODO: Check user role to decide which dashboard to show
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: const TabBar(
-              labelColor: AppTheme.primaryColor,
-              unselectedLabelColor: AppTheme.textSecondary,
-              indicatorColor: AppTheme.primaryColor,
-              tabs: [
-                Tab(text: 'Employer'),
-                Tab(text: 'Worker'),
-              ],
-            ),
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppTheme.primaryColor,
+            unselectedLabelColor: AppTheme.textSecondary,
+            indicatorColor: AppTheme.primaryColor,
+            tabs: const [
+              Tab(text: 'Employer'),
+              Tab(text: 'Worker'),
+            ],
           ),
-          const Expanded(
-            child: TabBarView(
-              children: [
-                EmployerDashboard(),
-                WorkerDashboard(),
-              ],
-            ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              EmployerDashboard(),
+              WorkerDashboard(),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
