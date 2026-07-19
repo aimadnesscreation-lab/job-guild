@@ -44,21 +44,33 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _messageController.text;
     if (text.trim().isEmpty) return;
-    ref.read(chatProvider.notifier).sendMessage(text);
+
     _messageController.clear();
-    // Scroll to bottom
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+    try {
+      await ref.read(chatProvider.notifier).sendMessage(text);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
         );
       }
-    });
+      return;
+    }
+
+    // Scroll to bottom
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override

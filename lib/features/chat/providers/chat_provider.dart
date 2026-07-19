@@ -1,18 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/features/chat/models/message_model.dart';
-import 'package:local_services_marketplace/features/chat/repositories/chat_repository.dart';
-import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
-
-final chatRepositoryProvider = Provider<ChatRepository>((ref) {
-  final client = ref.watch(supabaseClientProvider);
-  return ChatRepository(client);
-});
-
-final jobMessagesProvider = StreamProvider.family<List<Message>, String>((ref, jobId) {
-  final repo = ref.watch(chatRepositoryProvider);
-  return repo.watchMessages(jobId);
-});
 
 /// State for the chat feature
 class ChatState {
@@ -310,7 +298,8 @@ class ChatNotifier extends Notifier<ChatState> {
     _subscribeToMessages(conversationId);
   }
 
-  /// Send a message via Supabase
+  /// Send a message via Supabase. Re-throws on failure so the UI can surface
+  /// the error (e.g. show a SnackBar when the send fails / user is offline).
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
@@ -330,12 +319,10 @@ class ChatNotifier extends Notifier<ChatState> {
         'content_type': 'text',
       });
 
-      state = state.copyWith(isSending: false);
+      state = state.copyWith(isSending: false, clearError: true);
     } catch (e) {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: 'Failed to send message',
-      );
+      state = state.copyWith(isSending: false);
+      throw Exception('Failed to send message: $e');
     }
   }
 
