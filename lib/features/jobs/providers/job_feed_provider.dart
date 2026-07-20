@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
@@ -7,16 +9,27 @@ import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 /// so any INSERT, UPDATE, or DELETE on the jobs table is reflected instantly.
 ///
 /// This provider is the single source of truth for the live job feed.
+///
+/// Guarded so that, before `Supabase.initialize()` has run (e.g. widget tests
+/// with no Supabase client), it emits an empty list instead of throwing.
 final liveJobFeedProvider = StreamProvider<List<Job>>((ref) {
-  final client = Supabase.instance.client;
+  try {
+    final client = Supabase.instance.client;
 
-  return client
-      .from('jobs')
-      .stream(primaryKey: ['id'])
-      .order('created_at', ascending: false)
-      .map((data) {
-        return data.map((json) => Job.fromJson(json)).toList();
-      });
+    return client
+        .from('jobs')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((data) {
+          return data.map((json) => Job.fromJson(json)).toList();
+        });
+  } catch (_) {
+    // Supabase not initialized (e.g. widget tests) — emit an empty list.
+    final controller = StreamController<List<Job>>();
+    controller.add(const []);
+    controller.close();
+    return controller.stream;
+  }
 });
 
 /// Provider that filters jobs to only 'open' status for the worker feed.

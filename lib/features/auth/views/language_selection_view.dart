@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
-import 'package:local_services_marketplace/core/localization/strings.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/features/auth/views/otp_verification_view.dart';
@@ -34,7 +33,7 @@ class _LanguageSelectionViewState
       _selectedLanguage = lang;
       _showPhoneInput = true;
     });
-    ref.read(localeProvider.notifier).state = lang;
+    ref.read(localeProvider.notifier).setLocale(lang);
   }
 
   bool _isLoading = false;

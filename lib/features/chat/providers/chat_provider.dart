@@ -61,9 +61,15 @@ class ChatNotifier extends Notifier<ChatState> {
     return const ChatState(isLoading: true);
   }
 
-  /// Call this when leaving the chat to clean up subscriptions
+  /// Call this when leaving the chat to clean up subscriptions.
+  /// Both unsubscribes AND removes the channel from the Supabase client so
+  /// the realtime connection is fully torn down (otherwise it leaks).
   void disposeChannel() {
-    _messagesChannel?.unsubscribe();
+    if (_messagesChannel != null) {
+      _messagesChannel!.unsubscribe();
+      Supabase.instance.client.removeChannel(_messagesChannel!);
+      _messagesChannel = null;
+    }
   }
 
   /// Fetch the current user's conversations from Supabase
@@ -269,21 +275,6 @@ class ChatNotifier extends Notifier<ChatState> {
         isLoading: false,
         errorMessage: 'Failed to load messages: $e',
       );
-    }
-  }
-
-  MessageContentType _parseContentType(String? type) {
-    switch (type) {
-      case 'image':
-        return MessageContentType.image;
-      case 'voice':
-        return MessageContentType.voice;
-      case 'location':
-        return MessageContentType.location;
-      case 'file':
-        return MessageContentType.file;
-      default:
-        return MessageContentType.text;
     }
   }
 

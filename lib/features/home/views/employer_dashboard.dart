@@ -1,142 +1,116 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
+import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
+import 'package:local_services_marketplace/features/jobs/providers/job_feed_provider.dart';
+import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';
 
-/// Employer Dashboard — active jobs, applicants per job, completed job history, saved workers.
-class EmployerDashboard extends StatelessWidget {
+/// Employer Dashboard — real active jobs (from the live feed) with applicant
+/// counts per job, plus completed-job history.
+class EmployerDashboard extends ConsumerWidget {
   const EmployerDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ─── Stats Row ─────────────────────────────────────
-          Row(
-            children: [
-              _StatCard(
-                icon: Icons.work_outline,
-                value: '3',
-                label: 'Active Jobs',
-                color: AppTheme.primaryColor,
-              ),
-              const SizedBox(width: 8),
-              _StatCard(
-                icon: Icons.people_outline,
-                value: '7',
-                label: 'Applicants',
-                color: AppTheme.accentColor,
-              ),
-              const SizedBox(width: 8),
-              _StatCard(
-                icon: Icons.check_circle_outline,
-                value: '12',
-                label: 'Completed',
-                color: AppTheme.verifiedBadge,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final jobsAsync = user != null
+        ? ref.watch(employerJobsProvider(user.id))
+        : const AsyncValue<List<Job>>.data([]);
 
-          // ─── Active Jobs ───────────────────────────────────
-          Text(
-            'Active Jobs',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          _ActiveJobCard(
-            title: 'Plumber needed for bathroom fixing',
-            applicants: 3,
-            budget: 'PKR 2,000 - 3,000',
-            daysAgo: 1,
-          ),
-          const SizedBox(height: 6),
-          _ActiveJobCard(
-            title: 'AC repair and maintenance',
-            applicants: 2,
-            budget: 'PKR 3,500',
-            daysAgo: 2,
-          ),
-          const SizedBox(height: 6),
-          _ActiveJobCard(
-            title: 'Tutor for Class 10 Mathematics',
-            applicants: 2,
-            budget: 'PKR 500/hr',
-            daysAgo: 3,
-          ),
-          const SizedBox(height: 20),
-
-          // ─── Saved Workers ─────────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return jobsAsync.when(
+      data: (jobs) {
+        final active = jobs.where((j) => j.isOpen).toList();
+        final completed = jobs
+            .where((j) => j.status == JobStatus.completed)
+            .toList();
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ─── Stats Row ─────────────────────────────────────
+              Row(
+                children: [
+                  _StatCard(
+                    icon: Icons.work_outlined,
+                    value: '${active.length}',
+                    label: 'Active Jobs',
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  _StatCard(
+                    icon: Icons.people_outlined,
+                    value: '${_totalApplicants(ref, jobs)}',
+                    label: 'Applicants',
+                    color: AppTheme.accentColor,
+                  ),
+                  const SizedBox(width: 8),
+                  _StatCard(
+                    icon: Icons.check_circle_outlined,
+                    value: '${completed.length}',
+                    label: 'Completed',
+                    color: AppTheme.verifiedBadge,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // ─── Active Jobs ───────────────────────────────────
               Text(
-                'Saved Workers',
+                'Active Jobs',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
-              TextButton(
-                onPressed: () {},
-                child: const Text('See All'),
+              const SizedBox(height: 8),
+              if (active.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text('No active jobs. Post a job to get started.',
+                        style: TextStyle(color: AppTheme.textSecondary)),
+                  ),
+                )
+              else
+                ...active.map((job) => _ActiveJobCard(job: job)),
+              const SizedBox(height: 20),
+
+              // ─── Completed Jobs ───────────────────────────────
+              Text(
+                'Completed Jobs',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 8),
+              if (completed.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text('No completed jobs yet.',
+                        style: TextStyle(color: AppTheme.textSecondary)),
+                  ),
+                )
+              else
+                ...completed.map((job) => _ActiveJobCard(job: job)),
+              const SizedBox(height: 20),
             ],
           ),
-          SizedBox(
-            height: 72,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: const [
-                _SavedWorkerAvatar(name: 'Ahmed K.', rating: 4.8),
-                SizedBox(width: 12),
-                _SavedWorkerAvatar(name: 'Imran A.', rating: 4.5),
-                SizedBox(width: 12),
-                _SavedWorkerAvatar(name: 'Sana M.', rating: 4.9),
-                SizedBox(width: 12),
-                _SavedWorkerAvatar(name: 'Faisal A.', rating: 4.6),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ─── Recent Activity ───────────────────────────────
-          Text(
-            'Recent Activity',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          _ActivityTile(
-            icon: Icons.person_add_rounded,
-            text: 'Ahmed Khan applied for Plumbing job',
-            time: '2 hours ago',
-            color: AppTheme.primaryColor,
-          ),
-          const SizedBox(height: 4),
-          _ActivityTile(
-            icon: Icons.check_circle_rounded,
-            text: 'Plumbing job marked as complete',
-            time: '1 day ago',
-            color: AppTheme.primaryDark,
-          ),
-          const SizedBox(height: 4),
-          _ActivityTile(
-            icon: Icons.star_rounded,
-            text: 'You received a 5-star review',
-            time: '2 days ago',
-            color: AppTheme.accentColor,
-          ),
-        ],
-      ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => Center(child: Text('Error: $err')),
     );
   }
+}
+
+int _totalApplicants(WidgetRef ref, List<Job> jobs) {
+  return jobs.fold<int>(
+      0, (sum, j) => sum + (ref.read(_applicantCountProvider(j.id)).value ?? 0));
 }
 
 class _StatCard extends StatelessWidget {
@@ -176,9 +150,7 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textSecondary,
-              ),
+                fontSize: 11, color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -187,23 +159,16 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ActiveJobCard extends StatelessWidget {
-  final String title;
-  final int applicants;
-  final String budget;
-  final int daysAgo;
+class _ActiveJobCard extends ConsumerWidget {
+  final Job job;
 
-  const _ActiveJobCard({
-    required this.title,
-    required this.applicants,
-    required this.budget,
-    required this.daysAgo,
-  });
+  const _ActiveJobCard({required this.job});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final applicantCount = ref.watch(_applicantCountProvider(job.id));
     return Card(
-      margin: EdgeInsets.zero,
+      margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
@@ -211,96 +176,39 @@ class _ActiveJobCard extends StatelessWidget {
             color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.work_outline,
+          child: const Icon(Icons.work_outlined,
               color: AppTheme.primaryColor, size: 22),
         ),
-        title: Text(title,
+        title: Text(job.title,
             style: const TextStyle(fontSize: 14),
             maxLines: 1,
             overflow: TextOverflow.ellipsis),
         subtitle: Row(
           children: [
-            Text('$applicants applicants',
+            Text('${applicantCount.value ?? 0} applicants',
                 style: const TextStyle(fontSize: 12, color: AppTheme.accentDark)),
             const SizedBox(width: 8),
-            Text(budget,
+            Text(job.budgetDisplay,
                 style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
           ],
         ),
-        trailing: Text('$daysAgo d',
-            style: const TextStyle(
-                fontSize: 11, color: AppTheme.textDisabled)),
-        onTap: () {},
-      ),
-    );
-  }
-}
-
-class _SavedWorkerAvatar extends StatelessWidget {
-  final String name;
-  final double rating;
-
-  const _SavedWorkerAvatar({required this.name, required this.rating});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-          child: Text(
-            name[0],
-            style: const TextStyle(
-              color: AppTheme.primaryColor,
-              fontWeight: FontWeight.bold,
+        trailing: const Icon(Icons.chevron_right_rounded,
+            size: 18, color: AppTheme.textDisabled),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => JobDetailView(job: job),
             ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(name,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.star_rounded,
-                size: 10, color: AppTheme.accentColor),
-            const SizedBox(width: 2),
-            Text(rating.toStringAsFixed(1),
-                style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ActivityTile extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final String time;
-  final Color color;
-
-  const _ActivityTile({
-    required this.icon,
-    required this.text,
-    required this.time,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        dense: true,
-        leading: Icon(icon, color: color, size: 20),
-        title: Text(text,
-            style: const TextStyle(fontSize: 13)),
-        trailing: Text(time,
-            style: const TextStyle(
-                fontSize: 11, color: AppTheme.textDisabled)),
+          );
+        },
       ),
     );
   }
 }
+
+/// Lightweight applicant-count watcher for a single job.
+final _applicantCountProvider =
+    FutureProvider.family<int, String>((ref, jobId) async {
+  return ref.watch(supabaseRepositoryProvider).countApplicants(jobId);
+});

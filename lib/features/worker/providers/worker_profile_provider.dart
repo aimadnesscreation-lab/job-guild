@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/services/ai_service_provider.dart';
 import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
+import 'package:local_services_marketplace/features/worker/repositories/worker_repository.dart';
+import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 
 /// State holder for the worker profile editing flow.
 /// Manages form fields, availability, portfolio, and AI generation state.
@@ -54,23 +57,35 @@ class WorkerProfileState {
 class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
   @override
   WorkerProfileState build() {
+    // Seed from the real logged-in user's profile when available.
+    // myWorkerProfileProvider is a FutureProvider; we read its current value
+    // (null/placeholder until it resolves) and listen for the resolved
+    // profile so the form populates once Supabase responds.
+    // Seed from the real logged-in user's profile when available.
+    // myWorkerProfileProvider is a FutureProvider; ref.watch gives us its
+    // current AsyncValue so we can use the resolved profile synchronously
+    // (falling back to a placeholder until it loads).
+    final asyncProfile = ref.watch(myWorkerProfileProvider);
+    final real = asyncProfile.value;
+
     return WorkerProfileState(
-      profile: const WorkerProfile(
-        userId: 'user-placeholder',
-        fullName: 'Ahmed Khan',
-        headline: 'Experienced Plumber & Electrician',
-        bio:
-            'I have been working in home maintenance for over 8 years. Specializing in plumbing, electrical repairs, and general home improvement.',
-        yearsExperience: 8,
-        hourlyRatePkr: 500,
-        availabilityStatus: AvailabilityStatus.today,
-        serviceRadiusKm: 15,
-        averageRating: 4.5,
-        totalJobsCompleted: 127,
-        responseTimeAvgMinutes: 12,
-        categories: ['Plumbing', 'Electrical', 'Painting'],
-        isVerified: true,
-      ),
+      profile: real ??
+          const WorkerProfile(
+            userId: 'user-placeholder',
+            fullName: 'Ahmed Khan',
+            headline: 'Experienced Plumber & Electrician',
+            bio:
+                'I have been working in home maintenance for over 8 years. Specializing in plumbing, electrical repairs, and general home improvement.',
+            yearsExperience: 8,
+            hourlyRatePkr: 500,
+            availabilityStatus: AvailabilityStatus.today,
+            serviceRadiusKm: 15,
+            averageRating: 4.5,
+            totalJobsCompleted: 127,
+            responseTimeAvgMinutes: 12,
+            categories: ['Plumbing', 'Electrical', 'Painting'],
+            isVerified: true,
+          ),
     );
   }
 
@@ -241,8 +256,12 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
   Future<void> saveProfile() async {
     state = state.copyWith(isSaving: true, errorMessage: null);
     try {
-      // TODO: Persist to Supabase
-      await Future.delayed(const Duration(milliseconds: 500));
+      final repo = ref.read(workerRepositoryProvider);
+      final userId = ref.read(currentUserProvider)?.id ?? state.profile.userId;
+      final profile = userId != state.profile.userId
+          ? state.profile.copyWith(userId: userId)
+          : state.profile;
+      await repo?.updateWorkerProfile(userId, profile);
       state = state.copyWith(isSaving: false);
     } catch (e) {
       state = state.copyWith(

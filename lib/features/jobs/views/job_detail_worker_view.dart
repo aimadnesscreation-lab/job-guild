@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 
 /// Worker's view of a job — shows job info, employer rating, distance,
-/// and an "I'm Interested" button.
-class JobDetailWorkerView extends StatefulWidget {
+/// and an "I'm Interested" button (persisted via applyForJob).
+class JobDetailWorkerView extends ConsumerStatefulWidget {
   final Job job;
 
   const JobDetailWorkerView({super.key, required this.job});
 
   @override
-  State<JobDetailWorkerView> createState() => _JobDetailWorkerViewState();
+  ConsumerState<JobDetailWorkerView> createState() =>
+      _JobDetailWorkerViewState();
 }
 
-class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
+class _JobDetailWorkerViewState extends ConsumerState<JobDetailWorkerView> {
   bool _isInterested = false;
 
   @override
@@ -21,15 +25,13 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
     final job = widget.job;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Details'),
-      ),
+      appBar: AppBar(title: const Text('Job Details')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── Job Header Card ─────────────────────────────
+            // — Job Header Card —
             Card(
               margin: EdgeInsets.zero,
               child: Padding(
@@ -147,7 +149,7 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Employer Info ───────────────────────────────
+            // — Employer Info —
             Text(
               'Posted by',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -159,7 +161,8 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
               margin: EdgeInsets.zero,
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: AppTheme.verifiedBadge.withValues(alpha: 0.1),
+                  backgroundColor:
+                      AppTheme.verifiedBadge.withValues(alpha: 0.1),
                   child: const Icon(Icons.person_rounded,
                       color: AppTheme.verifiedBadge),
                 ),
@@ -184,7 +187,7 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
                         size: 13, color: AppTheme.textSecondary),
                     const SizedBox(width: 2),
                     Text(
-                      '${(2.3 + (job.id.hashCode % 10).toDouble()).toStringAsFixed(1)} km',
+                      '${(2.3 + (job.id.hashCode % 10)).toStringAsFixed(1)} km',
                       style: const TextStyle(
                           fontSize: 12, color: AppTheme.textSecondary),
                     ),
@@ -194,7 +197,7 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Required Skills ─────────────────────────────
+            // — Required Skills —
             if (job.aiExtractedMetadata?.requiredSkills != null &&
                 job.aiExtractedMetadata!.requiredSkills.isNotEmpty)
               Column(
@@ -223,7 +226,7 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
                 ],
               ),
 
-            // ─── Similar Jobs ────────────────────────────────
+            // — Similar Jobs —
             Text(
               'Similar Jobs Nearby',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -246,7 +249,7 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
           ],
         ),
       ),
-      // ─── Bottom Action ──────────────────────────────────────
+      // — Bottom Action —
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(
           16,
@@ -293,15 +296,21 @@ class _JobDetailWorkerViewState extends State<JobDetailWorkerView> {
                       ),
                     )
                   : FilledButton.icon(
-                      onPressed: () {
+                      onPressed: _isInterested ? null : () async {
+                        final userId = ref.read(currentUserProvider)?.id;
+                        if (userId == null) return;
                         setState(() => _isInterested = true);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Employer will be notified of your interest'),
-                            backgroundColor: AppTheme.primaryColor,
-                          ),
-                        );
+                        final repo = ref.read(supabaseRepositoryProvider);
+                        await repo.applyForJob(job.id, userId);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Employer will be notified of your interest'),
+                              backgroundColor: AppTheme.primaryColor,
+                            ),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.thumb_up_alt_outlined),
                       label: const Text("I'm Interested"),

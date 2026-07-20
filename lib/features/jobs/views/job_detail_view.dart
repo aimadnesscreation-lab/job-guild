@@ -1,20 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
+import 'package:local_services_marketplace/features/chat/views/chat_detail_view.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 
 /// Employer's view of a job — shows interested workers with match scores,
-/// "Hire" and "Mark Complete" actions.
-class JobDetailView extends StatefulWidget {
+/// "Hire" and "Mark Complete" actions (all persisted to Supabase).
+class JobDetailView extends ConsumerStatefulWidget {
   final Job job;
 
   const JobDetailView({super.key, required this.job});
 
   @override
-  State<JobDetailView> createState() => _JobDetailViewState();
+  ConsumerState<JobDetailView> createState() => _JobDetailViewState();
 }
 
-class _JobDetailViewState extends State<JobDetailView> {
+class _JobDetailViewState extends ConsumerState<JobDetailView> {
+  List<Map<String, dynamic>> _applicants = const [];
   String? _hiredWorkerId;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApplicants();
+  }
+
+  Future<void> _loadApplicants() async {
+    setState(() => _loading = true);
+    final repo = ref.read(supabaseRepositoryProvider);
+    final list = await repo.getApplicants(widget.job.id);
+    if (mounted) {
+      setState(() {
+        _applicants = list;
+        // Pre-select a hired worker if any application is already hired.
+        _hiredWorkerId = list
+            .where((a) => a['status'] == 'hired')
+            .map((a) => a['worker_id'] as String?)
+            .firstWhere((id) => id != null, orElse: () => null);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _hire(String workerId) async {
+    final repo = ref.read(supabaseRepositoryProvider);
+    await repo.hireWorker(widget.job.id, workerId);
+    if (mounted) {
+      setState(() => _hiredWorkerId = workerId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Worker hired!'),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _markComplete() async {
+    final repo = ref.read(supabaseRepositoryProvider);
+    await repo.updateJobStatus(widget.job.id, JobStatus.completed);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Job marked as complete!'),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    }
+  }
+
+  String _workerName(Map<String, dynamic> a) {
+    final wp = a['worker_profiles'] as Map<String, dynamic>?;
+    final user = wp?['users'] as Map<String, dynamic>?;
+    return user?['full_name'] as String? ?? 'Worker';
+  }
+
+  double _workerRating(Map<String, dynamic> a) {
+    final wp = a['worker_profiles'] as Map<String, dynamic>?;
+    return (wp?['average_rating'] as num?)?.toDouble() ?? 0;
+  }
+
+  bool _isVerified(Map<String, dynamic> a) {
+    final wp = a['worker_profiles'] as Map<String, dynamic>?;
+    return wp?['is_verified'] as bool? ?? false;
+  }
+
+  int _matchScore(Map<String, dynamic> a) {
+    final rating = _workerRating(a);
+    final verified = _isVerified(a);
+    final score = (rating / 5 * 70).round() + (verified ? 25 : 0) + 5;
+    return score.clamp(0, 100);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,248 +107,205 @@ class _JobDetailViewState extends State<JobDetailView> {
               Icons.edit_outlined,
               color: job.isOpen ? AppTheme.primaryColor : AppTheme.textDisabled,
             ),
-            onPressed: job.isOpen
-                ? () {
-                    // TODO: Edit job
-                  }
-                : null,
+            onPressed: job.isOpen ? () {} : null,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─── Job Header ──────────────────────────────────
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // ─── Job Header ──────────────────────────────────
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (job.isInstant)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentColor,
-                              borderRadius: BorderRadius.circular(4),
+                        Row(
+                          children: [
+                            if (job.isInstant)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('⚡ URGENT',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                            if (job.isInstant) const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                job.status.name.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                            child: const Text('⚡ URGENT',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        if (job.isInstant) const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            job.status.name.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                            const Spacer(),
+                            _StatusBadge(status: job.status),
+                          ],
                         ),
-                        const Spacer(),
-                        _StatusBadge(status: job.status),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      job.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      job.description,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.monetization_on_outlined,
-                            size: 16, color: AppTheme.accentDark),
-                        const SizedBox(width: 4),
+                        const SizedBox(height: 12),
                         Text(
-                          job.budgetDisplay,
+                          job.title,
                           style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.accentDark,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        const Icon(Icons.location_on_outlined,
-                            size: 16, color: AppTheme.textSecondary),
-                        const SizedBox(width: 4),
+                        const SizedBox(height: 8),
                         Text(
-                          job.locationText ?? 'Lahore',
+                          job.description,
                           style: const TextStyle(
-                              color: AppTheme.textSecondary),
+                            color: AppTheme.textSecondary,
+                            height: 1.5,
+                          ),
                         ),
-                      ],
-                    ),
-                    if (job.aiExtractedMetadata != null) ...[
-                      const SizedBox(height: 12),
-                      const Divider(),
-                      Row(
-                        children: [
-                          const Icon(Icons.auto_awesome,
-                              size: 14, color: AppTheme.accentColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            'AI: ${job.aiExtractedMetadata!.category} • ~${job.aiExtractedMetadata!.estimatedDurationHours}h',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(Icons.monetization_on_outlined,
+                                size: 16, color: AppTheme.accentDark),
+                            const SizedBox(width: 4),
+                            Text(
+                              job.budgetDisplay,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.accentDark,
+                              ),
                             ),
+                            const SizedBox(width: 16),
+                            const Icon(Icons.location_on_outlined,
+                                size: 16, color: AppTheme.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              job.locationText ?? 'Lahore',
+                              style: const TextStyle(
+                                  color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                        if (job.aiExtractedMetadata != null) ...[
+                          const SizedBox(height: 12),
+                          const Divider(),
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome,
+                                  size: 14, color: AppTheme.accentColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                'AI: ${job.aiExtractedMetadata!.category} • ~${job.aiExtractedMetadata!.estimatedDurationHours}h',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ─── Interested Workers ──────────────────────────
-            Text(
-              'Interested Workers',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            ..._interestedWorkers.map((worker) => _WorkerCard(
-                  worker: worker,
-                  isHired: worker.id == _hiredWorkerId,
-                  onHire: () {
-                    setState(() => _hiredWorkerId = worker.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Hired ${worker.name} for this job!'),
-                        backgroundColor: AppTheme.primaryColor,
-                      ),
-                    );
-                  },
-                  onMessage: () {
-                    // TODO: Navigate to chat
-                  },
-                )),
-            const SizedBox(height: 24),
-
-            // ─── Actions ─────────────────────────────────────
-            if (_hiredWorkerId != null && job.isOpen)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    // TODO: Mark as complete
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Job marked as complete!'),
-                        backgroundColor: AppTheme.primaryColor,
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.check_circle_rounded),
-                  label: const Text('Mark Complete'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.primaryDark,
+                      ],
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-      ),
+                const SizedBox(height: 20),
+
+                // ─── Interested Workers ──────────────────────────
+                Text(
+                  'Interested Workers',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                if (_applicants.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text('No applicants yet.',
+                          style:
+                              TextStyle(color: AppTheme.textSecondary)),
+                    ),
+                  )
+                else
+                  ..._applicants.map((a) {
+                    final workerId = a['worker_id'] as String? ?? '';
+                    final isHired = workerId == _hiredWorkerId;
+                    return _WorkerCard(
+                      name: _workerName(a),
+                      rating: _workerRating(a),
+                      isVerified: _isVerified(a),
+                      matchScore: _matchScore(a),
+                      isHired: isHired,
+                      onHire: () => _hire(workerId),
+                      onMessage: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatDetailView(
+                              conversationId: widget.job.id,
+                              otherUserName: _workerName(a),
+                              jobTitle: widget.job.title,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }),
+                const SizedBox(height: 24),
+
+                // ─── Actions ─────────────────────────────────────
+                if (_hiredWorkerId != null && job.isOpen)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _markComplete,
+                      icon: const Icon(Icons.check_circle_rounded),
+                      label: const Text('Mark Complete'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primaryDark,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
-
-  static final _interestedWorkers = [
-    _Worker(
-      id: 'w1',
-      name: 'Ahmed Khan',
-      rating: 4.8,
-      totalJobs: 127,
-      distance: '1.2 km',
-      responseTime: '5 min',
-      matchScore: 95,
-      isVerified: true,
-    ),
-    _Worker(
-      id: 'w2',
-      name: 'Imran Ali',
-      rating: 4.5,
-      totalJobs: 83,
-      distance: '2.5 km',
-      responseTime: '12 min',
-      matchScore: 82,
-      isVerified: true,
-    ),
-    _Worker(
-      id: 'w3',
-      name: 'Sajid Mehmood',
-      rating: 4.2,
-      totalJobs: 45,
-      distance: '3.8 km',
-      responseTime: '30 min',
-      matchScore: 68,
-      isVerified: false,
-    ),
-  ];
 }
 
-// ─── Supporting types & widgets ──────────────────────────────────────────
-
-class _Worker {
-  final String id;
-  final String name;
-  final double rating;
-  final int totalJobs;
-  final String distance;
-  final String responseTime;
-  final int matchScore;
-  final bool isVerified;
-
-  const _Worker({
-    required this.id,
-    required this.name,
-    required this.rating,
-    required this.totalJobs,
-    required this.distance,
-    required this.responseTime,
-    required this.matchScore,
-    required this.isVerified,
-  });
-}
+// ─── Supporting widgets ──────────────────────────────────────────
 
 class _WorkerCard extends StatelessWidget {
-  final _Worker worker;
+  final String name;
+  final double rating;
+  final bool isVerified;
+  final int matchScore;
   final bool isHired;
   final VoidCallback onHire;
   final VoidCallback onMessage;
 
   const _WorkerCard({
-    required this.worker,
+    required this.name,
+    required this.rating,
+    required this.isVerified,
+    required this.matchScore,
     required this.isHired,
     required this.onHire,
     required this.onMessage,
@@ -289,9 +324,10 @@ class _WorkerCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 22,
-                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  backgroundColor:
+                      AppTheme.primaryColor.withValues(alpha: 0.1),
                   child: Text(
-                    worker.name[0],
+                    name.isNotEmpty ? name[0] : '?',
                     style: const TextStyle(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,
@@ -307,12 +343,12 @@ class _WorkerCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            worker.name,
+                            name,
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (worker.isVerified) ...[
+                          if (isVerified) ...[
                             const SizedBox(width: 4),
                             const Icon(Icons.verified_rounded,
                                 size: 16, color: AppTheme.verifiedBadge),
@@ -326,26 +362,10 @@ class _WorkerCard extends StatelessWidget {
                               size: 13, color: AppTheme.accentColor),
                           const SizedBox(width: 2),
                           Text(
-                            '${worker.rating}',
+                            '${rating.toStringAsFixed(1)}',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${worker.totalJobs} jobs',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            worker.distance,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
                             ),
                           ),
                         ],
@@ -355,12 +375,11 @@ class _WorkerCard extends StatelessWidget {
                 ),
                 // Match score badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: worker.matchScore >= 90
+                    color: matchScore >= 90
                         ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                        : worker.matchScore >= 75
+                        : matchScore >= 75
                             ? AppTheme.accentColor.withValues(alpha: 0.1)
                             : AppTheme.surfaceColor,
                     borderRadius: BorderRadius.circular(8),
@@ -368,13 +387,13 @@ class _WorkerCard extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        '${worker.matchScore}%',
+                        '$matchScore%',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: worker.matchScore >= 90
+                          color: matchScore >= 90
                               ? AppTheme.primaryColor
-                              : worker.matchScore >= 75
+                              : matchScore >= 75
                                   ? AppTheme.accentDark
                                   : AppTheme.textSecondary,
                         ),
@@ -394,15 +413,10 @@ class _WorkerCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                _MiniStat(
-                    icon: Icons.timer_outlined,
-                    text: worker.responseTime),
-                const SizedBox(width: 12),
-                const Spacer(),
                 if (isHired)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -427,14 +441,16 @@ class _WorkerCard extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: onMessage,
-                      child: const Text('Message', style: TextStyle(fontSize: 12)),
+                      child: const Text('Message',
+                          style: TextStyle(fontSize: 12)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton(
                       onPressed: onHire,
-                      child: const Text('Hire', style: TextStyle(fontSize: 12)),
+                      child: const Text('Hire',
+                          style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -443,27 +459,6 @@ class _WorkerCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _MiniStat({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: AppTheme.textSecondary),
-        const SizedBox(width: 2),
-        Text(text,
-            style: const TextStyle(
-                fontSize: 11, color: AppTheme.textSecondary)),
-      ],
     );
   }
 }
@@ -496,7 +491,8 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         status.name.toUpperCase(),
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+            fontSize: 11, color: color, fontWeight: FontWeight.w600),
       ),
     );
   }

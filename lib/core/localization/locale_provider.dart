@@ -14,14 +14,3 @@ class LocaleNotifier extends Notifier<String> {
 final localeProvider =
     NotifierProvider<LocaleNotifier, String>(() => LocaleNotifier());
 
-/// Provides localized strings based on current locale
-final localeStringsProvider = Provider<AppStrings>((ref) {
-  final locale = ref.watch(localeProvider);
-  return AppStrings(locale);
-});
-
-/// The Locale object derived from the locale provider
-final localeObjectProvider = Provider<Locale>((ref) {
-  final code = ref.watch(localeProvider);
-  return Locale(code);
-});

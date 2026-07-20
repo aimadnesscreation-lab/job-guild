@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
+import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
+import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
 
 /// Search and browse workers screen with filters: category, distance,
-/// price range, rating, availability, verified-only.
-class SearchWorkersView extends StatefulWidget {
+/// price range, rating, availability, verified-only. Backed by the live
+/// nearby-workers query (PostGIS), with local filtering on top.
+class SearchWorkersView extends ConsumerStatefulWidget {
   const SearchWorkersView({super.key});
 
   @override
-  State<SearchWorkersView> createState() => _SearchWorkersViewState();
+  ConsumerState<SearchWorkersView> createState() => _SearchWorkersViewState();
 }
 
-class _SearchWorkersViewState extends State<SearchWorkersView> {
+class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
   final _searchController = TextEditingController();
   String _selectedCategory = 'All';
   double _maxDistance = 15;
@@ -28,6 +33,26 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
     'Any', 'Today', 'Tomorrow', 'Weekdays', 'Weekends', 'Morning', 'Evening',
   ];
 
+  List<_WorkerResult> get _fromProvider {
+    final async = ref.watch(nearbyWorkersProvider);
+    final data = async.value ?? [];
+    return data.map(_WorkerResult.fromMap).toList();
+  }
+
+  List<_WorkerResult> get _filtered {
+    final q = _searchController.text.toLowerCase();
+    return _fromProvider.where((w) {
+      final matchesCategory =
+          _selectedCategory == 'All' || w.category == _selectedCategory;
+      final matchesRating = w.rating >= _minRating;
+      final matchesVerified = !_verifiedOnly || w.isVerified;
+      final matchesSearch = q.isEmpty ||
+          w.name.toLowerCase().contains(q) ||
+          w.category.toLowerCase().contains(q);
+      return matchesCategory && matchesRating && matchesVerified && matchesSearch;
+    }).toList();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -36,10 +61,9 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
 
   @override
   Widget build(BuildContext context) {
+    final async = ref.watch(nearbyWorkersProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Find Workers'),
-      ),
+      appBar: AppBar(title: const Text('Find Workers')),
       body: Column(
         children: [
           // ─── Search Bar ────────────────────────────────────
@@ -82,7 +106,7 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
-                    label: 'Min ${_minRating.toStringAsFixed(1)} ⭐',
+                    label: 'Min ${_minRating.toStringAsFixed(1)} ★',
                     icon: Icons.star_rounded,
                     isSelected: _minRating > 3.0,
                     onTap: () => _showRatingFilter(),
@@ -141,17 +165,20 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
 
           // ─── Results ───────────────────────────────────────
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: _searchResults
-                  .where((w) =>
-                      _selectedCategory == 'All' ||
-                      w.category == _selectedCategory)
-                  .where((w) => w.rating >= _minRating)
-                  .where((w) => !_verifiedOnly || w.isVerified)
-                  .map((worker) => _WorkerResultCard(worker: worker))
-                  .toList(),
-            ),
+            child: async.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? const Center(
+                        child: Text('No workers match your filters.',
+                            style: TextStyle(color: AppTheme.textSecondary)),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        children: _filtered
+                            .map((worker) =>
+                                _WorkerResultCard(worker: worker))
+                            .toList(),
+                      ),
           ),
         ],
       ),
@@ -172,8 +199,7 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Minimum Rating',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Slider(
                 value: _minRating,
@@ -189,7 +215,7 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${_minRating.toStringAsFixed(1)} ⭐',
+                  Text('${_minRating.toStringAsFixed(1)} ★',
                       style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           color: AppTheme.accentDark)),
@@ -220,8 +246,7 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Maximum Distance',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Slider(
                 value: _maxDistance,
@@ -267,8 +292,7 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Availability',
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -292,76 +316,11 @@ class _SearchWorkersViewState extends State<SearchWorkersView> {
       ),
     );
   }
-
-  // ─── Mock Data ─────────────────────────────────────────────
-
-  static final _searchResults = [
-    _WorkerResult(
-      name: 'Ahmed Khan',
-      rating: 4.8,
-      totalJobs: 127,
-      distance: '1.2 km',
-      hourlyRate: 'Rs. 500/hr',
-      category: 'Plumbing',
-      isVerified: true,
-      availability: 'Today',
-    ),
-    _WorkerResult(
-      name: 'Imran Ali',
-      rating: 4.5,
-      totalJobs: 83,
-      distance: '2.5 km',
-      hourlyRate: 'Rs. 400/hr',
-      category: 'Electrical',
-      isVerified: true,
-      availability: 'Today',
-    ),
-    _WorkerResult(
-      name: 'Sana Malik',
-      rating: 4.9,
-      totalJobs: 210,
-      distance: '3.2 km',
-      hourlyRate: 'Rs. 600/hr',
-      category: 'Tutor',
-      isVerified: true,
-      availability: 'Weekdays',
-    ),
-    _WorkerResult(
-      name: 'Sajid Mehmood',
-      rating: 4.2,
-      totalJobs: 45,
-      distance: '3.8 km',
-      hourlyRate: 'Rs. 350/hr',
-      category: 'Painting',
-      isVerified: false,
-      availability: 'Weekends',
-    ),
-    _WorkerResult(
-      name: 'Faisal Ahmed',
-      rating: 4.6,
-      totalJobs: 98,
-      distance: '0.8 km',
-      hourlyRate: 'Rs. 450/hr',
-      category: 'Cleaning',
-      isVerified: true,
-      availability: 'Today',
-    ),
-    _WorkerResult(
-      name: 'Bilal Hussain',
-      rating: 4.3,
-      totalJobs: 62,
-      distance: '4.1 km',
-      hourlyRate: 'Rs. 300/hr',
-      category: 'General Labor',
-      isVerified: false,
-      availability: 'Morning',
-    ),
-  ];
 }
 
-// ─── Supporting types & widgets ──────────────────────────────────────────
-
+/// Result model mapped from the live nearby-workers query.
 class _WorkerResult {
+  final String id;
   final String name;
   final double rating;
   final int totalJobs;
@@ -372,6 +331,7 @@ class _WorkerResult {
   final String availability;
 
   const _WorkerResult({
+    required this.id,
     required this.name,
     required this.rating,
     required this.totalJobs,
@@ -381,6 +341,25 @@ class _WorkerResult {
     required this.isVerified,
     required this.availability,
   });
+
+  factory _WorkerResult.fromMap(Map<String, dynamic> m) {
+    final rating = (m['average_rating'] as num?)?.toDouble() ?? 0;
+    final distanceM = (m['distance_meters'] as num?)?.toDouble() ?? 0;
+    final hourly = (m['hourly_rate_pkr'] as num?)?.toInt();
+    return _WorkerResult(
+      id: m['id'] as String? ?? '',
+      name: m['full_name'] as String? ?? 'Worker',
+      rating: rating,
+      totalJobs: (m['total_jobs_completed'] as num?)?.toInt() ?? 0,
+      distance: distanceM > 0
+          ? '${(distanceM / 1000).toStringAsFixed(1)} km'
+          : '—',
+      hourlyRate: hourly != null ? 'Rs. $hourly/hr' : 'Negotiable',
+      category: m['category'] as String? ?? 'General Labor',
+      isVerified: m['is_verified'] as bool? ?? false,
+      availability: m['availability'] as String? ?? 'Today',
+    );
+  }
 }
 
 class _WorkerResultCard extends StatelessWidget {
@@ -395,7 +374,22 @@ class _WorkerResultCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // TODO: Navigate to public profile
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WorkerPublicProfileView(
+                profile: WorkerProfile(
+                  userId: worker.id,
+                  fullName: worker.name,
+                  headline: worker.category,
+                  averageRating: worker.rating,
+                  totalJobsCompleted: worker.totalJobs,
+                  isVerified: worker.isVerified,
+                  availabilityStatus: _availabilityFromString(worker.availability),
+                ),
+              ),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -405,7 +399,7 @@ class _WorkerResultCard extends StatelessWidget {
                 radius: 26,
                 backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                 child: Text(
-                  worker.name[0],
+                  worker.name.isNotEmpty ? worker.name[0] : '?',
                   style: const TextStyle(
                     color: AppTheme.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -422,9 +416,7 @@ class _WorkerResultCard extends StatelessWidget {
                       children: [
                         Text(
                           worker.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         if (worker.isVerified) ...[
                           const SizedBox(width: 4),
@@ -437,8 +429,7 @@ class _WorkerResultCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -459,17 +450,13 @@ class _WorkerResultCard extends StatelessWidget {
                         Text(
                           '${worker.rating}',
                           style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                            fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '(${worker.totalJobs} jobs)',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
+                            fontSize: 11, color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -482,9 +469,7 @@ class _WorkerResultCard extends StatelessWidget {
                         Text(
                           worker.distance,
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
+                            fontSize: 11, color: AppTheme.textSecondary),
                         ),
                         const SizedBox(width: 8),
                         const Icon(Icons.access_time_rounded,
@@ -493,9 +478,7 @@ class _WorkerResultCard extends StatelessWidget {
                         Text(
                           worker.availability,
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
+                            fontSize: 11, color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -515,7 +498,23 @@ class _WorkerResultCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   OutlinedButton(
                     onPressed: () {
-                      // TODO: Navigate to profile
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkerPublicProfileView(
+                            profile: WorkerProfile(
+                              userId: worker.id,
+                              fullName: worker.name,
+                              headline: worker.category,
+                              averageRating: worker.rating,
+                              totalJobsCompleted: worker.totalJobs,
+                              isVerified: worker.isVerified,
+                              availabilityStatus:
+                                  _availabilityFromString(worker.availability),
+                            ),
+                          ),
+                        ),
+                      );
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
@@ -533,6 +532,13 @@ class _WorkerResultCard extends StatelessWidget {
       ),
     );
   }
+}
+
+AvailabilityStatus _availabilityFromString(String s) {
+  for (final v in AvailabilityStatus.values) {
+    if (v.name.toLowerCase() == s.toLowerCase()) return v;
+  }
+  return AvailabilityStatus.today;
 }
 
 class _FilterChip extends StatelessWidget {
@@ -553,9 +559,7 @@ class _FilterChip extends StatelessWidget {
     return ActionChip(
       avatar: Icon(icon, size: 14,
           color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary),
-      label: Text(label, style: TextStyle(
-          fontSize: 12,
-          color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary)),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       onPressed: onTap,
       side: BorderSide(
         color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,

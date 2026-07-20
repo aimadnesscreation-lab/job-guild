@@ -6,14 +6,28 @@ final authStateChangesProvider = StreamProvider<AuthState>((ref) {
   return Supabase.instance.client.auth.onAuthStateChange;
 });
 
-/// Provides the current user directly
+/// Provides the current user directly.
+/// Returns null when `Supabase` has not been initialized yet (e.g. in widget
+/// tests) instead of throwing on `Supabase.instance.client`.
 final currentUserProvider = Provider<User?>((ref) {
-  return Supabase.instance.client.auth.currentUser;
+  try {
+    return Supabase.instance.client.auth.currentUser;
+  } catch (_) {
+    return null;
+  }
 });
 
-/// Provides access to the Supabase client
-final supabaseClientProvider = Provider<SupabaseClient>((ref) {
-  return Supabase.instance.client;
+/// Provides access to the Supabase client.
+/// Returns null when `Supabase` has not been initialized yet (e.g. in widget
+/// tests) instead of throwing on `Supabase.instance.client`. Consumers must
+/// handle a null client (the app always initializes Supabase in `main()`
+/// before any UI is built, so this is only ever null in tests).
+final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
+  try {
+    return Supabase.instance.client;
+  } catch (_) {
+    return null;
+  }
 });
 
 /// Whether the user is authenticated

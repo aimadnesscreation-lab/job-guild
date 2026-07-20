@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/constants/app_constants.dart';
@@ -23,7 +22,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
+    publishableKey: AppConstants.supabaseAnonKey,
   );
 
   runApp(
@@ -39,13 +38,15 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateChangesProvider);
-    final locale = ref.watch(localeObjectProvider);
+    // Watch the locale so switching language (in onboarding / settings)
+    // rebuilds MaterialApp with the new locale and re-localizes the UI.
+    final locale = ref.watch(localeProvider);
 
     return MaterialApp(
       title: 'Local Services Marketplace',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      locale: locale,
+      locale: Locale(locale),
       supportedLocales: const [Locale('en'), Locale('ur')],
       localizationsDelegates: const [
         DefaultMaterialLocalizations.delegate,

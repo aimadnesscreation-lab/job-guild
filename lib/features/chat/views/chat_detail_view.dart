@@ -39,6 +39,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   @override
   void dispose() {
+    ref.read(chatProvider.notifier).disposeChannel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

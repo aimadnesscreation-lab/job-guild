@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
+import 'package:local_services_marketplace/features/chat/views/chat_detail_view.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_profile_provider.dart';
 
 /// Public (read-only) worker profile as seen by an employer.
@@ -263,15 +266,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
             children: [
               // Save/Favorite button
               IconButton.outlined(
-                onPressed: () {
-                  // TODO: Toggle favorite
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Worker saved to favorites'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                onPressed: () => _toggleFavorite(context, ref, p.userId),
                 icon: const Icon(Icons.bookmark_border_rounded),
                 tooltip: 'Save',
               ),
@@ -279,9 +274,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
               // Message button
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Navigate to chat
-                  },
+                  onPressed: () => _message(context, ref, p),
                   icon: const Icon(Icons.chat_outlined),
                   label: const Text('Message'),
                 ),
@@ -290,9 +283,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
               // Hire button
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () {
-                    // TODO: Initiate hire flow
-                  },
+                  onPressed: () => _message(context, ref, p),
                   icon: const Icon(Icons.handshake_rounded),
                   label: const Text('Hire'),
                 ),
@@ -305,6 +296,37 @@ class WorkerPublicProfileView extends ConsumerWidget {
   }
 }
 
+
+  void _toggleFavorite(BuildContext context, WidgetRef ref, String workerId) async {
+    final userId = ref.read(currentUserProvider)?.id;
+    if (userId == null) return;
+    try {
+      await ref.read(supabaseRepositoryProvider).toggleFavorite(userId, workerId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Worker saved to favorites')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save favorite')),
+        );
+      }
+    }
+  }
+
+  void _message(BuildContext context, WidgetRef ref, WorkerProfile p) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatDetailView(
+          conversationId: p.userId,
+          otherUserName: p.fullName,
+          jobTitle: 'Direct message',
+        ),
+      ),
+    );
+  }
 // ─── Public Profile Sub-widgets ─────────────────────────────────────────
 
 class _PublicProfileHeader extends StatelessWidget {

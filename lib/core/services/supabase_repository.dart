@@ -93,6 +93,38 @@ class SupabaseRepository {
         .update({'status': 'hired'})
         .eq('id', jobId);
   }
+  /// Count how many workers have applied to a given job. Used by the
+  /// employer dashboard to show applicant counts per active job.
+  Future<int> countApplicants(String jobId) async {
+    if (!_isConnected) return 0;
+    try {
+      final response = await _client!
+          .from('applications')
+          .select('worker_id')
+          .eq('job_id', jobId);
+      if (response is List) return response.length;
+      return 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  /// Fetch the applicants (workers who applied) for a job, joined with
+  /// their worker profile + user info so the employer dashboard can show
+  /// names, ratings, and verification in one round-trip.
+  Future<List<Map<String, dynamic>>> getApplicants(String jobId) async {
+    if (!_isConnected) return [];
+    try {
+      final response = await _client!
+          .from('applications')
+          .select('*, worker_profiles!inner(id, headline, is_verified, average_rating, total_jobs_completed, users!inner(full_name, profile_photo_url))')
+          .eq('job_id', jobId)
+          .order('created_at');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      return [];
+    }
+  }
+
 
   // ─── Worker Profiles ──────────────────────────────────────
 

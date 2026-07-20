@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 
 /// Settings screen — language, notification preferences, service radius,
 /// account, verification, logout, report/block management, delete account.
-class SettingsView extends StatefulWidget {
+class SettingsView extends ConsumerStatefulWidget {
   const SettingsView({super.key});
 
   @override
-  State<SettingsView> createState() => _SettingsViewState();
+  ConsumerState<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
+class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _notificationsEnabled = true;
   bool _jobAlertsEnabled = true;
   bool _messageAlertsEnabled = true;
@@ -23,7 +25,7 @@ class _SettingsViewState extends State<SettingsView> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          // ─── Account ──────────────────────────────────────────
+          // ─── Account ──────────────────────────────────
           _SectionHeader(title: 'Account'),
           ListTile(
             leading: CircleAvatar(
@@ -38,7 +40,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           const Divider(height: 1),
 
-          // ─── Verification ─────────────────────────────────────
+          // ─── Verification ─────────────────────────────
           _SectionHeader(title: 'Verification'),
           ListTile(
             leading: Container(
@@ -59,7 +61,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           const Divider(height: 1),
 
-          // ─── Language ─────────────────────────────────────────
+          // ─── Language ─────────────────────────────────
           _SectionHeader(title: 'App Language'),
           ListTile(
             leading: const Icon(Icons.language_rounded,
@@ -81,7 +83,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           const Divider(height: 1),
 
-          // ─── Notifications ────────────────────────────────────
+          // ─── Notifications ────────────────────────────
           _SectionHeader(title: 'Notifications'),
           SwitchListTile(
             secondary: const Icon(Icons.notifications_rounded,
@@ -111,7 +113,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           const Divider(height: 1),
 
-          // ─── Service Radius ───────────────────────────────────
+          // ─── Service Radius ───────────────────────────
           _SectionHeader(title: 'Service Area'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -143,7 +145,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           const Divider(height: 1),
 
-          // ─── Support ──────────────────────────────────────────
+          // ─── Support ──────────────────────────────────
           _SectionHeader(title: 'Support'),
           ListTile(
             leading: const Icon(Icons.help_outline,
@@ -172,9 +174,11 @@ class _SettingsViewState extends State<SettingsView> {
               context,
               'Log Out',
               'Are you sure you want to log out?',
-              () {
-                // TODO: Implement logout via Supabase Auth
-                Navigator.of(context).popUntil((route) => route.isFirst);
+              () async {
+                await ref.read(authProvider.notifier).signOut();
+                if (mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
               },
             ),
           ),

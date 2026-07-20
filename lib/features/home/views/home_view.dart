@@ -62,7 +62,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const SettingsView()),
+                          builder: (_) => SettingsView()),
                     ),
                   ),
                 ],
@@ -334,7 +334,7 @@ class _HomeFeedTab extends ConsumerWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const SettingsView()),
+                        builder: (_) => SettingsView()),
                   ),
                 ),
               ),
