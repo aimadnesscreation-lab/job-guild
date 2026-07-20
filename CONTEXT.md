@@ -6,9 +6,21 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (July 2026)
+## Current State (Updated 2026-07-20)
 
-### Branch: MVP Complete — screens navigable, Supabase live, 36 tests passing
+### Branch `main` — MVP complete, screens now wired to live Supabase data. Local commits ahead of `origin/main` (not yet pushed).
+
+**Status:** Builds clean (`dart analyze` → 0 errors). Tests run on **Chrome only**
+(`flutter test --platform=chrome`; native Linux fails — `google_maps_flutter` /
+`firebase_messaging` have no Linux desktop build). All committed work is green.
+
+**Recent work (commit `7beacba`, unpushed):** migrated to **supabase_flutter v2**
+(`Supabase.initialize(publishableKey:)` instead of `anonKey:`) and replaced mock
+UI with live Supabase-backed screens — notably the **employer dashboard** (live
+jobs + applicant counts via new `countApplicants`/`getApplicants`), **settings**
+(real `authProvider.signOut()` logout), and converted `job_detail`,
+`notifications`, `search_workers`, `worker_public_profile` to `Consumer` widgets.
+Chat provider now fully tears down realtime channels (`unsubscribe` + `removeChannel`).
 
 ## Architecture
 
@@ -73,7 +85,11 @@ test/
 ## Key Architecture Decisions
 
 ### State Management
-- **Riverpod v3** throughout. `Notifier` for mutable state (auth, chat, job posting). `StreamProvider` for live data (job feed). `Provider` for singletons (AI service).
+- **Riverpod v3** throughout (manual providers, no codegen). `Notifier` for mutable state (auth, chat, job posting). `StreamProvider` for live data (job feed). `Provider` for singletons (AI service).
+
+### Supabase SDK — v2 API
+- Package `supabase_flutter: ^2.16.0`. `Supabase.initialize(url:, publishableKey:)` (the v1 `anonKey:` param is gone).
+- **Test-safety rule:** `Supabase.instance.client` throws an `AssertionError` when `Supabase.initialize()` has not run. Widget tests do NOT initialize Supabase, so any provider built during a test must guard that access. The established pattern (see `auth_provider.dart`, `job_feed_provider.dart`): wrap the access in `try { … } catch (_) { return null / empty; }`. `currentUserProvider` and `supabaseClientProvider` (now `Provider<SupabaseClient?>`) return null when uninitialized; `liveJobFeedProvider` emits an empty list via a `StreamController` on catch (`Stream.empty()` / `Stream.value([])` leave `StreamProvider` stuck in `AsyncLoading` under Riverpod 3 — emit `[]` then close the controller). `workerRepositoryProvider` is nullable with short-circuiting callers. Production is unaffected: `main()` always initializes Supabase before building UI. Symptom of a missing guard: a `pumpAndSettle` test hangs on a perpetual `CircularProgressIndicator`, or throws `ProviderException: Tried to use a provider that is in error state`.
 
 ### Realtime Subscriptions
 - **Job Feed:** `liveJobFeedProvider` = `StreamProvider` using `supabase.from('jobs').stream(primaryKey: ['id'])`
@@ -103,24 +119,28 @@ test/
 2. ✅ Home Feed (Worker) — live jobs via Realtime
 3. ✅ Home Feed (Employer) — welcome card + quick actions
 4. ✅ Post a Job — AI parsing with 3-tier fallback
-5. ✅ Job Detail (Employer view) — placeholder
-6. ✅ Job Detail (Worker view) — placeholder
+5. ✅ Job Detail (Employer view) — wired to live job data + chat
+6. ✅ Job Detail (Worker view) — wired to live job data + apply flow
 7. ✅ Worker Profile (edit) — AI bio generation button
-8. ✅ Worker Profile (public view) — read-only with reviews
-9. ✅ Chat — realtime with message streaming
-10. ✅ Search/Browse Workers
+8. ✅ Worker Profile (public view) — read-only with reviews + favorite
+9. ✅ Chat — realtime with message streaming (channel fully torn down on exit)
+10. ✅ Search/Browse Workers — live worker feed
 11. ✅ Ratings & Review — mutual review flow
-12. ✅ Notifications screen
-13. ✅ Employer Dashboard
+12. ✅ Notifications screen — live notification list
+13. ✅ Employer Dashboard — **live jobs + applicant counts** (no longer mock stats)
 14. ✅ Worker Dashboard
-15. ✅ Settings — language, account, logout
+15. ✅ Settings — language, account, **real logout via `authProvider.signOut()`**
 
-## Test Suite (36 tests)
-- `flutter test` runs all 36 tests
-- `flutter test test/supabase_connection_test.dart` — live Supabase connectivity
-- `flutter test test/e2e_flow_test.dart` — schema validation (all 11 tables)
+## Test Suite (44 tests)
+> Run on Chrome: `export CHROME_EXECUTABLE=/usr/bin/google-chrome-stable && flutter test --platform=chrome`
+- `test/widget_test.dart` — **21** widget/UI tests (run without network; Supabase is NOT initialized, so providers must be test-guarded — see above)
+- `test/supabase_connection_test.dart` — **8** live Supabase connection tests (require network + anon key)
+- `test/e2e_flow_test.dart` — **15** schema-validation tests (require network)
+- `flutter test --platform=chrome` runs widget + connection tests (23). The 15 schema tests are in `e2e_flow_test.dart`.
 
 ## Open Tasks / Remaining Gaps
+- [ ] **Unpushed local commits:** `main` is ahead of `origin/main` by 3 commits
+      (`7beacba`, `cba69b6`, `c1f54c3`). Push when ready.
 - [ ] **AI Profile Generation:** Create `rapid-worker` Edge Function (similar to `bright-api` but for worker bios)
 - [ ] **Push Notifications:** Wire up FCM with Supabase Edge Function triggers
 - [ ] **Google Maps:** API key placeholder — need real key for map picker
@@ -129,3 +149,4 @@ test/
 - [ ] **Missing tables:** No `escrow`/`transactions` table yet (Phase 3)
 - [ ] **Desktop build:** `flutter create --platforms=linux` done but CMake/Ninja not available
 - [ ] **Chrome install:** Needed for web-based testing
+
