@@ -12,9 +12,7 @@
 
 ## Current State (Updated 2026-07-23 — Session 15)
 
-### Branch `main` — End-to-end audit: 6 more bugs found & fixed. 0 analyze issues. All 111 tests green.
-
-**Status:** Flutter tests **111/111** pass. **0 dart analyze issues**. Local commits ahead of `origin/main` (not yet pushed).
+### Branch `main` — End-to-end audit: 19 bugs found & fixed. 0 analyze issues. All 111 tests green. Pushed to origin.
 
 ### Latest Developments (2026-07-23 — Session 15: End-to-end audit — 19 bugs fixed)
 
@@ -281,14 +279,14 @@ test/
 | `send-sms/index_test.ts` | 2 | ✅ All pass |
 | `bright-api/index_test.ts` | 4 | ✅ All pass |
 | `rapid-worker/index_test.ts` | 2 | ✅ All pass |
-| `send-push-notification/index_test.ts` | 5 | ⚠️ 4 pass, 1 needs `--allow-net` |
+| `send-push-notification/index_test.ts` | 5 | ✅ All pass |
 
 ## Future Goals / Phase 2 Roadmap
 
 ### Short-term (Next Sprint)
 - [ ] **Map/list toggle on Worker Feed** — The prompt requires a list/map toggle on the home feed to view nearby jobs on a map
 - [ ] **Push notifications end-to-end verification** — Test FCM delivery on a physical Android device (trigger exists, needs a worker with FCM token)
-- [ ] **Push to origin** — Get local commits backed up to GitHub
+- [x] **Push to origin** — ✅ Pushed commit `d3bb214` to `origin/main` (16 files, 19 bug fixes + 2 migrations deployed)
 
 ### Medium-term
 - [x] **Push notification webhooks** — ✅ Deployed 3 triggers + fix migration. Tested with real job INSERT.
