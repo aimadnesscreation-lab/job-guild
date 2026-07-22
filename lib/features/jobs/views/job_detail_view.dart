@@ -339,7 +339,7 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
                 const SizedBox(height: 24),
 
                 // ─── Actions ─────────────────────────────────────
-                if (_hiredWorkerId != null && job.isOpen)
+                if (_hiredWorkerId != null && job.status == JobStatus.hired)
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(

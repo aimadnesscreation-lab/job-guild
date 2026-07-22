@@ -269,9 +269,15 @@ class _HomeFeedTab extends ConsumerWidget {
         // Wait for the rebuilt stream to emit at least once (or error) before
         // the refresh indicator dismisses, instead of an arbitrary delay.
         final completer = Completer<void>();
+        bool hadError = false;
+        Object? capturedError;
         final sub = ref.listenManual<AsyncValue<List<Job>>>(
           liveJobFeedProvider,
           (_, next) {
+            if (next.hasError) {
+              hadError = true;
+              capturedError = next.error;
+            }
             if ((next.hasValue || next.hasError) && !completer.isCompleted) {
               completer.complete();
             }
@@ -280,12 +286,11 @@ class _HomeFeedTab extends ConsumerWidget {
         try {
           await completer.future.timeout(const Duration(seconds: 5));
           // Surface a stream error to the user so a failed refresh isn't silent.
-          final current = ref.read(liveJobFeedProvider);
-          if (current.hasError && context.mounted) {
+          if (hadError && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  '${strings.couldNotLoadJobs} ${current.error}',
+                  '${strings.couldNotLoadJobs} $capturedError',
                 ),
                 backgroundColor: AppTheme.errorColor,
               ),
