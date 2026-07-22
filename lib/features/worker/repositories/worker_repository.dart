@@ -20,15 +20,16 @@ class WorkerRepository {
 
       if (categories.isEmpty) return;
 
-      // Map category names to their IDs using the canonical lookup from job_model.
+      // Map category names to their IDs and batch insert in a single request.
+      final rows = <Map<String, dynamic>>[];
       for (final name in categories) {
         final catId = categoryNameToId[name];
         if (catId != null) {
-          await _supabase.from('worker_categories').insert({
-            'worker_id': userId,
-            'category_id': catId,
-          });
+          rows.add({'worker_id': userId, 'category_id': catId});
         }
+      }
+      if (rows.isNotEmpty) {
+        await _supabase.from('worker_categories').insert(rows);
       }
     } catch (_) {
       // Categories are best-effort — don't abort the profile save.

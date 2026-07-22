@@ -14,7 +14,12 @@ class WorkerPublicProfileView extends ConsumerWidget {
   /// Optionally pass a profile directly; otherwise reads from provider
   final WorkerProfile? profile;
 
-  const WorkerPublicProfileView({super.key, this.profile});
+  /// Optional distance from the viewer to this worker (in kilometres).
+  /// When provided, the profile header shows the real distance instead of a
+  /// hard-coded placeholder.
+  final double? distanceKm;
+
+  const WorkerPublicProfileView({super.key, this.profile, this.distanceKm});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,7 +43,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ─── Profile Header ────────────────────────────────
-            _PublicProfileHeader(profile: p),
+            _PublicProfileHeader(profile: p, distanceKm: distanceKm),
             const SizedBox(height: 16),
 
             // ─── Availability Badge ────────────────────────────
@@ -381,55 +386,59 @@ void _showReportUserDialog(
 
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          const Icon(Icons.flag_outlined, color: AppTheme.errorColor, size: 22),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Report $reportedUserName',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (ctx) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
-            const Text(
-              'Why are you reporting this user?',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: selectedReason,
-              decoration: const InputDecoration(labelText: 'Reason'),
-              items: reasons
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) selectedReason = val;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: detailsController,
-              decoration: const InputDecoration(
-                labelText: 'Details (optional)',
-                hintText: 'Describe the issue...',
-                alignLabelWithHint: true,
+            const Icon(Icons.flag_outlined, color: AppTheme.errorColor, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Report $reportedUserName',
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 3,
-              maxLength: 500,
             ),
           ],
         ),
-      ),
-      actions: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Why are you reporting this user?',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: selectedReason,
+                decoration: const InputDecoration(labelText: 'Reason'),
+                items: reasons
+                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() => selectedReason = val);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                  hintText: 'Describe the issue...',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 3,
+                maxLength: 500,
+              ),
+            ],
+          ),
+        ),
+        actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
           child: Text(ref.read(appStringsProvider).cancel),
@@ -468,8 +477,8 @@ void _showReportUserDialog(
             }
           },
           child: Text(ref.read(appStringsProvider).submit),
-        ),
-      ],
+        ),        ],
+      ),
     ),
   );
 }
@@ -533,8 +542,9 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
 
 class _PublicProfileHeader extends ConsumerWidget {
   final WorkerProfile profile;
+  final double? distanceKm;
 
-  const _PublicProfileHeader({required this.profile});
+  const _PublicProfileHeader({required this.profile, this.distanceKm});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -618,9 +628,10 @@ class _PublicProfileHeader extends ConsumerWidget {
                   size: 16,
                   color: AppTheme.textSecondary,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  '2.3 ${ref.watch(appStringsProvider).kmAway}',
+                const SizedBox(width: 4),                  Text(
+                  distanceKm != null
+                      ? '${distanceKm!.toStringAsFixed(1)} ${ref.watch(appStringsProvider).kmAway}'
+                      : 'Nearby',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,

@@ -248,9 +248,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
                         final currentUserId = ref
                             .watch(currentUserProvider)
                             ?.id;
-                        final isMine =
-                            msg.senderId == currentUserId ||
-                            msg.senderId == 'current-user';
+                        final isMine = msg.senderId == currentUserId;
                         return _MessageBubble(message: msg, isMine: isMine);
                       },
                     ),

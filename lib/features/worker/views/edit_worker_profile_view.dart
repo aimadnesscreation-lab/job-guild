@@ -468,7 +468,8 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                   Expanded(
                     child: DropdownButtonFormField<int>(
                       isExpanded: true,
-                      initialValue: profile.yearsExperience,
+                      // ignore: deprecated_member_use
+                      value: profile.yearsExperience,
                       decoration: InputDecoration(labelText: s.yearsExperience),
                       items: List.generate(31, (i) => i)
                           .map(

@@ -14,6 +14,7 @@ import 'package:local_services_marketplace/features/home/views/worker_dashboard.
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import 'package:local_services_marketplace/features/jobs/providers/job_feed_provider.dart';
 import 'package:local_services_marketplace/features/jobs/views/post_job_view.dart';
+import 'package:local_services_marketplace/features/jobs/providers/job_provider.dart';
 import 'package:local_services_marketplace/features/jobs/views/search_workers_view.dart';
 import 'package:local_services_marketplace/features/notifications/views/notifications_view.dart';
 import 'package:local_services_marketplace/features/settings/views/settings_view.dart';
@@ -57,7 +58,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     return tutorialAsync.when(
       data: (tutorialCompleted) {
         Widget scaffold = Scaffold(
-      // Only show AppBar for Home and Dashboard tabs — child screens have their own
+      // Only show AppBar for Home and Dashboard tabs — child screens have their own.
       appBar: _currentTabIndex == 0 || _currentTabIndex == 4
           ? AppBar(
               title: Text(
@@ -184,7 +185,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ? FloatingActionButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PostJobView(resetOnInit: true)),
+                MaterialPageRoute(builder: (_) => const _PostJobRoute()),
               ),
               child: const Icon(Icons.add_rounded),
             )
@@ -249,9 +250,10 @@ class _HomeFeedTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(currentRoleProvider);
 
-    // Employer mode: show worker search/browse
+    // Employer mode: show worker search/browse (embedded without its own AppBar
+    // because this screen already provides the main AppBar).
     if (role == AppRole.employer) {
-      return const SearchWorkersView();
+      return const SearchWorkersView(showAppBar: false);
     }
 
     // Worker mode: show live job feed
@@ -262,7 +264,9 @@ class _HomeFeedTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(liveJobFeedProvider);
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Wait for the rebuilt stream to emit at least once before the
+        // refresh indicator dismisses, instead of an arbitrary half-second delay.
+        await ref.read(liveJobFeedProvider.future);
       },
       child: ListView(
         padding: Breakpoints.horizontalPadding(width),
@@ -294,7 +298,7 @@ class _HomeFeedTab extends ConsumerWidget {
                           onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const PostJobView(),
+                              builder: (_) => const _PostJobRoute(),
                             ),
                           ),
                           icon: const Icon(Icons.add_rounded),
@@ -612,18 +616,20 @@ class _DashboardContainer extends ConsumerStatefulWidget {
 class _DashboardContainerState extends ConsumerState<_DashboardContainer>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final ProviderSubscription<AppRole> _roleSub;
+  late final ProviderSubscription<AsyncValue<WorkerProfile?>> _profileSub;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     // Sync with global role provider
-    ref.listenManual(currentRoleProvider, (_, next) {
+    _roleSub = ref.listenManual(currentRoleProvider, (_, next) {
       final target = next == AppRole.worker ? 1 : 0;
       if (_tabController.index != target) _tabController.index = target;
     });
     // Also sync from worker profile
-    ref.listenManual(myWorkerProfileProvider, (_, next) {
+    _profileSub = ref.listenManual(myWorkerProfileProvider, (_, next) {
       final isWorker = next.value != null;
       if (isWorker) {
         ref.read(currentRoleProvider.notifier).setRole(AppRole.worker);
@@ -633,6 +639,8 @@ class _DashboardContainerState extends ConsumerState<_DashboardContainer>
 
   @override
   void dispose() {
+    _roleSub.close();
+    _profileSub.close();
     _tabController.dispose();
     super.dispose();
   }
@@ -874,6 +882,22 @@ class FavoritesView extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Route wrapper that gives every pushed PostJobView its own [postJobProvider]
+/// instance so it cannot share stale form state with the bottom-nav tab.
+class _PostJobRoute extends StatelessWidget {
+  const _PostJobRoute();
+
+  @override
+  Widget build(BuildContext context) {
+    return ProviderScope(
+      overrides: [
+        postJobProvider.overrideWith(() => PostJobNotifier()),
+      ],
+      child: const PostJobView(),
     );
   }
 }

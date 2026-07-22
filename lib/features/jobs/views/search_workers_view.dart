@@ -11,7 +11,11 @@ import 'package:local_services_marketplace/features/worker/models/worker_profile
 /// price range, rating, availability, verified-only. Backed by the live
 /// nearby-workers query (PostGIS), with local filtering on top.
 class SearchWorkersView extends ConsumerStatefulWidget {
-  const SearchWorkersView({super.key});
+  /// When false, the embedded instance (e.g. employer home tab) will not show
+  /// its own AppBar, letting the parent screen provide one instead.
+  final bool showAppBar;
+
+  const SearchWorkersView({super.key, this.showAppBar = true});
 
   @override
   ConsumerState<SearchWorkersView> createState() => _SearchWorkersViewState();
@@ -93,9 +97,11 @@ class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
   Widget build(BuildContext context) {
     final async = ref.watch(nearbyWorkersProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(ref.watch(appStringsProvider).findWorkersTitle),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: Text(ref.watch(appStringsProvider).findWorkersTitle),
+            )
+          : null,
       body: Column(
         children: [
           // ─── Search Bar ────────────────────────────────────
@@ -441,8 +447,7 @@ class _WorkerResultCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        borderRadius: BorderRadius.circular(12),            onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -458,6 +463,7 @@ class _WorkerResultCard extends ConsumerWidget {
                     worker.availability,
                   ),
                 ),
+                distanceKm: worker.distanceMeters / 1000.0,
               ),
             ),
           );
@@ -607,6 +613,7 @@ class _WorkerResultCard extends ConsumerWidget {
                                 worker.availability,
                               ),
                             ),
+                            distanceKm: worker.distanceMeters / 1000.0,
                           ),
                         ),
                       );

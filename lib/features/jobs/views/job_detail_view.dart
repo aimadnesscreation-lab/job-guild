@@ -8,6 +8,7 @@ import 'package:local_services_marketplace/core/services/supabase_repository.dar
 import 'package:local_services_marketplace/features/chat/views/chat_detail_view.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import 'package:local_services_marketplace/features/jobs/views/post_job_view.dart';
+import 'package:local_services_marketplace/features/jobs/providers/job_provider.dart';
 
 /// Employer's view of a job — shows interested workers with match scores,
 /// "Hire" and "Mark Complete" actions (all persisted to Supabase).
@@ -146,7 +147,12 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => PostJobView(job: widget.job),
+                        builder: (_) => ProviderScope(
+                          overrides: [
+                            postJobProvider.overrideWith(() => PostJobNotifier()),
+                          ],
+                          child: PostJobView(job: widget.job),
+                        ),
                       ),
                     );
                   }

@@ -46,16 +46,8 @@ DECLARE
 BEGIN
   -- Get job location and category; support both PostGIS geography and legacy columns
   SELECT
-    COALESCE(
-      ST_Y(j.location_coords::geometry),
-      j.location_lat,
-      31.5204  -- Lahore default
-    ),
-    COALESCE(
-      ST_X(j.location_coords::geometry),
-      j.location_lng,
-      74.3587
-    ),
+    COALESCE(ST_Y(j.location_coords::geometry), 31.5204),
+    COALESCE(ST_X(j.location_coords::geometry), 74.3587),
     j.category_id,
     j.employer_id
   INTO v_job_lat, v_job_lng, v_job_category_id, v_employer_id
@@ -103,13 +95,13 @@ BEGIN
       -- Rating score: 5 pts per star, max 25
       LEAST(25, COALESCE(wd.average_rating, 0) * 5) AS raw_rating_score,
       -- Experience score: 1 pt per completed job in this category, cap 15; min 2 for new workers
-      GREATEST(2, LEAST(15, COALESCE((
+      LEAST(15, COALESCE((
         SELECT COUNT(*) FROM applications a
         JOIN jobs j ON a.job_id = j.id
         WHERE a.worker_id = wd.user_id
           AND a.status = 'completed'
           AND j.category_id = v_job_category_id
-      ), 0))) AS raw_experience_score,
+      ), 0)) AS raw_experience_score,
       -- Availability score
       CASE
         WHEN wd.availability_status = 'offline' THEN 0

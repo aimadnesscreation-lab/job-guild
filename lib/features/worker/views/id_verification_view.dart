@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously, use_null_aware_elements
 
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -293,20 +294,33 @@ class _UploadCard extends StatelessWidget {
                     onPressed: onRemove,
                   )
                 : null,
-          ),
-          if (image != null)
+          ),            if (image != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(12),
               ),
               child: kIsWeb
-                  ? Image.network(
-                      image!.path,
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const Center(child: Icon(Icons.broken_image)),
+                  ? FutureBuilder<Uint8List>(
+                      future: image!.readAsBytes(),
+                      builder: (context, snapshot) {
+                        final bytes = snapshot.data;
+                        if (bytes == null) {
+                          return const SizedBox(
+                            height: 160,
+                            child: Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        return Image.memory(
+                          bytes,
+                          height: 160,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Center(child: Icon(Icons.broken_image)),
+                        );
+                      },
                     )
                   : Image.file(
                       File(image!.path),

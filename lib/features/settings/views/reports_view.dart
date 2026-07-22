@@ -48,87 +48,92 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(ref.watch(appStringsProvider).reportUser),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedReason,
-                decoration: const InputDecoration(labelText: 'Reason'),
-                items: const [
-                  DropdownMenuItem(value: 'Spam', child: Text('Spam')),
-                  DropdownMenuItem(
-                    value: 'Harassment',
-                    child: Text('Harassment'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Fake profile',
-                    child: Text('Fake profile'),
-                  ),
-                  DropdownMenuItem(value: 'Scam', child: Text('Scam')),
-                  DropdownMenuItem(value: 'Other', child: Text('Other')),
-                ],
-                onChanged: (val) {
-                  if (val != null) selectedReason = val;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: detailsController,
-                decoration: const InputDecoration(
-                  labelText: 'Details',
-                  hintText: 'Describe the issue...',
-                  alignLabelWithHint: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(ref.watch(appStringsProvider).reportUser),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
+                  value: selectedReason,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                  items: const [
+                    DropdownMenuItem(value: 'Spam', child: Text('Spam')),
+                    DropdownMenuItem(
+                      value: 'Harassment',
+                      child: Text('Harassment'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Fake profile',
+                      child: Text('Fake profile'),
+                    ),
+                    DropdownMenuItem(value: 'Scam', child: Text('Scam')),
+                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() => selectedReason = val);
+                    }
+                  },
                 ),
-                maxLines: 3,
-                maxLength: 500,
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: detailsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Details',
+                    hintText: 'Describe the issue...',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 3,
+                  maxLength: 500,
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(ref.watch(appStringsProvider).cancel),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final userId = ref.read(currentUserProvider)?.id;
-              if (userId == null) return;
-              try {
-                await ref
-                    .read(supabaseRepositoryProvider)
-                    .submitReport(
-                      reporterId: userId,
-                      reason: selectedReason,
-                      details: detailsController.text.trim(),
-                    );
-              } catch (e) {
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(ref.watch(appStringsProvider).cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final userId = ref.read(currentUserProvider)?.id;
+                if (userId == null) return;
+                try {
+                  await ref
+                      .read(supabaseRepositoryProvider)
+                      .submitReport(
+                        reporterId: userId,
+                        reason: selectedReason,
+                        details: detailsController.text.trim(),
+                      );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to submit report: $e'),
+                      backgroundColor: AppTheme.errorColor,
+                    ),
+                  );
+                  return;
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadReports();
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to submit report: $e'),
-                    backgroundColor: AppTheme.errorColor,
+                    content: Text(ref.read(appStringsProvider).reportSubmitted),
+                    backgroundColor: AppTheme.primaryColor,
                   ),
                 );
-                return;
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-              _loadReports();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ref.read(appStringsProvider).reportSubmitted),
-                  backgroundColor: AppTheme.primaryColor,
-                ),
-              );
-            },
-            child: Text(ref.watch(appStringsProvider).submit),
-          ),
-        ],
+              },
+              child: Text(ref.watch(appStringsProvider).submit),
+            ),
+          ],
+        ),
       ),
     );
   }

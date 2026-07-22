@@ -262,7 +262,6 @@ BEGIN
     st_setsrid(st_makepoint(lng, lat), 4326)::geography,
     radius_km * 1000
   )
-  AND wp.availability_status != 'offline'
   ORDER BY distance_meters;
 END;
 $$ LANGUAGE plpgsql;

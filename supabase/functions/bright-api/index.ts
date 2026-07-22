@@ -270,12 +270,28 @@ function fallbackParse(text: string): ParseResponse {
  * Estimate a reasonable budget based on category and any budget hints in text.
  */
 function estimateBudget(category: string, text: string): number {
-  // Try to extract a budget hint from the text e.g. "5000", "5k", "3rs"
-  const match = text.match(/(\d+)\s*(k|rs|pkr)?/i);
-  if (match) {
-    const num = parseInt(match[1], 10);
-    if (match[2]?.toLowerCase() === "k") return num * 1000;
-    if (num >= 100 && num <= 100000) return num;
+  // Try to extract a budget hint from the text e.g. "5000", "5k", "3rs".
+  // We look at every number and prefer k-suffixed values, then the largest
+  // reasonable number, so house numbers like "42" don't override a "3k" budget.
+  const matches = text.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)\s*(k|rs|pkr)?/gi);
+  let best: number | null = null;
+  let bestHasK = false;
+  for (const match of matches) {
+    const raw = match[1].replace(/,/g, "");
+    const num = parseInt(raw, 10);
+    const hasK = match[2]?.toLowerCase() === "k";
+    const scaled = hasK ? num * 1000 : num;
+    if (
+      best === null ||
+      (hasK && !bestHasK) ||
+      (hasK === bestHasK && scaled > best)
+    ) {
+      best = scaled;
+      bestHasK = hasK;
+    }
+  }
+  if (best !== null && best >= 100 && best <= 100000) {
+    return best;
   }
 
   const budgets: Record<string, number> = {

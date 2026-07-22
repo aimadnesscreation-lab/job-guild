@@ -75,6 +75,16 @@ class SupabaseRepository {
     if (client == null) return;
 
     await client.from('jobs').update({'status': status.name}).eq('id', jobId);
+
+    // When a job is marked completed, also mark the hired worker's
+    // application as completed so the smart-matching experience score counts it.
+    if (status == JobStatus.completed) {
+      await client
+          .from('applications')
+          .update({'status': 'completed'})
+          .eq('job_id', jobId)
+          .eq('status', 'hired');
+    }
   }
 
   // ─── Applications ─────────────────────────────────────────
@@ -647,6 +657,12 @@ class SupabaseRepository {
 
 /// Riverpod provider for Supabase repository
 final supabaseRepositoryProvider = Provider<SupabaseRepository>((ref) {
-  final client = Supabase.instance.client;
-  return SupabaseRepository(client);
+  try {
+    final client = Supabase.instance.client;
+    return SupabaseRepository(client);
+  } catch (_) {
+    // Supabase has not been initialized (e.g. widget tests). Return a
+    // repository backed by mock data instead of crashing.
+    return SupabaseRepository(null);
+  }
 });

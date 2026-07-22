@@ -179,7 +179,9 @@ async function getUserFcmToken(userId: string): Promise<string | null> {
   }
 
   const data = await response.json();
-  return data?.token || null;
+  return Array.isArray(data)
+    ? data[0]?.token || null
+    : data?.token || null;
 }
 
 /**
