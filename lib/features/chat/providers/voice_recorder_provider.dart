@@ -60,7 +60,15 @@ class VoiceRecorderNotifier extends Notifier<VoiceRecorderState> {
   Timer? _timer;
 
   @override
-  VoiceRecorderState build() => const VoiceRecorderState();
+  VoiceRecorderState build() {
+    // Ensure the timer is cancelled if the provider is disposed while
+    // recording is in progress.
+    ref.onDispose(() {
+      _timer?.cancel();
+      _timer = null;
+    });
+    return const VoiceRecorderState();
+  }
 
   /// Request microphone permission
   Future<bool> requestPermission() async {

@@ -10,13 +10,31 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 13)
+## Current State (Updated 2026-07-23 — Session 14)
 
-### Branch `main` — Comprehensive end-to-end audit: 25 bugs found & fixed. 0 analyze issues. All 111 tests green.
+### Branch `main` — End-to-end audit: 6 more bugs found & fixed. 0 analyze issues. All 111 tests green.
 
-**Status:** Flutter tests **134/134** pass. **0 dart analyze issues**. Live Supabase integration **23/23** pass. Local commits ahead of `origin/main` (not yet pushed).
+**Status:** Flutter tests **111/111** pass. **0 dart analyze issues**. Local commits ahead of `origin/main` (not yet pushed).
 
-### Latest Developments (2026-07-23 — Session 13: Comprehensive end-to-end audit fixes)
+### Latest Developments (2026-07-23 — Session 14: End-to-end audit + 6 bug fixes)
+
+*Session 14 (end-to-end audit — 6 bugs fixed):*
+
+1. 🔴 **`normalizePhone()` mishandled 11-digit `92`-prefix numbers** (`auth_provider.dart`) — 11-digit numbers like `92300123456` fell through to `'+92$digits'` producing double-prefix `+9292300123456`. Fixed: handle 11-digit case by dropping the leading `92` and re-adding as country code.
+
+2. 🟠 **`SettingsNotifier._loadSettings()` modified `localeProvider` during `build()`** (`settings_provider.dart`) — Riverpod discourages modifying another provider's state during `build()`. Fixed: wrapped `setLocale()` call in `Future.microtask()` to defer until after the build phase.
+
+3. 🟠 **`VoiceRecorderNotifier` timer leaked on provider disposal** (`voice_recorder_provider.dart`) — The duration timer was never cancelled if the provider was disposed while recording. Fixed: added `ref.onDispose()` to cancel and null out the timer.
+
+4. 🟡 **`JobDetailWorkerView._isInterested` always started `false`** (`job_detail_worker_view.dart`) — Workers who had already applied would see "I'm Interested" instead of "Interested ✓" on re-opening. Fixed: load existing application status from server in `initState()`.
+
+5. 🟡 **`SupabaseRepository` used deprecated `.match()` API** (`supabase_repository.dart`) — `hireWorker()` and `toggleFavorite()` used `.match({...})` which is deprecated in supabase_flutter v2. Replaced with explicit `.eq()` chains for forward-compatibility.
+
+6. 🟡 **`getWorkerProfile()` used `.single()` throwing on missing row** (`supabase_repository.dart`) — Replaced with `.maybeSingle()` + null check to avoid unnecessary `PostgrestException` overhead.
+
+**Code Health:**
+- `flutter analyze`: **0 issues**
+- `flutter test`: **111/111 tests pass**
 
 **🔴 Bugs Found & Fixed (8 total across Session 10 + 11):**
 

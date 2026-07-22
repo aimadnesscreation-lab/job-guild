@@ -22,6 +22,25 @@ class _JobDetailWorkerViewState extends ConsumerState<JobDetailWorkerView> {
   bool _isInterested = false;
 
   @override
+  void initState() {
+    super.initState();
+    _checkExistingApplication();
+  }
+
+  Future<void> _checkExistingApplication() async {
+    final userId = ref.read(currentUserProvider)?.id;
+    if (userId == null) return;
+    try {
+      final repo = ref.read(supabaseRepositoryProvider);
+      final applications = await repo.getMyApplications(userId);
+      final alreadyApplied = applications.any((a) => a['job_id'] == widget.job.id);
+      if (mounted) setState(() => _isInterested = alreadyApplied);
+    } catch (_) {
+      // Best-effort check — if it fails, the button defaults to not interested.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final job = widget.job;
 

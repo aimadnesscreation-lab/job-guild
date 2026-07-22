@@ -120,10 +120,13 @@ class SupabaseRepository {
     final client = _client;
     if (client == null) return;
 
-    await client.from('applications').update({'status': 'hired'}).match({
-      'job_id': jobId,
-      'worker_id': workerId,
-    });
+    // Atomically update the application to 'hired' — only if the worker
+    // has actually applied (row exists). If no row matches, do nothing.
+    await client
+        .from('applications')
+        .update({'status': 'hired'})
+        .eq('job_id', jobId)
+        .eq('worker_id', workerId);
     await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
   }
 
@@ -231,7 +234,8 @@ class SupabaseRepository {
           .from('worker_profiles')
           .select('*, users!inner(full_name, profile_photo_url, is_verified)')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
+      if (response == null) return null;
       return WorkerProfile.fromJson(response);
     } catch (e) {
       return null;
@@ -377,17 +381,20 @@ class SupabaseRepository {
     // This avoids silently deleting a favorite when the INSERT fails for a
     // non-unique-violation reason (e.g. network error).
     try {
-      final existing = await client.from('favorites').select('id').match({
-        'user_id': userId,
-        'favorited_user_id': favoritedUserId,
-      }).maybeSingle();
+      final existing = await client
+          .from('favorites')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('favorited_user_id', favoritedUserId)
+          .maybeSingle();
 
       if (existing != null) {
         // Already favorited — remove
-        await client.from('favorites').delete().match({
-          'user_id': userId,
-          'favorited_user_id': favoritedUserId,
-        });
+        await client
+            .from('favorites')
+            .delete()
+            .eq('user_id', userId)
+            .eq('favorited_user_id', favoritedUserId);
         return false; // now not favorited
       } else {
         // Not favorited — insert

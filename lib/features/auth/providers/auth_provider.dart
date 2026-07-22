@@ -48,6 +48,12 @@ class AuthNotifier extends Notifier<void> {
     // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
       if (digits.length == 12) return '+$digits';
+      // Handle 11-digit 92-prefixed input (e.g. "92300123456") by treating
+      // the leading "92" as the country code and the remaining 9 digits as
+      // the local number (missing a leading 0).
+      if (digits.length == 11) return '+92${digits.substring(2)}';
+      // Any other length — treat as-is.
+      return '+$digits';
     }
     if (digits.startsWith('0')) {
       final withoutLeading = digits.substring(1);

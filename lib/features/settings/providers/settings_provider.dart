@@ -103,7 +103,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
       final raw = await repo.getUserSettings(userId);
       final settings = UserSettings.fromJson(raw);
       // Sync the locale to match persisted language preference.
-      ref.read(localeProvider.notifier).setLocale(settings.preferredLanguage);
+      // Schedule as a microtask to avoid modifying another provider's
+      // state during the current build() phase.
+      Future.microtask(() {
+        ref.read(localeProvider.notifier).setLocale(settings.preferredLanguage);
+      });
       state = SettingsState(settings: settings, isLoading: false);
     } catch (_) {
       state = SettingsState(settings: const UserSettings(), isLoading: false);
