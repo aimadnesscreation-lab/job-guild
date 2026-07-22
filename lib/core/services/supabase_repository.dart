@@ -74,10 +74,22 @@ class SupabaseRepository {
     final client = _client;
     if (client == null) return;
 
+    // Use the atomic complete_job RPC when marking a job completed so both the
+    // job and the hired application are updated in a single transaction.
+    if (status == JobStatus.completed) {
+      try {
+        await client.rpc('complete_job', params: {'p_job_id': jobId});
+        return;
+      } on PostgrestException catch (e) {
+        // If the RPC doesn't exist yet (migration not run), fall back to the
+        // legacy two-step update. Any other error should still be thrown.
+        if (e.code != 'PGRST202' && e.code != '42883') rethrow;
+      }
+    }
+
     await client.from('jobs').update({'status': status.name}).eq('id', jobId);
 
-    // When a job is marked completed, also mark the hired worker's
-    // application as completed so the smart-matching experience score counts it.
+    // Legacy fallback: mark the hired worker's application as completed.
     if (status == JobStatus.completed) {
       await client
           .from('applications')
@@ -154,7 +166,7 @@ class SupabaseRepository {
       final response = await client
           .from('applications')
           .select(
-            '*, jobs!inner(title, budget_amount, budget_type, status, updated_at)',
+            '*, jobs!inner(title, budget_amount, budget_type, status, updated_at, created_at)',
           )
           .eq('worker_id', workerId)
           .order('created_at', ascending: false);

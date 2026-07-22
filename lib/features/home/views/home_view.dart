@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/utils/responsive.dart';
@@ -264,15 +266,36 @@ class _HomeFeedTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(liveJobFeedProvider);
-        // Wait for the rebuilt stream to emit at least once before the
-        // refresh indicator dismisses, instead of an arbitrary half-second delay.
+        // Wait for the rebuilt stream to emit at least once (or error) before
+        // the refresh indicator dismisses, instead of an arbitrary delay.
+        final completer = Completer<void>();
+        final sub = ref.listenManual<AsyncValue<List<Job>>>(
+          liveJobFeedProvider,
+          (_, next) {
+            if ((next.hasValue || next.hasError) && !completer.isCompleted) {
+              completer.complete();
+            }
+          },
+        );
         try {
-          await ref
-              .read(liveJobFeedProvider.future)
-              .timeout(const Duration(seconds: 5));
+          await completer.future.timeout(const Duration(seconds: 5));
+          // Surface a stream error to the user so a failed refresh isn't silent.
+          final current = ref.read(liveJobFeedProvider);
+          if (current.hasError && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '${strings.couldNotLoadJobs} ${current.error}',
+                ),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
         } catch (_) {
-          // Ignore timeout/errors; the stream will continue loading in the
-          // background.
+          // Timeout or other failure — the stream will keep trying in the
+          // background, so just let the indicator finish.
+        } finally {
+          sub.close();
         }
       },
       child: ListView(

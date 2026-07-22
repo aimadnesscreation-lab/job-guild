@@ -250,31 +250,34 @@ class WorkerDashboard extends ConsumerWidget {
                     ),
                   ),
                 );
-              }
-              final now = DateTime.now();
-              final sevenDaysAgo = now.subtract(const Duration(days: 7));
-              int totalEarnings = 0;
-              return Column(
-                children: [
-                  ...completed.where((entry) {
-                    final jobData =
-                        entry['jobs'] as Map<String, dynamic>? ?? {};
-                    final updatedAt = jobData['updated_at'] as String?;
-                    final date = DateTime.tryParse(updatedAt ?? '');
-                    return date != null &&
-                        date.isAfter(sevenDaysAgo) &&
-                        date.isBefore(now.add(const Duration(days: 1)));
-                  }).take(10).map((entry) {
-                    final jobData =
-                        entry['jobs'] as Map<String, dynamic>? ?? {};
-                    final title = jobData['title'] as String? ?? '';
-                    final amount = jobData['budget_amount'] as int? ?? 0;
-                    totalEarnings += amount;
-                    final updatedAt = jobData['updated_at'] as String?;
-                    final dateStr = _formatDate(
-                      DateTime.tryParse(updatedAt ?? ''),
-                      s,
-                    );
+              }                  final now = DateTime.now();
+                  final sevenDaysAgo = now.subtract(const Duration(days: 7));
+                  int totalEarnings = 0;
+                  return Column(
+                    children: [
+                      ...completed.where((entry) {
+                        final jobData =
+                            entry['jobs'] as Map<String, dynamic>? ?? {};
+                        final updatedAt = jobData['updated_at'] as String?;
+                        final createdAt = jobData['created_at'] as String?;
+                        final date = DateTime.tryParse(updatedAt ?? '') ??
+                            DateTime.tryParse(createdAt ?? '');
+                        return date != null &&
+                            date.isAfter(sevenDaysAgo) &&
+                            date.isBefore(now.add(const Duration(days: 1)));
+                      }).take(10).map((entry) {
+                        final jobData =
+                            entry['jobs'] as Map<String, dynamic>? ?? {};
+                        final title = jobData['title'] as String? ?? '';
+                        final amount = jobData['budget_amount'] as int? ?? 0;
+                        totalEarnings += amount;
+                        final updatedAt = jobData['updated_at'] as String?;
+                        final createdAt = jobData['created_at'] as String?;
+                        final dateStr = _formatDate(
+                          DateTime.tryParse(updatedAt ?? '') ??
+                              DateTime.tryParse(createdAt ?? ''),
+                          s,
+                        );
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: _EarningEntry(
