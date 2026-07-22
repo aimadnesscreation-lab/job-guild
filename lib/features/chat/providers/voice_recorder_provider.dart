@@ -7,9 +7,10 @@ import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Whether voice recording is supported on this platform.
-/// Web and desktop (Linux) do not support the `record` package well;
-/// we short-circuit those platforms to avoid runtime exceptions.
-bool get _voiceRecordingSupported => !kIsWeb && !Platform.isLinux;
+/// Web and all desktop platforms (Linux, macOS, Windows) may lack reliable
+/// encoder support for the `record` package. Short-circuit to avoid runtime
+/// exceptions on unsupported platforms.
+bool get _voiceRecordingSupported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
 /// State for the voice recorder
 class VoiceRecorderState {

@@ -28,6 +28,8 @@ class EmployerDashboard extends ConsumerWidget {
         final completed = jobs
             .where((j) => j.status == JobStatus.completed)
             .toList();
+        // Count all jobs the employer has ever posted (not just active+completed).
+        final totalPosted = jobs.length;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -50,7 +52,7 @@ class EmployerDashboard extends ConsumerWidget {
                       ),
                       _StatCard(
                         icon: Icons.people_outlined,
-                        value: '${active.length + completed.length}',
+                        value: '$totalPosted',
                         label: ref.watch(appStringsProvider).jobsPosted,
                         color: AppTheme.accentColor,
                         width: (constraints.maxWidth - (cols - 1) * 8) / cols,

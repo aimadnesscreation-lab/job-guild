@@ -186,6 +186,9 @@ class ChatNotifier extends Notifier<ChatState> {
       final uniqueOtherIds = <String>{};
       final jobIdToOtherId = <String, String>{};
       final jobIdToIsEmployer = <String, bool>{};
+      // Jobs where only employer-sent messages exist (no worker reply yet).
+      // We resolve the worker from the applications table in a batch query.
+      final employerOnlyJobIds = <String>{};
 
       for (final msg in data) {
         final jobId = msg['job_id'] as String? ?? '';
@@ -196,11 +199,16 @@ class ChatNotifier extends Notifier<ChatState> {
         final isEmployer = employerId == userId;
         final senderId = msg['sender_id'] as String? ?? '';
 
-        // For an employer, the "other user" is the worker. Skip messages
-        // sent by the employer and wait until we see a message from the
-        // worker, otherwise the conversation card would show the employer's
-        // own name.
-        if (isEmployer && senderId == userId) continue;
+        // For an employer, the "other user" is the worker. If the employer
+        // sent the message, we can't get the worker from the message itself —
+        // flag this job for resolution via the applications table.
+        if (isEmployer && senderId == userId) {
+          if (!jobIdToOtherId.containsKey(jobId)) {
+            employerOnlyJobIds.add(jobId);
+            jobIdToIsEmployer[jobId] = true;
+          }
+          continue;
+        }
 
         if (jobIdToOtherId.containsKey(jobId)) continue;
 
@@ -210,6 +218,26 @@ class ChatNotifier extends Notifier<ChatState> {
         jobIdToIsEmployer[jobId] = isEmployer;
         if (otherId.isNotEmpty) {
           uniqueOtherIds.add(otherId);
+        }
+      }
+
+      // Resolve employer-only jobs: look up the worker from applications.
+      if (employerOnlyJobIds.isNotEmpty) {
+        try {
+          final appsData = await client
+              .from('applications')
+              .select('job_id, worker_id')
+              .filter('job_id', 'in', employerOnlyJobIds.toList());
+          for (final app in _safeList(appsData)) {
+            final jid = app['job_id'] as String?;
+            final wid = app['worker_id'] as String?;
+            if (jid != null && wid != null && employerOnlyJobIds.contains(jid)) {
+              jobIdToOtherId[jid] = wid;
+              uniqueOtherIds.add(wid);
+            }
+          }
+        } catch (_) {
+          // Fall through — jobs without a resolved worker will show 'Worker'.
         }
       }
 
@@ -758,6 +786,14 @@ class ChatNotifier extends Notifier<ChatState> {
             if (msg['metadata'] != null) 'metadata': msg['metadata'],
           });
           debugPrint('[OfflineQueue] Delivered queued message');
+        } on PostgrestException catch (e) {
+          // FK violation (code 23503): the referenced job was deleted while
+          // the message was queued. Discard rather than retrying forever.
+          if (e.code == '23503') {
+            debugPrint('[OfflineQueue] Discarding message for deleted job');
+            continue;
+          }
+          remaining.add(msg);
         } catch (e) {
           remaining.add(msg);
         }

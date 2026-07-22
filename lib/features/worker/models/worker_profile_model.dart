@@ -171,7 +171,8 @@ class WorkerProfile {
     'availability_status': availabilityStatus.name,
     'service_radius_km': serviceRadiusKm,
     'portfolio_media': portfolioMediaUrls,
-    'is_featured': isFeatured,
+    // 'is_featured' is intentionally excluded — it is an admin-managed flag
+    // that should never be overwritten by client-side profile saves.
   };
 
   /// Display a star rating string (e.g. "4.5 ⭐")

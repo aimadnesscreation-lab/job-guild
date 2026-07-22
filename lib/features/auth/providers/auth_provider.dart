@@ -47,12 +47,11 @@ class AuthNotifier extends Notifier<void> {
     // Pakistani mobile numbers are +92 followed by exactly 10 digits,
     // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
+      // Only 12-digit 92-prefixed numbers are valid Pakistani mobile numbers
+      // (92 + 10-digit local number). Anything else (e.g. 11 digits) is
+      // ambiguous — we fall through to the catch-all and let Supabase auth
+      // handle validation rather than silently producing an invalid number.
       if (digits.length == 12) return '+$digits';
-      // Handle 11-digit 92-prefixed input (e.g. "92300123456") by treating
-      // the leading "92" as the country code and the remaining 9 digits as
-      // the local number (missing a leading 0).
-      if (digits.length == 11) return '+92${digits.substring(2)}';
-      // Any other length — treat as-is.
       return '+$digits';
     }
     if (digits.startsWith('0')) {

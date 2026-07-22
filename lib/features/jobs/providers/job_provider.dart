@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/services/ai_service_provider.dart';
+import 'package:local_services_marketplace/core/utils/budget_parser.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 
@@ -242,8 +243,15 @@ class PostJobNotifier extends Notifier<PostJobState> {
       final repo = ref.read(supabaseRepositoryProvider);
       await repo.postJob(job);
 
-      // Reset form on success
-      state = PostJobState();
+      // Reset form on success, preserving the default location so the next
+      // job post doesn't start with an empty location field.
+      state = PostJobState(
+        draftJob: Job(
+          locationText: AppConstants.defaultCity,
+          lat: AppConstants.defaultLatitude,
+          lng: AppConstants.defaultLongitude,
+        ),
+      );
     } catch (e) {
       state = state.copyWith(
         isPosting: false,
@@ -272,73 +280,18 @@ class PostJobNotifier extends Notifier<PostJobState> {
     }
   }
 
+  /// Keyword-based mock parsing — delegates to shared [budget_parser.dart]
+  /// utilities for consistent category detection and budget estimation.
   JobAiMetadata _mockParse(String text) {
     final lower = text.toLowerCase();
-    String category = 'General Labor';
-    if (lower.contains('plumb')) {
-      category = 'Plumbing';
-    } else if (lower.contains('electr')) {
-      category = 'Electrical';
-    } else if (lower.contains('paint')) {
-      category = 'Painting';
-    } else if (lower.contains('carpent')) {
-      category = 'Carpentry';
-    } else if (lower.contains('clean')) {
-      category = 'Cleaning';
-    } else if (lower.contains('tutor') || lower.contains('teach')) {
-      category = 'Tutor';
-    } else if (lower.contains('mechanic')) {
-      category = 'Mechanic';
-    } else if (lower.contains('cook') || lower.contains('food')) {
-      category = 'Cook';
-    } else if (lower.contains('move') || lower.contains('shift')) {
-      category = 'Moving';
-    } else if (lower.contains('photo')) {
-      category = 'Photographer';
-    } else if (lower.contains('laptop') || lower.contains('computer')) {
-      category = 'Laptop Repair';
-    } else if (lower.contains('mobile') || lower.contains('phone')) {
-      category = 'Mobile Repair';
-    } else if (lower.contains('web') || lower.contains('website')) {
-      category = 'Web Developer';
-    }
-
-    final urgency =
-        lower.contains('urgent') ||
-            lower.contains('emergency') ||
-            lower.contains('asap')
-        ? 'instant'
-        : lower.contains('next') ||
-              lower.contains('tomorrow') ||
-              lower.contains('schedule')
-        ? 'scheduled'
-        : 'today';
-
-    int budget = 2000;
-    final matches = RegExp(r'(\d{1,3}(?:,\d{3})+|\d+)\s*([kK])?').allMatches(lower);
-    int? bestValue;
-    var bestHasK = false;
-    for (final match in matches) {
-      final raw = match.group(1)!.replaceAll(',', '');
-      final value = int.parse(raw);
-      final hasK = match.group(2) != null;
-      final scaled = hasK ? value * 1000 : value;
-      if (bestValue == null ||
-          (hasK && !bestHasK) ||
-          (hasK == bestHasK && scaled > bestValue)) {
-        bestValue = scaled;
-        bestHasK = hasK;
-      }
-    }
-    if (bestValue != null) budget = bestValue;
+    final category = guessCategory(text);
+    final urgency = guessUrgency(text);
 
     return JobAiMetadata(
       category: category,
       urgency: urgency,
-      suggestedBudgetPkr: budget,
-      estimatedDurationHours: lower.contains('hour') || lower.contains('hr')
-          ? 1
-          : 2,
+      suggestedBudgetPkr: estimateBudget(lower, category),
+      estimatedDurationHours: estimateDuration(lower),
       requiredSkills: [category],
     );
   }

@@ -182,13 +182,13 @@ void main() {
 
       test('estimates budget from numeric input', () async {
         final result = await service.generateJson(
-          prompt: '5000 plumbing repair',
+          prompt: 'budget 5000 plumbing repair',
         );
         expect(result['suggested_budget_pkr'], 5000);
       });
 
       test('estimates budget with k suffix multiplies by 1000', () async {
-        final result = await service.generateJson(prompt: '5k plumbing');
+        final result = await service.generateJson(prompt: '5k rs plumbing');
         expect(result['suggested_budget_pkr'], 5000);
       });
 

@@ -10,13 +10,57 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 14)
+## Current State (Updated 2026-07-23 — Session 15)
 
 ### Branch `main` — End-to-end audit: 6 more bugs found & fixed. 0 analyze issues. All 111 tests green.
 
 **Status:** Flutter tests **111/111** pass. **0 dart analyze issues**. Local commits ahead of `origin/main` (not yet pushed).
 
-### Latest Developments (2026-07-23 — Session 14: End-to-end audit + 6 bug fixes)
+### Latest Developments (2026-07-23 — Session 15: End-to-end audit — 19 bugs fixed)
+
+*Session 15 (comprehensive audit — 19 bugs fixed across all severity levels):*
+
+**🔴 Critical (3):**
+1. **`messages` table missing `metadata JSONB` column** — All image/voice message sends failed with PostgREST 400. Added migration `20260723000003_add_messages_metadata.sql`.
+2. **`getMyApplications` and `getWorkerCompletedJobs` ordered by non-existent `created_at`** — Changed to `.order('applied_at', ...)` in both methods.
+3. **`normalizePhone()` 11-digit branch silently produced invalid numbers** — Removed the broken 11-digit branch; invalid-length inputs fall through to catch-all.
+
+**🟠 High (5):**
+4. **Employer conversation visibility: chats disappeared until worker replied** — First pass now resolves worker identities from `applications` table for employer-initiated conversations.
+5. **`complete_job` legacy fallback bypassed hired-state security check** — Removed unprotected legacy fallback; only the hardened RPC can complete jobs.
+6. **`WorkerProfileNotifier._seeded` prevented profile refresh on account switch** — Detects user ID changes and re-seeds when the logged-in account changes.
+7. **`get_nearby_workers` returned only ONE category per worker (LIMIT 1)** — Replaced with `ARRAY(SELECT ...)` returning `categories TEXT[]`; Dart handles both old and new formats.
+8. **`PostJobNotifier.postJob()` reset lost default location** — Reset preserves `locationText`, `lat`, `lng` from `AppConstants`.
+
+**🟡 Medium (6):**
+9. **Employer home tab and Search tab showed identical `SearchWorkersContent`** — Employer tab now shows `EmployerDashboard` with stats and job list.
+10. **Budget extraction regex matched any number (house numbers, phone numbers)** — Budget-context-aware matching: only numbers near budget keywords (rupees, price, cost, etc.).
+11. **`toggleFavorite` had TOCTOU race condition on rapid double-tap** — Catches PostgREST unique violation (code 23505) and treats as success.
+12. **Employer dashboard "jobs posted" undercounted (only open+completed)** — Now counts `jobs.length` (all statuses).
+13. **`_HomeFeedTab` refresh listener hung on loading→data transitions** — Skips `isLoading` state in listener to avoid spinner hang.
+14. **Offline message queue retried FK violations forever for deleted jobs** — Catches code 23503 (FK violation) and discards orphaned messages.
+
+**🔵 Low (5):**
+15. **`WorkerProfile.toJson()` included `is_featured` — could overwrite admin-set flag** — Removed from `toJson()`.
+16. **Voice recorder platform check `!Platform.isLinux` excluded only Linux** — Changed to `!kIsWeb && (Platform.isAndroid || Platform.isIOS)` for explicit allowlist.
+17. **`notifications` table had no INSERT RLS policy** — Added policy (notifications are SECURITY DEFINER-managed, but policy makes schema self-documenting).
+18. **`get_nearby_workers` included null-location workers at 999999m** — Filtered to `WHERE u.current_location IS NOT NULL`.
+19. **Budget extraction logic duplicated between `openrouter_service.dart` and `job_provider.dart`** — Extracted shared `lib/core/utils/budget_parser.dart` with `estimateBudget`, `guessCategory`, `guessUrgency`, `estimateDuration`.
+
+**New Migration Files:**
+| File | Description |
+|------|-------------|
+| `20260723000003_add_messages_metadata.sql` | Add `metadata JSONB` column to `messages` |
+| `20260723000004_fix_workers_categories_notif_rls.sql` | Fix `get_nearby_workers` array categories, notifications INSERT policy, exclude null-location workers |
+
+**New Shared Utility:**
+- `lib/core/utils/budget_parser.dart` — Shared budget extraction, category guessing, urgency detection, duration estimation (used by both `openrouter_service.dart` mock fallback and `job_provider.dart` keyword parse).
+
+**Code Health:**
+- `flutter analyze`: **0 issues**
+- `flutter test`: **111/111 tests pass**
+
+### Previous Session (Session 14: End-to-end audit + 6 bug fixes)
 
 *Session 14 (end-to-end audit — 6 bugs fixed):*
 

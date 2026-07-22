@@ -64,13 +64,13 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
     final q = _searchController.text.toLowerCase();
     return _fromProvider.where((w) {
       final matchesCategory =
-          _selectedCategory == 'All' || w.category == _selectedCategory;
+          _selectedCategory == 'All' || w.categories.contains(_selectedCategory);
       final matchesRating = w.rating >= _minRating;
       final matchesVerified = !_verifiedOnly || w.isVerified;
       final matchesSearch =
           q.isEmpty ||
           w.name.toLowerCase().contains(q) ||
-          w.category.toLowerCase().contains(q);
+          w.categories.any((c) => c.toLowerCase().contains(q));
       final matchesAvailability =
           _selectedAvailability == 'Any' ||
           w.availability.toLowerCase() ==
@@ -392,7 +392,7 @@ class _WorkerResult {
   final String distance;
   final num distanceMeters;
   final String hourlyRate;
-  final String category;
+  final List<String> categories;
   final bool isVerified;
   final String availability;
 
@@ -404,7 +404,7 @@ class _WorkerResult {
     required this.distance,
     required this.distanceMeters,
     required this.hourlyRate,
-    required this.category,
+    required this.categories,
     required this.isVerified,
     required this.availability,
   });
@@ -423,12 +423,32 @@ class _WorkerResult {
           : '—',
       distanceMeters: distanceM,
       hourlyRate: hourly != null ? 'Rs. $hourly/hr' : 'Negotiable',
-      category: m['category'] as String? ?? 'General Labor',
+      categories: _parseCategories(m),
       isVerified: m['is_verified'] as bool? ?? false,
       availability: m['availability'] as String? ?? 'Today',
     );
   }
 }
+
+/// Parse categories from the RPC response. Supports both the old single-
+/// category string format and the new array-of-strings format.
+List<String> _parseCategories(Map<String, dynamic> m) {
+  // New format: 'categories' as a Postgres array
+  final cats = m['categories'];
+  if (cats is List) {
+    return cats.map((c) => c.toString()).toList();
+  }
+  // Old format: single 'category' string
+  final singleCat = m['category'] as String?;
+  if (singleCat != null && singleCat.isNotEmpty) {
+    return [singleCat];
+  }
+  return ['General Labor'];
+}
+
+/// Display helper: first category or fallback.
+String _firstCategory(List<String> categories) =>
+    categories.isNotEmpty ? categories.first : 'General Labor';
 
 class _WorkerResultCard extends ConsumerWidget {
   final _WorkerResult worker;
@@ -448,7 +468,7 @@ class _WorkerResultCard extends ConsumerWidget {
                 profile: WorkerProfile(
                   userId: worker.id,
                   fullName: worker.name,
-                  headline: worker.category,
+                  headline: _firstCategory(worker.categories),
                   averageRating: worker.rating,
                   totalJobsCompleted: worker.totalJobs,
                   isVerified: worker.isVerified,
@@ -511,7 +531,7 @@ class _WorkerResultCard extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            worker.category,
+                            _firstCategory(worker.categories),
                             style: const TextStyle(
                               fontSize: 10,
                               color: AppTheme.primaryColor,
@@ -598,7 +618,7 @@ class _WorkerResultCard extends ConsumerWidget {
                             profile: WorkerProfile(
                               userId: worker.id,
                               fullName: worker.name,
-                              headline: worker.category,
+                              headline: _firstCategory(worker.categories),
                               averageRating: worker.rating,
                               totalJobsCompleted: worker.totalJobs,
                               isVerified: worker.isVerified,

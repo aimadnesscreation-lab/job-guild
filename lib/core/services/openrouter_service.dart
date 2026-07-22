@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
+import 'package:local_services_marketplace/core/utils/budget_parser.dart';
 
 /// Service for calling OpenRouter AI models (replaces Claude).
 /// Supports JSON extraction and text generation using free models.
@@ -144,79 +145,14 @@ class OpenRouterService {
 
   Map<String, dynamic> _mockJsonResponse(String input) {
     final lower = input.toLowerCase();
-    String category = 'General Labor';
-    if (lower.contains('plumb')) {
-      category = 'Plumbing';
-    } else if (lower.contains('electr')) {
-      category = 'Electrical';
-    } else if (lower.contains('paint')) {
-      category = 'Painting';
-    } else if (lower.contains('carpent')) {
-      category = 'Carpentry';
-    } else if (lower.contains('clean')) {
-      category = 'Cleaning';
-    } else if (lower.contains('tutor') || lower.contains('teach')) {
-      category = 'Tutor';
-    } else if (lower.contains('mechanic')) {
-      category = 'Mechanic';
-    } else if (lower.contains('cook')) {
-      category = 'Cook';
-    } else if (lower.contains('move')) {
-      category = 'Moving';
-    }
+    final category = guessCategory(input);
 
     return {
       'category': category,
-      'urgency': lower.contains('urgent') || lower.contains('emergency')
-          ? 'instant'
-          : lower.contains('tomorrow') || lower.contains('next week')
-          ? 'scheduled'
-          : 'today',
-      'suggested_budget_pkr': _estimateBudget(lower, category),
-      'estimated_duration_hours': _estimateDuration(lower),
+      'urgency': guessUrgency(input),
+      'suggested_budget_pkr': estimateBudget(lower, category),
+      'estimated_duration_hours': estimateDuration(lower),
       'required_skills': [category],
     };
-  }
-
-  int _estimateBudget(String input, String category) {
-    // Look for budget-like numbers, allowing comma separators and an optional
-    // 'k'/'K' suffix. Prefer values with a 'k' suffix, then the largest value,
-    // so house numbers like "42" don't override a stated budget like "3k".
-    final matches = RegExp(r'(\d{1,3}(?:,\d{3})+|\d+)\s*([kK])?').allMatches(input);
-    int? bestValue;
-    var bestHasK = false;
-    for (final match in matches) {
-      final raw = match.group(1)!.replaceAll(',', '');
-      final value = int.parse(raw);
-      final hasK = match.group(2) != null;
-      final scaled = hasK ? value * 1000 : value;
-      if (bestValue == null ||
-          (hasK && !bestHasK) ||
-          (hasK == bestHasK && scaled > bestValue)) {
-        bestValue = scaled;
-        bestHasK = hasK;
-      }
-    }
-    if (bestValue != null) return bestValue;
-    // Default estimates by category
-    const budgets = {
-      'Plumbing': 3000,
-      'Electrical': 3500,
-      'Painting': 4000,
-      'Carpentry': 3500,
-      'Cleaning': 1500,
-      'Tutor': 500,
-      'Mechanic': 3000,
-      'Moving': 5000,
-      'Cook': 2000,
-    };
-    return budgets[category] ?? 2000;
-  }
-
-  int _estimateDuration(String input) {
-    if (input.contains('hour') || input.contains('hr')) return 1;
-    if (input.contains('day')) return 8;
-    if (input.contains('week')) return 40;
-    return 2; // default 2 hours
   }
 }

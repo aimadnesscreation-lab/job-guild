@@ -252,10 +252,10 @@ class _HomeFeedTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(currentRoleProvider);
 
-    // Employer mode: show worker search/browse (embedded without its own AppBar
-    // because this screen already provides the main AppBar).
+    // Employer mode: show the employer dashboard with stats, active jobs,
+    // and quick actions (instead of duplicating the Search tab content).
     if (role == AppRole.employer) {
-      return const SearchWorkersContent();
+      return const EmployerDashboard();
     }
 
     // Worker mode: show live job feed
@@ -278,7 +278,11 @@ class _HomeFeedTab extends ConsumerWidget {
               hadError = true;
               capturedError = next.error;
             }
-            if ((next.hasValue || next.hasError) && !completer.isCompleted) {
+            // Complete when the stream emits a value or error. Skip transient
+            // loading states to avoid hanging the refresh spinner when the
+            // provider transitions through loading → data.
+            if (next.isLoading) return;
+            if (!completer.isCompleted) {
               completer.complete();
             }
           },

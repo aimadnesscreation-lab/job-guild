@@ -76,9 +76,16 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
 
     // Preserve in-progress edits across rebuilds of the watched provider.
     // Once we have a real profile (or the fallback), keep that state so
-    // unsaved form changes are not silently discarded.
+    // unsaved form changes are not silently discarded. Also detects account
+    // switches: if the logged-in user changed, re-seed from the new profile.
     if (_seeded) {
-      return state;
+      final currentUserId = ref.watch(currentUserProvider)?.id;
+      final stateUserId = state.profile.userId;
+      if (currentUserId != null && currentUserId != stateUserId) {
+        _seeded = false;
+      } else {
+        return state;
+      }
     }
 
     _seeded = true;

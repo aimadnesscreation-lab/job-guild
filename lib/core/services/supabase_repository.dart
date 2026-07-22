@@ -81,21 +81,19 @@ class SupabaseRepository {
         await client.rpc('complete_job', params: {'p_job_id': jobId});
         return;
       } on PostgrestException catch (e) {
-        // If the RPC doesn't exist yet (migration not run), fall back to the
-        // legacy two-step update. Any other error should still be thrown.
+        // If the RPC doesn't exist yet (migration not run), log a warning
+        // and fall through. The job will NOT be marked complete via the
+        // legacy path — this is intentional to avoid bypassing the RPC's
+        // security check that only hired jobs can be completed.
         if (e.code != 'PGRST202' && e.code != '42883') rethrow;
+        debugPrint('[Job] complete_job RPC not found — ensure migration '
+            '20260722000010_harden_complete_job.sql is deployed.');
       }
     }
 
-    await client.from('jobs').update({'status': status.name}).eq('id', jobId);
-
-    // Legacy fallback: mark the hired worker's application as completed.
-    if (status == JobStatus.completed) {
-      await client
-          .from('applications')
-          .update({'status': 'completed'})
-          .eq('job_id', jobId)
-          .eq('status', 'hired');
+    // Non-completed status updates are safe to apply directly.
+    if (status != JobStatus.completed) {
+      await client.from('jobs').update({'status': status.name}).eq('id', jobId);
     }
   }
 
@@ -143,7 +141,7 @@ class SupabaseRepository {
             '*, jobs!inner(title, budget_amount, budget_type, status, urgency, location_text)',
           )
           .eq('worker_id', workerId)
-          .order('created_at', ascending: false);
+          .order('applied_at', ascending: false);
       return _safeList(response);
     } catch (e) {
       return [];
@@ -173,7 +171,7 @@ class SupabaseRepository {
             '*, jobs!inner(title, budget_amount, budget_type, status, updated_at, created_at)',
           )
           .eq('worker_id', workerId)
-          .order('created_at', ascending: false);
+          .order('applied_at', ascending: false);
       final allApps = _safeList(response);
       // Client-side filter: include hired apps OR apps for completed jobs.
       return allApps.where((a) {
@@ -397,11 +395,22 @@ class SupabaseRepository {
             .eq('favorited_user_id', favoritedUserId);
         return false; // now not favorited
       } else {
-        // Not favorited — insert
-        await client.from('favorites').insert({
-          'user_id': userId,
-          'favorited_user_id': favoritedUserId,
-        });
+        // Not favorited — insert. Handle TOCTOU race: if a concurrent
+        // request inserted the same favorite, treat the unique violation
+        // as a no-op (the record already exists, which is the desired state).
+        try {
+          await client.from('favorites').insert({
+            'user_id': userId,
+            'favorited_user_id': favoritedUserId,
+          });
+        } on PostgrestException catch (e) {
+          if (e.code == '23505') {
+            // Unique violation — favorite already exists from a concurrent
+            // request. Treat as success (favorited state).
+            return true;
+          }
+          rethrow;
+        }
         return true; // now favorited
       }
     } catch (e) {
