@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:local_services_marketplace/core/providers/tutorial_provider.dart';
 import 'package:local_services_marketplace/features/auth/views/language_selection_view.dart';
 import 'package:local_services_marketplace/features/home/providers/role_provider.dart';
 import 'package:local_services_marketplace/features/home/views/home_view.dart';
@@ -18,6 +19,9 @@ Widget createTestApp(Widget child) {
       // Role defaults to worker in tests so the feed shows job listings (the
       // most commonly tested path). Employer-mode tests can override this.
       currentRoleProvider.overrideWith(() => _TestRoleNotifier()),
+      // Tutorial state completes immediately to avoid the loading gate in
+      // HomeView tests.
+      tutorialCompletedProvider.overrideWith(() => _TestTutorialNotifier()),
     ],
     child: MaterialApp(home: child),
   );
@@ -27,6 +31,13 @@ Widget createTestApp(Widget child) {
 class _TestRoleNotifier extends RoleNotifier {
   @override
   AppRole build() => AppRole.worker;
+}
+
+/// Test notifier that completes the tutorial check immediately so HomeView
+/// tests don't have to wait for SharedPreferences.
+class _TestTutorialNotifier extends TutorialNotifier {
+  @override
+  Future<bool> build() async => true;
 }
 
 void main() {

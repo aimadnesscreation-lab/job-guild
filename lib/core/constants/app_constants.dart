@@ -16,16 +16,24 @@ class AppConstants {
   static String? _env(String key) =>
       dotenv.isInitialized ? dotenv.env[key] : null;
 
-  static String get supabaseUrl => _env('SUPABASE_URL') ?? _supabaseUrl;
+  static String get supabaseUrl {
+    // Return an empty string when .env is not loaded (e.g. widget tests).
+    // Callers that need a real connection (main.dart, integration tests)
+    // should check [isSupabaseConfigured] and handle the missing config case.
+    return _env('SUPABASE_URL') ?? '';
+  }
 
-  static String get supabaseAnonKey =>
-      _env('SUPABASE_ANON_KEY') ?? _supabaseAnonKey;
+  static String get supabaseAnonKey {
+    return _env('SUPABASE_ANON_KEY') ?? '';
+  }
+
+  /// True when both Supabase URL and anon key are configured.
+  static bool get isSupabaseConfigured =>
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   static String get openRouterApiKey {
     final value = _env('OPENROUTER_API_KEY');
-    return value != null && value.isNotEmpty
-        ? value
-        : _openRouterApiKeyPlaceholder;
+    return value != null && value.isNotEmpty ? value : _openRouterApiKeyPlaceholder;
   }
 
   /// True only when a real OpenRouter key (not the placeholder) is configured.
@@ -35,10 +43,6 @@ class AppConstants {
       openRouterApiKey.trim().isNotEmpty &&
       openRouterApiKey != _openRouterApiKeyPlaceholder;
 
-  // Source-controlled fallbacks (safe defaults so the app still runs without a .env)
-  static const String _supabaseUrl = 'https://izjfugswuwyinaeauhvz.supabase.co';
-  static const String _supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6amZ1Z3N3dXd5aW5hZWF1aHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTE5MjQsImV4cCI6MjA5OTk2NzkyNH0.BJMENZ9Q8IvUIegjXmaDMVK9NYZHUkJ3-8ovHLJShP0';
   static const String _openRouterApiKeyPlaceholder = 'YOUR_OPENROUTER_API_KEY';
 
   // App metadata

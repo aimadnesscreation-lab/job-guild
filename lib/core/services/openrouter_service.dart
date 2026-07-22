@@ -179,11 +179,25 @@ class OpenRouterService {
   }
 
   int _estimateBudget(String input, String category) {
-    final match = RegExp(r'(\d+)\s*[kK]?').firstMatch(input);
-    if (match != null) {
-      final num = int.parse(match.group(1)!);
-      return input.contains('k') || input.contains('K') ? num * 1000 : num;
+    // Look for budget-like numbers, allowing comma separators and an optional
+    // 'k'/'K' suffix. Prefer values with a 'k' suffix, then the largest value,
+    // so house numbers like "42" don't override a stated budget like "3k".
+    final matches = RegExp(r'(\d{1,3}(?:,\d{3})+|\d+)\s*([kK])?').allMatches(input);
+    int? bestValue;
+    var bestHasK = false;
+    for (final match in matches) {
+      final raw = match.group(1)!.replaceAll(',', '');
+      final value = int.parse(raw);
+      final hasK = match.group(2) != null;
+      final scaled = hasK ? value * 1000 : value;
+      if (bestValue == null ||
+          (hasK && !bestHasK) ||
+          (hasK == bestHasK && scaled > bestValue)) {
+        bestValue = scaled;
+        bestHasK = hasK;
+      }
     }
+    if (bestValue != null) return bestValue;
     // Default estimates by category
     const budgets = {
       'Plumbing': 3000,

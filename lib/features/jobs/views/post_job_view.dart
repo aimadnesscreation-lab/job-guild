@@ -15,7 +15,12 @@ import 'package:local_services_marketplace/features/jobs/views/map_picker_view.d
 class PostJobView extends ConsumerStatefulWidget {
   final Job? job;
 
-  const PostJobView({super.key, this.job});
+  /// When true, the provider is reset when this view is created and disposed.
+  /// Use this for pushed routes so they start fresh and don't leave stale state
+  /// on the bottom-nav tab instance.
+  final bool resetOnInit;
+
+  const PostJobView({super.key, this.job, this.resetOnInit = false});
 
   @override
   ConsumerState<PostJobView> createState() => _PostJobViewState();
@@ -30,9 +35,9 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
   @override
   void initState() {
     super.initState();
-    // If an existing job was passed (editing), pre-populate the provider
     final existing = widget.job;
     if (existing != null && existing.id.isNotEmpty) {
+      // If an existing job was passed (editing), pre-populate the provider
       ref.read(postJobProvider.notifier).updateTitle(existing.title);
       ref
           .read(postJobProvider.notifier)
@@ -51,6 +56,10 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
             .read(postJobProvider.notifier)
             .updateLocation(existing.locationText!, existing.lat, existing.lng);
       }
+    } else if (widget.resetOnInit) {
+      // Start with a clean form so a pushed route doesn't reuse the tab's
+      // stale provider state.
+      ref.read(postJobProvider.notifier).resetForm();
     }
     // Listen for draft job updates to sync controllers
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -73,6 +82,9 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
     _titleController.dispose();
     _descriptionController.dispose();
     _budgetController.dispose();
+    if (widget.resetOnInit) {
+      ref.read(postJobProvider.notifier).resetForm();
+    }
     super.dispose();
   }
 
@@ -103,7 +115,9 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(ref.watch(appStringsProvider).jobPostedSuccess),
+                // Use ref.read inside an async callback; ref.watch is only
+                // valid during build.
+                content: Text(ref.read(appStringsProvider).jobPostedSuccess),
                 backgroundColor: AppTheme.primaryColor,
               ),
             );

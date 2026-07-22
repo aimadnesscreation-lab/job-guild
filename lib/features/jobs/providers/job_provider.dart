@@ -56,7 +56,26 @@ class PostJobState {
 
 class PostJobNotifier extends Notifier<PostJobState> {
   @override
-  PostJobState build() => PostJobState();
+  PostJobState build() => PostJobState(
+        draftJob: Job(
+          locationText: AppConstants.defaultCity,
+          lat: AppConstants.defaultLatitude,
+          lng: AppConstants.defaultLongitude,
+        ),
+      );
+
+  /// Reset the form to a clean default state. Called when PostJobView is
+  /// opened without an existing job so the tab and pushed route don't share
+  /// stale form data.
+  void resetForm() {
+    state = PostJobState(
+      draftJob: Job(
+        locationText: AppConstants.defaultCity,
+        lat: AppConstants.defaultLatitude,
+        lng: AppConstants.defaultLongitude,
+      ),
+    );
+  }
 
   // ─── Freeform text ──────────────────────────────────────────
 
@@ -296,12 +315,22 @@ class PostJobNotifier extends Notifier<PostJobState> {
         : 'today';
 
     int budget = 2000;
-    final budgetMatch = RegExp(r'(\d+)\s*(k|rs|pkr)?').firstMatch(lower);
-    if (budgetMatch != null) {
-      final num = int.parse(budgetMatch.group(1)!);
-      final suffix = budgetMatch.group(2) ?? '';
-      budget = suffix == 'k' ? num * 1000 : num;
+    final matches = RegExp(r'(\d{1,3}(?:,\d{3})+|\d+)\s*([kK])?').allMatches(lower);
+    int? bestValue;
+    var bestHasK = false;
+    for (final match in matches) {
+      final raw = match.group(1)!.replaceAll(',', '');
+      final value = int.parse(raw);
+      final hasK = match.group(2) != null;
+      final scaled = hasK ? value * 1000 : value;
+      if (bestValue == null ||
+          (hasK && !bestHasK) ||
+          (hasK == bestHasK && scaled > bestValue)) {
+        bestValue = scaled;
+        bestHasK = hasK;
+      }
     }
+    if (bestValue != null) budget = bestValue;
 
     return JobAiMetadata(
       category: category,

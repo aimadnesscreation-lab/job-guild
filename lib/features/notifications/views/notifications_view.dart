@@ -212,9 +212,19 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
                             itemBuilder: (context, index) {
                               final n = filtered[index];
                               final isRead = n['is_read'] == true;
+                              // Notifications are stored with a JSONB payload;
+                              // title and body live inside it, not as top-level columns.
+                              final payload =
+                                  n['payload'] as Map<String, dynamic>? ?? {};
+                              final title = payload['title'] as String? ??
+                                  n['title'] as String? ??
+                                  '';
+                              final body = payload['body'] as String? ??
+                                  n['body'] as String? ??
+                                  '';
                               return _NotificationTile(
-                                title: n['title'] as String? ?? '',
-                                body: n['body'] as String? ?? '',
+                                title: title,
+                                body: body,
                                 time: _formatTime(n['created_at']),
                                 type: n['type'] as String? ?? 'All',
                                 icon: _iconForType(

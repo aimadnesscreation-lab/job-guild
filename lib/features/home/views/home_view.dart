@@ -50,11 +50,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    final tutorialCompleted = ref.watch(tutorialCompletedProvider);
+    final tutorialAsync = ref.watch(tutorialCompletedProvider);
     final unreadCount =
         ref.watch(unreadNotificationCountProvider).asData?.value ?? 0;
 
-    Widget scaffold = Scaffold(
+    return tutorialAsync.when(
+      data: (tutorialCompleted) {
+        Widget scaffold = Scaffold(
       // Only show AppBar for Home and Dashboard tabs — child screens have their own
       appBar: _currentTabIndex == 0 || _currentTabIndex == 4
           ? AppBar(
@@ -125,7 +127,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     icon: const Icon(Icons.settings_outlined),
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => SettingsView()),
+                      MaterialPageRoute(builder: (_) => const SettingsView()),
                     ),
                   ),
                 ],
@@ -182,32 +184,40 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ? FloatingActionButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PostJobView()),
+                MaterialPageRoute(builder: (_) => const PostJobView(resetOnInit: true)),
               ),
               child: const Icon(Icons.add_rounded),
             )
           : null,
     );
 
-    // Wrap scaffold in a Stack to overlay coach marks on first launch
-    if (!tutorialCompleted) {
-      return Stack(
-        children: [
-          scaffold,
-          // Measure the bottom nav bar using its GlobalKey, then show overlay
-          CoachMarkOverlay(
-            bottomNavWidth:
-                _navBarGlobalKey.currentContext?.size?.width ??
-                MediaQuery.of(context).size.width,
-            bottomNavHeight:
-                _navBarGlobalKey.currentContext?.size?.height ??
-                MediaQuery.of(context).size.height * 0.08,
-          ),
-        ],
-      );
-    }
+        // Wrap scaffold in a Stack to overlay coach marks on first launch
+        if (!tutorialCompleted) {
+          return Stack(
+            children: [
+              scaffold,
+              // Measure the bottom nav bar using its GlobalKey, then show overlay
+              CoachMarkOverlay(
+                bottomNavWidth:
+                    _navBarGlobalKey.currentContext?.size?.width ??
+                    MediaQuery.of(context).size.width,
+                bottomNavHeight:
+                    _navBarGlobalKey.currentContext?.size?.height ??
+                    MediaQuery.of(context).size.height * 0.08,
+              ),
+            ],
+          );
+        }
 
-    return scaffold;
+        return scaffold;
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => const Scaffold(
+        body: Center(child: Text('Failed to load tutorial state')),
+      ),
+    );
   }
 
   String _tabTitle(int index) {
@@ -437,7 +447,7 @@ class _HomeFeedTab extends ConsumerWidget {
                   color: AppTheme.textSecondary,
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => SettingsView()),
+                    MaterialPageRoute(builder: (_) => const SettingsView()),
                   ),
                 ),
               ),

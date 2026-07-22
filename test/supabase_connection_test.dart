@@ -11,6 +11,12 @@ import 'package:local_services_marketplace/core/constants/app_constants.dart';
 /// 4. Data fetching from categories and jobs works
 /// 5. Realtime subscriptions can be established
 void main() {
+    if (!AppConstants.isSupabaseConfigured) {
+    // ignore: avoid_print
+    print('Skipping Supabase connection tests: credentials not configured');
+    return;
+  }
+
   late SupabaseClient supabase;
 
   setUpAll(() {

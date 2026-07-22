@@ -41,6 +41,8 @@ const VALID_CATEGORIES = [
 const OPENROUTER_BASE_URL =
   Deno.env.get("OPENROUTER_BASE_URL") || "https://openrouter.ai/api/v1";
 
+const APP_REFERER = Deno.env.get("SUPABASE_URL") || "https://localservices.app";
+
 /**
  * Call OpenRouter chat completions API.
  * Uses google/gemma-4-26b-a4b-it:free for text generation (profiles).
@@ -59,8 +61,7 @@ async function callOpenRouter(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://izjfugswuwyinaeauhvz.supabase.co",
+      Authorization: `Bearer ${apiKey}`,            "HTTP-Referer": APP_REFERER,
       "X-Title": "Local Services Marketplace",
     },
     body: JSON.stringify({
@@ -89,12 +90,12 @@ async function callOpenRouter(
         `${OPENROUTER_BASE_URL}/chat/completions`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": "https://izjfugswuwyinaeauhvz.supabase.co",
-            "X-Title": "Local Services Marketplace",
-          },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": APP_REFERER,
+        "X-Title": "Local Services Marketplace",
+      },
           body: JSON.stringify({
             model: "openrouter/free",
             messages: [

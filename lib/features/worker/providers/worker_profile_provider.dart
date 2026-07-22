@@ -200,10 +200,14 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
               'Return JSON with format: {"bio": "...", "categories": ["..."]}',
           systemPrompt: systemPrompt,
         );
-        generatedBio = result['bio'] as String? ?? _mockTextResponse(rawInput);
-        suggestedCategories =
-            (result['categories'] as List?)?.cast<String>() ??
-            _inferCategories(rawInput);
+        final rawBio = result['bio'];
+        final rawCategories = result['categories'];
+        generatedBio = (rawBio is String && rawBio.trim().isNotEmpty)
+            ? rawBio.trim()
+            : _mockTextResponse(rawInput);
+        suggestedCategories = (rawCategories is List)
+            ? rawCategories.whereType<String>().toList()
+            : _inferCategories(rawInput);
       } else {
         // Demo/mock mode
         await Future.delayed(const Duration(milliseconds: 800));

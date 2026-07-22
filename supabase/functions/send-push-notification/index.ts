@@ -131,10 +131,11 @@ async function getAccessToken(): Promise<string> {
     );
   }
 
-  // Cache the token (expires_in is typically 3600s)
+  // Cache the token (expires_in is typically 3600s). Store expiry in ms so
+  // the comparison with Date.now() works correctly.
   _cachedToken = {
     token: tokenData.access_token,
-    expiresAt: now + (tokenData.expires_in || 3600),
+    expiresAt: (now + (tokenData.expires_in || 3600)) * 1000,
   };
 
   return tokenData.access_token;

@@ -23,9 +23,10 @@ class Message {
   }) : sentAt = sentAt ?? DateTime.now();
 
   bool get isRead => readAt != null;
-  bool get isMine => senderId == currentUserId;
 
-  static String currentUserId = '';
+  /// Whether this message was sent by the currently authenticated user.
+  /// Pass the current user's ID from the provider/session that owns the view.
+  bool isMe(String currentUserId) => senderId == currentUserId;
 
   factory Message.fromJson(Map<String, dynamic> json) {
     final sender = json['sender'] as Map<String, dynamic>?;

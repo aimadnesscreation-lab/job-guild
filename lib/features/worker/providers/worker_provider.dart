@@ -48,10 +48,16 @@ final nearbyWorkersProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final repo = ref.watch(workerRepositoryProvider);
   if (repo == null) return [];
-  final position = await LocationUtils.getCurrentLocation();
-  return repo.getNearbyWorkers(
-    position.latitude,
-    position.longitude,
-    10, // 10km radius
-  );
+  try {
+    final position = await LocationUtils.getCurrentLocation();
+    return await repo.getNearbyWorkers(
+      position.latitude,
+      position.longitude,
+      10, // 10km radius
+    );
+  } catch (e) {
+    // If location permissions are denied or GPS is disabled, fall back to
+    // an empty list so the UI shows the no-results state instead of crashing.
+    return [];
+  }
 });

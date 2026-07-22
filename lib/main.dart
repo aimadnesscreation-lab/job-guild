@@ -21,6 +21,27 @@ Future<void> main() async {
     // .env not present — defaults in AppConstants are used.
   }
 
+  if (!AppConstants.isSupabaseConfigured) {
+    runApp(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Text(
+                'Supabase is not configured.\n\n'
+                'Copy .env.example to .env and fill in your '
+                'SUPABASE_URL and SUPABASE_ANON_KEY.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     publishableKey: AppConstants.supabaseAnonKey,

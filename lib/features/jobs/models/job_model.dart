@@ -138,6 +138,9 @@ class Job {
     DateTime? scheduledFor,
     DateTime? createdAt,
     bool clearAiMetadata = false,
+    bool clearBudgetAmount = false,
+    bool clearLocationText = false,
+    bool clearScheduledFor = false,
   }) {
     return Job(
       id: id ?? this.id,
@@ -148,14 +151,17 @@ class Job {
       aiExtractedMetadata: clearAiMetadata
           ? null
           : (aiExtractedMetadata ?? this.aiExtractedMetadata),
-      budgetAmount: budgetAmount ?? this.budgetAmount,
+      budgetAmount:
+          clearBudgetAmount ? null : (budgetAmount ?? this.budgetAmount),
       budgetType: budgetType ?? this.budgetType,
-      locationText: locationText ?? this.locationText,
+      locationText:
+          clearLocationText ? null : (locationText ?? this.locationText),
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       status: status ?? this.status,
       urgency: urgency ?? this.urgency,
-      scheduledFor: scheduledFor ?? this.scheduledFor,
+      scheduledFor:
+          clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
       createdAt: createdAt ?? this.createdAt,
     );
   }

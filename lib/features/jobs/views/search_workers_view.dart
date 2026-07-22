@@ -67,10 +67,19 @@ class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
           q.isEmpty ||
           w.name.toLowerCase().contains(q) ||
           w.category.toLowerCase().contains(q);
+      final matchesAvailability =
+          _selectedAvailability == 'Any' ||
+          w.availability.toLowerCase() ==
+              _selectedAvailability.toLowerCase();
+      // distance_meters is returned by the nearby-workers RPC.
+      final distanceKm = w.distanceMeters / 1000.0;
+      final matchesDistance = distanceKm <= _maxDistance;
       return matchesCategory &&
           matchesRating &&
           matchesVerified &&
-          matchesSearch;
+          matchesSearch &&
+          matchesAvailability &&
+          matchesDistance;
     }).toList();
   }
 
@@ -382,6 +391,7 @@ class _WorkerResult {
   final double rating;
   final int totalJobs;
   final String distance;
+  final num distanceMeters;
   final String hourlyRate;
   final String category;
   final bool isVerified;
@@ -393,6 +403,7 @@ class _WorkerResult {
     required this.rating,
     required this.totalJobs,
     required this.distance,
+    required this.distanceMeters,
     required this.hourlyRate,
     required this.category,
     required this.isVerified,
@@ -411,6 +422,7 @@ class _WorkerResult {
       distance: distanceM > 0
           ? '${(distanceM / 1000).toStringAsFixed(1)} km'
           : '—',
+      distanceMeters: distanceM,
       hourlyRate: hourly != null ? 'Rs. $hourly/hr' : 'Negotiable',
       category: m['category'] as String? ?? 'General Labor',
       isVerified: m['is_verified'] as bool? ?? false,

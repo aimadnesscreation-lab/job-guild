@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.applications (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     job_id UUID REFERENCES public.jobs(id) ON DELETE CASCADE NOT NULL,
     worker_id UUID REFERENCES public.worker_profiles(id) ON DELETE CASCADE NOT NULL,
-    status TEXT DEFAULT 'interested' CHECK (status IN ('interested', 'shortlisted', 'hired', 'rejected')),
+    status TEXT DEFAULT 'interested' CHECK (status IN ('interested', 'shortlisted', 'hired', 'rejected', 'completed')),
     message TEXT,
     applied_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(job_id, worker_id)
@@ -233,7 +233,11 @@ RETURNS TABLE (
     bio TEXT,
     average_rating DECIMAL,
     total_jobs_completed INTEGER,
-    distance_meters FLOAT
+    distance_meters FLOAT,
+    availability TEXT,
+    category TEXT,
+    is_verified BOOLEAN,
+    hourly_rate_pkr INTEGER
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -245,10 +249,15 @@ BEGIN
     wp.bio, 
     wp.average_rating, 
     wp.total_jobs_completed,
-    st_distance(u.current_location, st_setsrid(st_makepoint(lng, lat), 4326)::geography) as distance_meters
+    st_distance(u.current_location, st_setsrid(st_makepoint(lng, lat), 4326)::geography) as distance_meters,
+    wp.availability_status as availability,
+    (SELECT c.name_en FROM worker_categories wc JOIN categories c ON wc.category_id = c.id WHERE wc.worker_id = wp.id LIMIT 1) as category,
+    u.is_verified,
+    wp.hourly_rate_pkr
   FROM users u
   JOIN worker_profiles wp ON u.id = wp.id
-  WHERE st_dwithin(
+  WHERE u.current_location IS NOT NULL
+  AND st_dwithin(
     u.current_location,
     st_setsrid(st_makepoint(lng, lat), 4326)::geography,
     radius_km * 1000

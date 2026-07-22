@@ -14,6 +14,12 @@ class SupabaseRepository {
 
   SupabaseRepository(this._client);
 
+  /// Safely cast a Supabase response into a list of row maps.
+  static List<Map<String, dynamic>> _safeList(dynamic response) {
+    if (response is! List) return <Map<String, dynamic>>[];
+    return response.whereType<Map<String, dynamic>>().toList();
+  }
+
   // ─── Jobs ─────────────────────────────────────────────────
 
   Future<List<Job>> getNearbyJobs({
@@ -113,7 +119,7 @@ class SupabaseRepository {
           )
           .eq('worker_id', workerId)
           .order('created_at', ascending: false);
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }
@@ -142,7 +148,7 @@ class SupabaseRepository {
           )
           .eq('worker_id', workerId)
           .order('created_at', ascending: false);
-      final allApps = (response as List).cast<Map<String, dynamic>>();
+      final allApps = _safeList(response);
       // Client-side filter: include hired apps OR apps for completed jobs.
       return allApps.where((a) {
         if (a['status'] == 'hired') return true;
@@ -163,7 +169,8 @@ class SupabaseRepository {
       final response = await client
           .from('applications')
           .select('worker_id')
-          .eq('job_id', jobId);
+          .eq('job_id', jobId)
+          .neq('status', 'rejected');
       return response.length;
     } catch (e) {
       return 0;
@@ -184,7 +191,7 @@ class SupabaseRepository {
           )
           .eq('job_id', jobId)
           .order('created_at');
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }
@@ -252,7 +259,7 @@ class SupabaseRepository {
           .select()
           .eq('job_id', conversationId)
           .order('sent_at');
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }
@@ -312,7 +319,7 @@ class SupabaseRepository {
           )
           .or('reviewer_id.eq.$userId,reviewee_id.eq.$userId')
           .order('created_at', ascending: false);
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       debugPrint('[Reviews] getUserReviews error: $e');
       return [];
@@ -333,7 +340,7 @@ class SupabaseRepository {
             'favorited_user_id!inner(id, full_name, is_verified, worker_profiles(headline, average_rating, total_jobs_completed))',
           )
           .eq('user_id', userId);
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }
@@ -403,7 +410,7 @@ class SupabaseRepository {
           .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false);
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }
@@ -430,7 +437,7 @@ class SupabaseRepository {
           .select()
           .eq('reporter_id', userId)
           .order('created_at', ascending: false);
-      return response.cast<Map<String, dynamic>>();
+      return _safeList(response);
     } catch (e) {
       return [];
     }

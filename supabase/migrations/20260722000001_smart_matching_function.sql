@@ -69,35 +69,29 @@ BEGIN
   v_job_point := ST_SetSRID(ST_MakePoint(v_job_lng, v_job_lat), 4326);
 
   RETURN QUERY
-  WITH  workers_with_distance AS (
+  WITH workers_with_distance AS (
     SELECT
-      wp.user_id,
+      wp.id AS user_id,
       wp.service_radius_km,
       wp.average_rating,
       wp.total_jobs_completed,
       wp.availability_status,
       wp.response_time_avg_minutes,
-      -- Compute distance inline using the user's location from the users table
+      -- Compute distance inline using the user's PostGIS current_location
       COALESCE(
-        ST_Distance(
-          ST_SetSRID(ST_MakePoint(
-            COALESCE(u.location_lng, 74.3587),
-            COALESCE(u.location_lat, 31.5204)
-          ), 4326),
-          v_job_point
-        ) / 1000.0,
+        ST_Distance(u.current_location, v_job_point) / 1000.0,
         999999
       ) AS distance_km,
       -- Check if worker offers the job's category
       EXISTS (
         SELECT 1 FROM worker_categories wc
         JOIN categories c ON wc.category_id = c.id
-        WHERE wc.worker_id = wp.user_id AND c.id = v_job_category_id
+        WHERE wc.worker_id = wp.id AND c.id = v_job_category_id
       ) AS has_category
     FROM worker_profiles wp
-    LEFT JOIN public.users u ON wp.user_id = u.id
-    WHERE wp.user_id IS NOT NULL
-      AND wp.user_id <> v_employer_id
+    JOIN public.users u ON wp.id = u.id
+    WHERE wp.id IS NOT NULL
+      AND wp.id <> v_employer_id
   ),
   worker_scores AS (
     SELECT
@@ -153,7 +147,7 @@ BEGIN
     CASE
       WHEN ws.category_match = 0 THEN 'Does not offer this category'
       WHEN ws.availability_status = 'offline' THEN 'Worker is offline'
-      WHEN ws.distance_km > (SELECT service_radius_km FROM worker_profiles WHERE user_id = ws.user_id) THEN 'Outside service radius'
+      WHEN ws.distance_km > (SELECT service_radius_km FROM worker_profiles WHERE id = ws.user_id) THEN 'Outside service radius'
       ELSE
         CONCAT(
           'Match score ', ROUND((ws.raw_distance_score + ws.raw_rating_score + ws.raw_experience_score + ws.raw_availability_score + ws.raw_response_score)::NUMERIC, 0),

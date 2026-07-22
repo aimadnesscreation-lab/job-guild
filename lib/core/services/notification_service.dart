@@ -102,7 +102,8 @@ class NotificationService {
   /// Detect the current platform
   String _detectPlatform() {
     if (kIsWeb) return 'web';
-    // Default to android for simplicity; iOS also works via FCM
+    if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
+    if (defaultTargetPlatform == TargetPlatform.macOS) return 'ios';
     return 'android';
   }
 
@@ -114,11 +115,8 @@ class NotificationService {
         'Foreground notification: ${notification.title} - ${notification.body}',
       );
       // The notification badge/overlay is handled by the UI layer
-      // via a Riverpod provider that watches for new notifications
-    }
-    // Always forward the data payload
-    if (message.data.isNotEmpty) {
-      _onMessageTap?.call(message.data);
+      // via a Riverpod provider that watches for new notifications.
+      // Do NOT navigate on foreground messages — only taps should navigate.
     }
   }
 

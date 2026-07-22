@@ -10,6 +10,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 
 void main() {
+    if (!AppConstants.isSupabaseConfigured) {
+    // ignore: avoid_print
+    print('Skipping e2e tests: SUPABASE_URL/SUPABASE_ANON_KEY not configured');
+    return;
+  }
+
   late SupabaseClient db;
 
   setUpAll(() {

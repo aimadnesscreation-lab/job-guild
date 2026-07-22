@@ -715,16 +715,13 @@ void main() {
 
   group('Message model', () {
     test('default constructor sets sensible defaults', () {
-      // When both senderId and the static currentUserId are empty strings,
-      // isMine returns true ('' == ''). The app sets currentUserId at login
-      // time so this edge case only arises in test isolation.
       final msg = Message();
       expect(msg.id, '');
       expect(msg.content, '');
       expect(msg.senderName, '');
       expect(msg.contentType, MessageContentType.text);
       expect(msg.isRead, isFalse);
-      expect(msg.isMine, isTrue);
+      expect(msg.isMe('any-user'), isFalse);
     });
 
     test('fromJson parses all fields', () {
@@ -789,21 +786,20 @@ void main() {
       );
     });
 
-    test('isMine compares against currentUserId', () {
-      Message.currentUserId = 'user-1';
+    test('isMe compares against passed currentUserId', () {
       final myMsg = Message.fromJson({
         'id': '1',
         'sender_id': 'user-1',
         'sent_at': '2026-07-20T10:00:00.000Z',
       });
-      expect(myMsg.isMine, isTrue);
+      expect(myMsg.isMe('user-1'), isTrue);
 
       final otherMsg = Message.fromJson({
         'id': '2',
         'sender_id': 'user-2',
         'sent_at': '2026-07-20T10:00:00.000Z',
       });
-      expect(otherMsg.isMine, isFalse);
+      expect(otherMsg.isMe('user-1'), isFalse);
     });
 
     test('toJson round-trips correctly', () {

@@ -75,23 +75,12 @@ class WorkerRepository {
       // RPC not available (e.g. migration not run yet) — fall through.
     }
 
-    // Fallback: insert-then-update via PostgREST.
-    try {
-      // Try INSERT first.
-      await _supabase.from('worker_profiles').insert({
-        'id': userId,
-        ...payload,
-      });
-    } catch (_) {
-      // INSERT failed (row already exists) — UPDATE instead.
-      // Remove 'id' from the payload to avoid PostgREST rejecting the
-      // PATCH request when the primary key is included in the body.
-      final updatePayload = Map<String, dynamic>.from(payload)..remove('id');
-      await _supabase
-          .from('worker_profiles')
-          .update(updatePayload)
-          .eq('id', userId);
-    }
+    // Fallback: atomic upsert via PostgREST. This avoids the race between
+    // INSERT and UPDATE and correctly handles the id primary key.
+    await _supabase.from('worker_profiles').upsert(
+      payload,
+      onConflict: 'id',
+    );
 
     // Persist categories (best-effort, non-fatal).
     await _saveCategories(userId, profile.categories);
@@ -174,7 +163,7 @@ class WorkerRepository {
           .map((r) => (r as Map<String, dynamic>)['worker_id'] as String)
           .toList();
       if (workerIds.isNotEmpty) {
-        query = query.filter('id', 'in', '(${workerIds.join(',')})');
+        query = query.filter('id', 'in', workerIds);
       } else {
         // No workers match the category — return empty.
         return [];

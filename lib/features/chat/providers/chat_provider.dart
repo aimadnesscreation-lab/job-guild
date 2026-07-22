@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -101,6 +103,18 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// Generate a v4 UUID without adding a dependency.
+  String _generateUuid() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
   /// Fetch the current user's conversations from Supabase
   Future<void> _loadConversations() async {
     try {
@@ -119,12 +133,11 @@ class ChatNotifier extends Notifier<ChatState> {
       // on the top-level `job_id` column.
       //
       // 1. Jobs the user posted as employer
-      final employerJobIds =
-          (await client.from('jobs').select('id').eq('employer_id', userId))
-              as List;
-      final jobIds = employerJobIds
-          .map((j) => (j as Map<String, dynamic>)['id'] as String)
-          .toList();
+      final employerJobIdsRaw = await client
+          .from('jobs')
+          .select('id')
+          .eq('employer_id', userId);
+      final jobIds = _parseJobIds(employerJobIdsRaw);
 
       // 2. Jobs the user applied to as a worker (best-effort — the user may
       //    not have a worker_profile yet, or RLS may deny the query).
@@ -135,9 +148,8 @@ class ChatNotifier extends Notifier<ChatState> {
             .from('applications')
             .select('job_id')
             .eq('worker_id', userId);
-        for (final row in (appliedJobs as List)) {
-          final jid = (row as Map<String, dynamic>)['job_id'] as String?;
-          if (jid != null && !jobIds.contains(jid)) {
+        for (final jid in _parseJobIds(appliedJobs)) {
+          if (!jobIds.contains(jid)) {
             jobIds.add(jid);
           }
         }
@@ -157,13 +169,14 @@ class ChatNotifier extends Notifier<ChatState> {
       if (jobIds.isEmpty) {
         query.eq('sender_id', userId);
       } else {
-        // Build proper PostgREST in.() syntax: job_id.in.(id1,id2,id3)
-        final jobIdsStr = jobIds.join(',');
-        query.or('sender_id.eq.$userId,job_id.in.($jobIdsStr)');
+        // Build a proper PostgREST `in` filter string:
+        //   job_id.in.(id1,id2,id3)
+        final jobIdFilter = jobIds.map((id) => id).join(',');
+        query.or('sender_id.eq.$userId,job_id.in.($jobIdFilter)');
       }
       final response = await query.order('sent_at', ascending: false);
 
-      final data = response as List;
+      final data = _safeList(response);
 
       // First pass: collect unique other-user IDs for a single batched lookup.
       final uniqueOtherIds = <String>{};
@@ -191,16 +204,13 @@ class ChatNotifier extends Notifier<ChatState> {
       // Batch-lookup all unique user names in a single query.
       final nameCache = <String, String>{};
       if (uniqueOtherIds.isNotEmpty) {
-        try {              final userIdsList = uniqueOtherIds.toList();
-              // PostgREST `in` filter requires a comma-separated string
-              // wrapped in parentheses, e.g. "(id1,id2,id3)". Passing a
-              // Dart List would toString as "[id1, id2]" which is invalid.
-              final idFilter = '(${userIdsList.join(',')})';
-              final userDataList = await client
-                  .from('users')
-                  .select('id, full_name')
-                  .filter('id', 'in', idFilter);
-          for (final userData in (userDataList as List)) {
+        try {
+          final userIdsList = uniqueOtherIds.toList();
+          final userDataList = await client
+              .from('users')
+              .select('id, full_name')
+              .filter('id', 'in', userIdsList);
+          for (final userData in _safeList(userDataList)) {
             final uid = userData['id'] as String?;
             final name = userData['full_name'] as String?;
             if (uid != null && name != null && name.isNotEmpty) {
@@ -259,7 +269,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
       // Subscribe to realtime updates for the conversation list now that
       // we have the job IDs cached.
-      _subscribeToConversations();
+      _subscribeToConversations(userId);
     } catch (e) {
       state = ChatState(
         isLoading: false,
@@ -268,20 +278,32 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// Safely parse a Supabase response into a list of row maps.
+  List<Map<String, dynamic>> _safeList(dynamic response) {
+    if (response is! List) return <Map<String, dynamic>>[];
+    return response
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  /// Extract job IDs from a Supabase list response.
+  List<String> _parseJobIds(dynamic response) {
+    return _safeList(response)
+        .map((j) => j['id'] as String?)
+        .whereType<String>()
+        .toList();
+  }
+
   // ─── Global Realtime (conversation list) ─────────────────────────
 
   /// Subscribe to INSERT events on the `messages` table so the conversation
   /// list updates live when a new message arrives — even if the user is not
-  /// currently viewing that conversation.  The callback checks the cached
-  /// [_userJobIds] set to filter only relevant messages (ignoring messages
-  /// for other users' conversations entirely).
-  void _subscribeToConversations() {
+  /// currently viewing that conversation.
+  void _subscribeToConversations(String userId) {
     // Unsubscribe previous channel before creating a new one
     _conversationsChannel?.unsubscribe();
 
     final client = Supabase.instance.client;
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) return;
 
     _conversationsChannel = client.channel('conversations:$userId');
     _conversationsChannel!.onPostgresChanges(
@@ -293,17 +315,24 @@ class ChatNotifier extends Notifier<ChatState> {
     _conversationsChannel!.subscribe();
   }
 
-  /// Handle a new message INSERT that is relevant to the current user
-  /// (its `job_id` is in [_userJobIds]).  Updates the conversation preview
-  /// live.  If the conversation is not yet in the list (new conversation),
-  /// fetches job title + other user info and creates a fresh entry.
+  /// Handle a new message INSERT. If the job_id is not in the cached set,
+  /// verify on the fly that the current user is a participant before adding
+  /// it to the list.
   Future<void> _onConversationMessageInsert(
     PostgresChangePayload payload,
     String userId,
   ) async {
     final record = payload.newRecord;
     final jobId = record['job_id'] as String? ?? '';
-    if (jobId.isEmpty || !_userJobIds.contains(jobId)) return;
+    if (jobId.isEmpty) return;
+
+    if (!_userJobIds.contains(jobId)) {
+      // New job appeared after we loaded conversations. Verify participation
+      // before adding it to the cache.
+      final isParticipant = await _isParticipant(jobId, userId);
+      if (!isParticipant) return;
+      _userJobIds.add(jobId);
+    }
 
     final senderId = record['sender_id'] as String? ?? '';
     final content = record['content'] as String? ?? '';
@@ -380,6 +409,29 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// Check whether the current user is a participant in the given job.
+  Future<bool> _isParticipant(String jobId, String userId) async {
+    try {
+      final client = Supabase.instance.client;
+      final job = await client
+          .from('jobs')
+          .select('employer_id')
+          .eq('id', jobId)
+          .maybeSingle();
+      if (job == null) return false;
+      if ((job['employer_id'] as String?) == userId) return true;
+      final application = await client
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', userId)
+          .maybeSingle();
+      return application != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Update the conversation preview for a recently-sent message (used by
   /// [sendMessage] and [sendVoice] so the chat list shows the latest text).
   void _updateConversationPreview(
@@ -399,7 +451,11 @@ class ChatNotifier extends Notifier<ChatState> {
       otherUserId: conv.otherUserId,
       otherUserName: conv.otherUserName,
       otherUserPhotoUrl: conv.otherUserPhotoUrl,
-      lastMessage: Message(content: content, sentAt: now, contentType: contentType),
+      lastMessage: Message(
+        content: content,
+        sentAt: now,
+        contentType: contentType,
+      ),
       unreadCount: conv.unreadCount,
       updatedAt: now,
     );
@@ -409,8 +465,7 @@ class ChatNotifier extends Notifier<ChatState> {
     state = state.copyWith(conversations: list);
   }
 
-  /// Parse a content_type string into [MessageContentType] (mirrors the
-  /// private static [Message._parseContentType] which we cannot access).
+  /// Parse a content_type string into [MessageContentType].
   static MessageContentType _parseContentType(String? type) {
     switch (type) {
       case 'image':
@@ -522,8 +577,6 @@ class ChatNotifier extends Notifier<ChatState> {
   Future<void> _fetchMessages(String conversationId) async {
     try {
       final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-      Message.currentUserId = userId ?? '';
 
       final messages = await client
           .from('messages')
@@ -531,8 +584,8 @@ class ChatNotifier extends Notifier<ChatState> {
           .eq('job_id', conversationId)
           .order('sent_at');
 
-      final parsed = (messages as List)
-          .map((json) => Message.fromJson(json as Map<String, dynamic>))
+      final parsed = _safeList(messages)
+          .map((json) => Message.fromJson(json))
           .toList();
 
       // Warm the sender cache so realtime inserts can be enriched cheaply.
@@ -567,7 +620,9 @@ class ChatNotifier extends Notifier<ChatState> {
 
   /// Send a message via Supabase with optimistic UI update and offline queue.
   ///
-  /// 1. Optimistically adds the message to the UI immediately.
+  /// 1. Optimistically adds the message to the UI immediately using the same
+  ///    UUID that will be inserted into Supabase, so the realtime delta
+  ///    overwrites it rather than duplicating it.
   /// 2. Tries to send to Supabase.
   /// 3. On failure, saves to local queue and marks as unsent.
   Future<void> sendMessage(String text, {String? imageUrl}) async {
@@ -577,19 +632,20 @@ class ChatNotifier extends Notifier<ChatState> {
     if (conversationId == null) return;
 
     final client = Supabase.instance.client;
-    final userId = client.auth.currentUser?.id ?? 'anonymous';
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
 
-    // Create an optimistic message with a temporary ID
-    final optimisticId = 'opt_${DateTime.now().millisecondsSinceEpoch}';
+    final messageId = _generateUuid();
+    final content = imageUrl ?? text.trim();
+    final contentType = imageUrl != null ? 'image' : 'text';
+
     final optimisticMsg = Message(
-      id: optimisticId,
+      id: messageId,
       jobId: conversationId,
       senderId: userId,
       senderName: 'You',
-      contentType: imageUrl != null
-          ? MessageContentType.image
-          : MessageContentType.text,
-      content: imageUrl ?? text.trim(),
+      contentType: _parseContentType(contentType),
+      content: content,
       sentAt: DateTime.now(),
     );
 
@@ -600,16 +656,17 @@ class ChatNotifier extends Notifier<ChatState> {
     // the new message without waiting for the server round-trip.
     _updateConversationPreview(
       conversationId,
-      imageUrl ?? text.trim(),
-      imageUrl != null ? MessageContentType.image : MessageContentType.text,
+      content,
+      optimisticMsg.contentType,
     );
 
     try {
       await client.from('messages').insert({
+        'id': messageId,
         'job_id': conversationId,
         'sender_id': userId,
-        'content': imageUrl ?? text.trim(),
-        'content_type': imageUrl != null ? 'image' : 'text',
+        'content': content,
+        'content_type': contentType,
         if (imageUrl != null)
           'metadata': jsonEncode({'type': 'image', 'url': imageUrl}),
       });
@@ -618,10 +675,12 @@ class ChatNotifier extends Notifier<ChatState> {
     } catch (e) {
       // Save to offline queue
       await _addToOfflineQueue({
+        'id': messageId,
         'job_id': conversationId,
-        'sender_id': userId,
-        'content': imageUrl ?? text.trim(),
-        'content_type': imageUrl != null ? 'image' : 'text',
+        'content': content,
+        'content_type': contentType,
+        if (imageUrl != null)
+          'metadata': jsonEncode({'type': 'image', 'url': imageUrl}),
         'failed_at': DateTime.now().toIso8601String(),
       });
       state = state.copyWith(
@@ -636,9 +695,7 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getString('message_queue');
-      final queue = existing != null
-          ? (jsonDecode(existing) as List).cast<Map<String, dynamic>>()
-          : <Map<String, dynamic>>[];
+      final queue = existing != null ? _safeList(jsonDecode(existing)) : <Map<String, dynamic>>[];
       queue.add(msg);
       await prefs.setString('message_queue', jsonEncode(queue));
       debugPrint('[OfflineQueue] Message queued. Queue size: ${queue.length}');
@@ -647,26 +704,35 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// Retry sending all queued offline messages
+  /// Retry sending all queued offline messages.
+  ///
+  /// SECURITY: The stored `sender_id` is never trusted. Every queued message
+  /// is stamped with the currently authenticated user's ID before insertion,
+  /// preventing local-storage spoofing of another user's identity.
   Future<void> retryOfflineQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getString('message_queue');
       if (existing == null) return;
 
-      final queue = (jsonDecode(existing) as List).cast<Map<String, dynamic>>();
+      final queue = _safeList(jsonDecode(existing));
       if (queue.isEmpty) return;
 
       final client = Supabase.instance.client;
+      final currentUserId = client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
       final remaining = <Map<String, dynamic>>[];
 
       for (final msg in queue) {
         try {
           await client.from('messages').insert({
+            'id': msg['id'] as String?,
             'job_id': msg['job_id'],
-            'sender_id': msg['sender_id'],
+            'sender_id': currentUserId,
             'content': msg['content'],
             'content_type': msg['content_type'],
+            if (msg['metadata'] != null) 'metadata': msg['metadata'],
           });
           debugPrint('[OfflineQueue] Delivered queued message');
         } catch (e) {
@@ -688,7 +754,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
   /// Send an image message
   Future<void> sendImage(String imageUrl) async {
-    await sendMessage('🖼️ Image', imageUrl: imageUrl);
+    await sendMessage('', imageUrl: imageUrl);
   }
 
   /// Send a voice message — stores the audio URL with content_type: 'voice'
@@ -700,12 +766,14 @@ class ChatNotifier extends Notifier<ChatState> {
     if (conversationId == null) return;
 
     final client = Supabase.instance.client;
-    final userId = client.auth.currentUser?.id ?? 'anonymous';
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    final messageId = _generateUuid();
 
     // Optimistic message
-    final optimisticId = 'opt_${DateTime.now().millisecondsSinceEpoch}';
     final optimisticMsg = Message(
-      id: optimisticId,
+      id: messageId,
       jobId: conversationId,
       senderId: userId,
       senderName: 'You',
@@ -724,6 +792,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
     try {
       await client.from('messages').insert({
+        'id': messageId,
         'job_id': conversationId,
         'sender_id': userId,
         'content': audioUrl,
@@ -733,10 +802,11 @@ class ChatNotifier extends Notifier<ChatState> {
       state = state.copyWith(isSending: false, clearError: true);
     } catch (e) {
       await _addToOfflineQueue({
+        'id': messageId,
         'job_id': conversationId,
-        'sender_id': userId,
         'content': audioUrl,
         'content_type': 'voice',
+        'metadata': jsonEncode({'type': 'voice', 'url': audioUrl}),
         'failed_at': DateTime.now().toIso8601String(),
       });
       state = state.copyWith(
