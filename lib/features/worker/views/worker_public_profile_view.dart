@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/utils/responsive.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
-import 'package:local_services_marketplace/features/chat/views/chat_detail_view.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_profile_provider.dart';
 
 /// Public (read-only) worker profile as seen by an employer.
@@ -21,14 +22,14 @@ class WorkerPublicProfileView extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Worker Profile'),
+        title: Text(ref.watch(appStringsProvider).workerProfile),
         actions: [
           IconButton(
             icon: const Icon(Icons.flag_outlined),
             onPressed: () {
-              // TODO: Report user
+              _showReportUserDialog(context, ref, p.userId, p.fullName);
             },
-            tooltip: 'Report',
+            tooltip: ref.watch(appStringsProvider).reportUser,
           ),
         ],
       ),
@@ -80,7 +81,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _InfoSection(
-                  title: 'About',
+                  title: ref.watch(appStringsProvider).about,
                   icon: Icons.description_outlined,
                   child: Text(
                     p.bio!,
@@ -98,21 +99,27 @@ class WorkerPublicProfileView extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _InfoSection(
-                  title: 'Categories',
+                  title: ref.watch(appStringsProvider).categories,
                   icon: Icons.category_rounded,
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     children: p.categories
-                        .map((cat) => Chip(
-                              label: Text(cat, style: const TextStyle(fontSize: 12)),
-                              backgroundColor: AppTheme.primaryColor
-                                  .withValues(alpha: 0.1),
-                              side: BorderSide.none,
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ))
+                        .map(
+                          (cat) => Chip(
+                            label: Text(
+                              cat,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            backgroundColor: AppTheme.primaryColor.withValues(
+                              alpha: 0.1,
+                            ),
+                            side: BorderSide.none,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        )
                         .toList(),
                   ),
                 ),
@@ -127,15 +134,16 @@ class WorkerPublicProfileView extends ConsumerWidget {
                   Expanded(
                     child: _InfoTile(
                       icon: Icons.work_outline,
-                      title: 'Experience',
-                      value: '${p.yearsExperience} years',
+                      title: ref.watch(appStringsProvider).experience,
+                      value:
+                          '${p.yearsExperience} ${ref.watch(appStringsProvider).years}',
                     ),
                   ),
                   if (p.hourlyRatePkr != null)
                     Expanded(
                       child: _InfoTile(
                         icon: Icons.monetization_on_outlined,
-                        title: 'Hourly Rate',
+                        title: ref.watch(appStringsProvider).hourlyRate,
                         value: 'Rs. ${p.hourlyRatePkr}/hr',
                         valueColor: AppTheme.accentDark,
                       ),
@@ -150,7 +158,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _InfoTile(
                 icon: Icons.near_me_rounded,
-                title: 'Service Radius',
+                title: ref.watch(appStringsProvider).serviceRadius,
                 value: '${p.serviceRadiusKm} km',
               ),
             ),
@@ -161,8 +169,8 @@ class WorkerPublicProfileView extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _InfoTile(
                 icon: Icons.location_on_outlined,
-                title: 'Location',
-                value: 'Lahore, Pakistan',
+                title: ref.watch(appStringsProvider).location,
+                value: ref.watch(appStringsProvider).lahorePakistan,
               ),
             ),
             const SizedBox(height: 16),
@@ -172,39 +180,47 @@ class WorkerPublicProfileView extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _InfoSection(
-                  title: 'Portfolio (${p.portfolioMediaUrls.length})',
+                  title:
+                      '${ref.watch(appStringsProvider).portfolioCount} (${p.portfolioMediaUrls.length})',
                   icon: Icons.photo_library_outlined,
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: p.portfolioMediaUrls.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () {
-                          // TODO: Open full-screen image viewer
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            p.portfolioMediaUrls[index],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: AppTheme.surfaceColor,
-                              child: const Icon(Icons.broken_image_outlined,
-                                  color: AppTheme.textDisabled),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: p.portfolioMediaUrls.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () {
+                            _showFullScreenImage(
+                              context,
+                              p.portfolioMediaUrls[index],
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              p.portfolioMediaUrls[index],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (_, _, _) => Container(
+                                color: AppTheme.surfaceColor,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppTheme.textDisabled,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -227,13 +243,15 @@ class WorkerPublicProfileView extends ConsumerWidget {
                   ),
                   title: Text(
                     p.isVerified
-                        ? 'Verified Worker'
-                        : 'Not Yet Verified',
+                        ? ref.watch(appStringsProvider).verifiedWorker
+                        : ref.watch(appStringsProvider).notYetVerified,
                   ),
                   subtitle: Text(
                     p.isVerified
-                        ? 'Identity confirmed'
-                        : 'This worker has not completed verification',
+                        ? ref.watch(appStringsProvider).identityConfirmed
+                        : ref
+                              .watch(appStringsProvider)
+                              .notCompletedVerification,
                   ),
                 ),
               ),
@@ -268,7 +286,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
               IconButton.outlined(
                 onPressed: () => _toggleFavorite(context, ref, p.userId),
                 icon: const Icon(Icons.bookmark_border_rounded),
-                tooltip: 'Save',
+                tooltip: ref.watch(appStringsProvider).save,
               ),
               const SizedBox(width: 8),
               // Message button
@@ -276,7 +294,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => _message(context, ref, p),
                   icon: const Icon(Icons.chat_outlined),
-                  label: const Text('Message'),
+                  label: Text(ref.watch(appStringsProvider).message),
                 ),
               ),
               const SizedBox(width: 8),
@@ -285,7 +303,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
                 child: FilledButton.icon(
                   onPressed: () => _message(context, ref, p),
                   icon: const Icon(Icons.handshake_rounded),
-                  label: const Text('Hire'),
+                  label: Text(ref.watch(appStringsProvider).hire),
                 ),
               ),
             ],
@@ -296,49 +314,234 @@ class WorkerPublicProfileView extends ConsumerWidget {
   }
 }
 
-
-  void _toggleFavorite(BuildContext context, WidgetRef ref, String workerId) async {
-    final userId = ref.read(currentUserProvider)?.id;
-    if (userId == null) return;
-    try {
-      await ref.read(supabaseRepositoryProvider).toggleFavorite(userId, workerId);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Worker saved to favorites')),
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save favorite')),
-        );
-      }
+/// Static helper — toggle favorite/unfavorite a worker profile.
+Future<bool> _toggleFavorite(
+  BuildContext context,
+  WidgetRef ref,
+  String workerId,
+) async {
+  final userId = ref.read(currentUserProvider)?.id;
+  if (userId == null) return false;
+  try {
+    final isNowFavorited = await ref
+        .read(supabaseRepositoryProvider)
+        .toggleFavorite(userId, workerId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isNowFavorited
+                ? ref.read(appStringsProvider).workerSavedFavorites
+                : ref.read(appStringsProvider).workerRemovedFavorites,
+          ),
+        ),
+      );
     }
+    return isNowFavorited;
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ref.read(appStringsProvider).couldNotSaveFavorite),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+    return false;
   }
+}
 
-  void _message(BuildContext context, WidgetRef ref, WorkerProfile p) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ChatDetailView(
-          conversationId: p.userId,
-          otherUserName: p.fullName,
-          jobTitle: 'Direct message',
+/// Static helper — message a worker.
+void _message(BuildContext context, WidgetRef ref, WorkerProfile p) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(ref.read(appStringsProvider).sendMessageViaJob),
+      backgroundColor: AppTheme.primaryColor,
+    ),
+  );
+}
+
+/// Show a report dialog for flagging this worker's profile.
+void _showReportUserDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String reportedUserId,
+  String reportedUserName,
+) {
+  final reasons = [
+    'Fake profile',
+    'Harassment',
+    'Spam',
+    'Inappropriate content',
+    'Scam',
+    'Other',
+  ];
+  String selectedReason = reasons.first;
+  final detailsController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          const Icon(Icons.flag_outlined, color: AppTheme.errorColor, size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Report $reportedUserName',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Why are you reporting this user?',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: selectedReason,
+              decoration: const InputDecoration(labelText: 'Reason'),
+              items: reasons
+                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) selectedReason = val;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: detailsController,
+              decoration: const InputDecoration(
+                labelText: 'Details (optional)',
+                hintText: 'Describe the issue...',
+                alignLabelWithHint: true,
+              ),
+              maxLines: 3,
+              maxLength: 500,
+            ),
+          ],
         ),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(ref.read(appStringsProvider).cancel),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final userId = ref.read(currentUserProvider)?.id;
+            if (userId == null) return;
+
+            try {
+              await ref.read(supabaseRepositoryProvider).submitReport(
+                    reporterId: userId,
+                    reportedUserId: reportedUserId,
+                    reason: selectedReason,
+                    details: detailsController.text.trim(),
+                  );
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ref.read(appStringsProvider).reportSubmitted),
+                  backgroundColor: AppTheme.primaryColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            } catch (e) {
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to submit report: $e'),
+                  backgroundColor: AppTheme.errorColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          child: Text(ref.read(appStringsProvider).submit),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Show a full-screen image viewer for the given image URL.
+void _showFullScreenImage(BuildContext context, String imageUrl) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          title: const Text('Portfolio Image'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+        body: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Center(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              loadingBuilder: (_, child, progress) {
+                if (progress == null) return child;
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                );
+              },
+              errorBuilder: (_, _, _) => const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.broken_image_outlined,
+                    size: 64,
+                    color: Colors.white38,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Could not load image',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 // ─── Public Profile Sub-widgets ─────────────────────────────────────────
 
-class _PublicProfileHeader extends StatelessWidget {
+class _PublicProfileHeader extends ConsumerWidget {
   final WorkerProfile profile;
 
   const _PublicProfileHeader({required this.profile});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final w = MediaQuery.of(context).size.width;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(Breakpoints.isTablet(w) ? 40 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -359,8 +562,11 @@ class _PublicProfileHeader extends StatelessWidget {
                 ? NetworkImage(profile.profilePhotoUrl!)
                 : null,
             child: profile.profilePhotoUrl == null
-                ? const Icon(Icons.person_rounded,
-                    size: 48, color: AppTheme.primaryColor)
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 48,
+                    color: AppTheme.primaryColor,
+                  )
                 : null,
           ),
           const SizedBox(height: 12),
@@ -377,8 +583,11 @@ class _PublicProfileHeader extends StatelessWidget {
               ),
               if (profile.isVerified) ...[
                 const SizedBox(width: 6),
-                const Icon(Icons.verified_rounded,
-                    color: AppTheme.verifiedBadge, size: 20),
+                const Icon(
+                  Icons.verified_rounded,
+                  color: AppTheme.verifiedBadge,
+                  size: 20,
+                ),
               ],
             ],
           ),
@@ -401,14 +610,17 @@ class _PublicProfileHeader extends StatelessWidget {
               color: AppTheme.surfaceColor,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_on_outlined,
-                    size: 16, color: AppTheme.textSecondary),
-                SizedBox(width: 4),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 4),
                 Text(
-                  '2.3 km away',
+                  '2.3 ${ref.watch(appStringsProvider).kmAway}',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,
@@ -424,13 +636,13 @@ class _PublicProfileHeader extends StatelessWidget {
   }
 }
 
-class _AvailabilityBadge extends StatelessWidget {
+class _AvailabilityBadge extends ConsumerWidget {
   final AvailabilityStatus status;
 
   const _AvailabilityBadge({required this.status});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -444,7 +656,7 @@ class _AvailabilityBadge extends StatelessWidget {
           Icon(status.icon, size: 18, color: AppTheme.primaryColor),
           const SizedBox(width: 6),
           Text(
-            'Available: ${status.label}',
+            '${ref.watch(appStringsProvider).availablePrefix} ${status.label}',
             style: const TextStyle(
               color: AppTheme.primaryColor,
               fontWeight: FontWeight.w600,

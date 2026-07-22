@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
@@ -16,8 +18,7 @@ class LanguageSelectionView extends ConsumerStatefulWidget {
       _LanguageSelectionViewState();
 }
 
-class _LanguageSelectionViewState
-    extends ConsumerState<LanguageSelectionView> {
+class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
   String _selectedLanguage = 'en';
   final _phoneController = TextEditingController();
   bool _showPhoneInput = false;
@@ -42,7 +43,7 @@ class _LanguageSelectionViewState
     final phone = _phoneController.text.trim();
     if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your phone number')),
+        SnackBar(content: Text(ref.read(appStringsProvider).emptyPhoneError)),
       );
       return;
     }
@@ -52,25 +53,23 @@ class _LanguageSelectionViewState
     final normalizedPhone = AuthNotifier.normalizePhone(phone);
     try {
       await ref.read(authProvider.notifier).sendOtp(phone: phone);
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OtpVerificationView(phoneNumber: normalizedPhone),
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationView(phoneNumber: normalizedPhone),
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send code: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${ref.read(appStringsProvider).failedToSendCode} $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (context.mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -94,22 +93,22 @@ class _LanguageSelectionViewState
               Text(
                 _selectedLanguage == 'ur'
                     ? AppConstants.appNameUrdu
-                    : AppConstants.appName,
+                    : ref.watch(appStringsProvider).appName,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _selectedLanguage == 'ur'
                     ? 'قریبی پیشہ ور افراد سے اپنی ضروریات پوری کریں'
-                    : 'Get your local jobs done by nearby professionals',
+                    : ref.watch(appStringsProvider).appTagline,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: AppTheme.textSecondary),
               ),
               const Spacer(flex: 1),
               // Language selection (shown before phone input)
@@ -117,7 +116,7 @@ class _LanguageSelectionViewState
                 _LanguageCard(
                   emoji: '🇬🇧',
                   title: 'English',
-                  subtitle: 'Continue in English',
+                  subtitle: ref.watch(appStringsProvider).continueInEnglish,
                   isSelected: _selectedLanguage == 'en',
                   onTap: () => _onLanguageSelected('en'),
                 ),
@@ -125,7 +124,7 @@ class _LanguageSelectionViewState
                 _LanguageCard(
                   emoji: '🇵🇰',
                   title: 'اردو',
-                  subtitle: 'اردو میں جاری رکھیں',
+                  subtitle: ref.watch(appStringsProvider).continueInUrdu,
                   isSelected: _selectedLanguage == 'ur',
                   onTap: () => _onLanguageSelected('ur'),
                 ),
@@ -135,10 +134,10 @@ class _LanguageSelectionViewState
                 Text(
                   _selectedLanguage == 'ur'
                       ? 'اپنا فون نمبر درج کریں'
-                      : 'Enter your phone number',
+                      : ref.watch(appStringsProvider).enterPhone,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -146,12 +145,10 @@ class _LanguageSelectionViewState
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
                     prefixText: '+92 ',
-                    hintText: _selectedLanguage == 'ur'
-                        ? '300 1234567'
-                        : '300 1234567',
+                    hintText: ref.watch(appStringsProvider).phoneHint,
                     labelText: _selectedLanguage == 'ur'
                         ? 'فون نمبر'
-                        : 'Phone Number',
+                        : ref.watch(appStringsProvider).phoneLabel,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -170,7 +167,7 @@ class _LanguageSelectionViewState
                   label: Text(
                     _selectedLanguage == 'ur'
                         ? 'جاری رکھیں'
-                        : 'Continue',
+                        : ref.watch(appStringsProvider).continueEnglish,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -180,21 +177,17 @@ class _LanguageSelectionViewState
                       _showPhoneInput = false;
                     });
                   },
-                  child: Text(
-                    _selectedLanguage == 'ur' ? 'واپس جائیں' : 'Go back',
-                  ),
+                  child: Text(ref.watch(appStringsProvider).goBack),
                 ),
               ],
               const Spacer(flex: 2),
               // Footer
               Text(
-                _selectedLanguage == 'ur'
-                    ? 'جاری رکھنے سے، آپ ہماری شرائط و ضوابط سے اتفاق کرتے ہیں'
-                    : 'By continuing, you agree to our Terms & Conditions',
+                ref.watch(appStringsProvider).termsFooter,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textDisabled,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textDisabled),
               ),
               const SizedBox(height: 24),
             ],

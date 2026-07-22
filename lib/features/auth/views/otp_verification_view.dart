@@ -1,7 +1,12 @@
+// ignore_for_file: use_build_context_synchronously
+
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
+import 'package:local_services_marketplace/features/home/views/home_view.dart';
 
 /// OTP verification screen — user enters 6-digit code received via SMS.
 /// Handles auto-submit, resend, and error states.
@@ -22,6 +27,7 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
   bool _isResending = false;
   int _resendCountdown = 30;
   String? _error;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
@@ -31,6 +37,7 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     for (final c in _otpControllers) {
       c.dispose();
     }
@@ -42,18 +49,27 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
 
   void _startResendCountdown() {
     _resendCountdown = 30;
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() => _resendCountdown--);
-      return _resendCountdown > 0;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!context.mounted) {
+        _countdownTimer?.cancel();
+        return;
+      }
+      setState(() {
+        _resendCountdown--;
+        if (_resendCountdown <= 0) {
+          _countdownTimer?.cancel();
+          _countdownTimer = null;
+        }
+      });
     });
   }
 
-  String get _otpCode =>
-      _otpControllers.map((c) => c.text).join();
+  String get _otpCode => _otpControllers.map((c) => c.text).join();
 
   void _onDigitChanged(int index, String value) {
+    // Guard: don't auto-submit if already verifying
+    if (_isVerifying) return;
     setState(() => _error = null);
     if (value.length > 1) {
       // Pasted code — fill all fields
@@ -69,6 +85,9 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     }
     if (value.isNotEmpty && index < 5) {
       _otpFocusNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      // Move focus back on backspace
+      _otpFocusNodes[index - 1].requestFocus();
     }
     // Auto-submit when all filled
     if (_otpCode.length == 6) {
@@ -76,16 +95,13 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     }
   }
 
-  void _onDigitBackspace(int index) {
-    if (_otpControllers[index].text.isEmpty && index > 0) {
-      _otpFocusNodes[index - 1].requestFocus();
-    }
-  }
-
   Future<void> _verifyOtp() async {
+    // Guard against re-entrant calls (auto-submit + button tap)
+    if (_isVerifying) return;
+
     final code = _otpCode;
     if (code.length != 6) {
-      setState(() => _error = 'Please enter the full 6-digit code');
+      setState(() => _error = ref.read(appStringsProvider).enterFullCode);
       return;
     }
 
@@ -95,18 +111,24 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     });
 
     try {
-      await ref.read(authProvider.notifier).verifyOtp(
-            phone: widget.phoneNumber,
-            otp: code,
-          );
-      // Auth state changes will trigger navigation in main.dart
+      await ref
+          .read(authProvider.notifier)
+          .verifyOtp(phone: widget.phoneNumber, otp: code);
+      // Auth state changes in main.dart, but the OTP screen was pushed on
+      // top of the route stack — so we must navigate explicitly to HomeView
+      // (clearing the stack) or the user stays stuck on this screen.
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeView()),
+        (route) => false,
+      );
     } catch (e) {
       setState(() {
         _isVerifying = false;
-        _error = 'Invalid code. Please try again.';
+        _error = ref.read(appStringsProvider).invalidCode;
       });
     } finally {
-      if (mounted) setState(() => _isVerifying = false);
+      if (context.mounted) setState(() => _isVerifying = false);
     }
   }
 
@@ -123,12 +145,10 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     _otpFocusNodes[0].requestFocus();
 
     try {
-      await ref.read(authProvider.notifier).sendOtp(
-            phone: widget.phoneNumber,
-          );
+      await ref.read(authProvider.notifier).sendOtp(phone: widget.phoneNumber);
       _startResendCountdown();
     } catch (e) {
-      setState(() => _error = 'Failed to resend code');
+      setState(() => _error = ref.read(appStringsProvider).failedToResend);
     } finally {
       setState(() => _isResending = false);
     }
@@ -137,184 +157,175 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Verify Phone'),
-      ),
+      appBar: AppBar(title: Text(ref.watch(appStringsProvider).verifyPhone)),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const SizedBox(height: 40),
-            // ─── Icon ────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.smartphone_rounded,
-                size: 48,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ─── Instructions ────────────────────────────────
-            const Text(
-              'Enter Verification Code',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text.rich(
-              TextSpan(
-                text: 'Enter the 6-digit code sent to ',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // ─── Icon ────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                children: [
-                  TextSpan(
-                    text: '${widget.phoneNumber.replaceFirst('+92', '+92 ')}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                child: const Icon(
+                  Icons.smartphone_rounded,
+                  size: 48,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ─── Instructions ────────────────────────────────
+              Text(
+                ref.watch(appStringsProvider).enterVerificationCode,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text.rich(
+                TextSpan(
+                  text: ref.watch(appStringsProvider).enterCodeSentTo,
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                  children: [
+                    TextSpan(
+                      text: widget.phoneNumber.replaceFirst('+92', '+92 '),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+
+              // ─── OTP Input ───────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(6, (index) {
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: index == 0 || index == 3 ? 4 : 4,
+                    ),
+                    child: SizedBox(
+                      width: 44,
+                      height: 52,
+                      child: TextField(
+                        controller: _otpControllers[index],
+                        focusNode: _otpFocusNodes[index],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 1,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: _error != null
+                                  ? AppTheme.errorColor
+                                  : AppTheme.borderColor,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: _error != null
+                                  ? AppTheme.errorColor
+                                  : AppTheme.borderColor,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppTheme.primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onChanged: (val) => _onDigitChanged(index, val),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: AppTheme.errorColor,
+                    fontSize: 13,
                   ),
+                ),
+              ],
+              const SizedBox(height: 32),
+
+              // ─── Verify Button ───────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _isVerifying ? null : _verifyOtp,
+                  child: _isVerifying
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          ref.watch(appStringsProvider).verify,
+                          style: TextStyle(fontSize: 16),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ─── Resend ──────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    ref.watch(appStringsProvider).didntReceiveCode,
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  if (_resendCountdown > 0)
+                    Text(
+                      '${ref.watch(appStringsProvider).resendIn}$_resendCountdown s',
+                      style: const TextStyle(
+                        color: AppTheme.textDisabled,
+                        fontSize: 13,
+                      ),
+                    )
+                  else
+                    TextButton(
+                      onPressed: _isResending ? null : _resendOtp,
+                      child: _isResending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(ref.watch(appStringsProvider).resendCode),
+                    ),
                 ],
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // ─── OTP Input ───────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(6, (index) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: index == 0 || index == 3 ? 4 : 4,
-                  ),
-                  child: SizedBox(
-                    width: 44,
-                    height: 52,
-                    child: TextField(
-                      controller: _otpControllers[index],
-                      focusNode: _otpFocusNodes[index],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      maxLength: 1,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                            color: _error != null
-                                ? AppTheme.errorColor
-                                : AppTheme.borderColor,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                            color: _error != null
-                                ? AppTheme.errorColor
-                                : AppTheme.borderColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: AppTheme.primaryColor,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (val) => _onDigitChanged(index, val),
-                    ),
-                  ),
-                );
-              }),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: const TextStyle(
-                  color: AppTheme.errorColor,
-                  fontSize: 13,
-                ),
-              ),
             ],
-            const SizedBox(height: 32),
-
-            // ─── Verify Button ───────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: _isVerifying ? null : _verifyOtp,
-                child: _isVerifying
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Verify',
-                        style: TextStyle(fontSize: 16),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ─── Resend ──────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "Didn't receive the code? ",
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
-                if (_resendCountdown > 0)
-                  Text(
-                    'Resend in $_resendCountdown s',
-                    style: const TextStyle(
-                      color: AppTheme.textDisabled,
-                      fontSize: 13,
-                    ),
-                  )
-                else
-                  TextButton(
-                    onPressed: _isResending ? null : _resendOtp,
-                    child: _isResending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Resend Code'),
-                  ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

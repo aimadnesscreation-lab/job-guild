@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "auto-context": {
+      "source": "aimadnesscreation-lab/my-skills",
+      "sourceType": "github",
+      "skillPath": "skills/auto-context/SKILL.md",
+      "computedHash": "43d74c08ed47d377a5063d5ad8219c6fb31544a2e59167a08b71f198784610d6"
+    }
+  }
+}

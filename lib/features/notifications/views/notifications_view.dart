@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
@@ -13,9 +14,13 @@ class NotificationsView extends ConsumerStatefulWidget {
   ConsumerState<NotificationsView> createState() => _NotificationsViewState();
 }
 
+/// Enum-based filter type — NOT localized string, so the filter logic works
+/// correctly regardless of the current locale (Urdu/English).
+enum _NotifFilter { all, unread, messages, jobs, reviews }
+
 class _NotificationsViewState extends ConsumerState<NotificationsView> {
   List<Map<String, dynamic>> _items = const [];
-  String _filter = 'All';
+  _NotifFilter _filter = _NotifFilter.all;
   bool _loading = true;
 
   @override
@@ -24,16 +29,20 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     _load();
   }
 
+  Future<void> _refresh() async {
+    await _load();
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     final userId = ref.read(currentUserProvider)?.id;
     final repo = ref.read(supabaseRepositoryProvider);
     final list = userId != null
-        ? (await repo.getNotifications(userId))
-            .map((n) => Map<String, dynamic>.from(n))
-            .toList()
+        ? (await repo.getNotifications(
+            userId,
+          )).map((n) => Map<String, dynamic>.from(n)).toList()
         : <Map<String, dynamic>>[];
-    if (mounted) {
+    if (context.mounted) {
       setState(() {
         _items = list;
         _loading = false;
@@ -44,7 +53,7 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
   Future<void> _markRead(String id) async {
     final repo = ref.read(supabaseRepositoryProvider);
     await repo.markNotificationRead(id);
-    if (mounted) {
+    if (context.mounted) {
       setState(() {
         _items = _items
             .map((n) => n['id'] == id ? {...n, 'is_read': true} : n)
@@ -60,7 +69,7 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     for (final n in _items.where((n) => n['is_read'] != true)) {
       await repo.markNotificationRead(n['id'] as String);
     }
-    if (mounted) {
+    if (context.mounted) {
       setState(() {
         _items = _items.map((n) => {...n, 'is_read': true}).toList();
       });
@@ -68,14 +77,21 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    if (_filter == 'All') return _items;
-    if (_filter == 'Unread') {
-      return _items.where((n) => n['is_read'] != true).toList();
+    switch (_filter) {
+      case _NotifFilter.all:
+        return _items;
+      case _NotifFilter.unread:
+        return _items.where((n) => n['is_read'] != true).toList();
+      case _NotifFilter.messages:
+        return _items.where((n) => n['type'] == 'Messages').toList();
+      case _NotifFilter.jobs:
+        return _items.where((n) => n['type'] == 'Jobs').toList();
+      case _NotifFilter.reviews:
+        return _items.where((n) => n['type'] == 'Reviews').toList();
     }
-    return _items.where((n) => n['type'] == _filter).toList();
   }
 
-  IconData _iconFor(String type) {
+  static IconData _iconForType(String type) {
     switch (type) {
       case 'Messages':
         return Icons.chat_rounded;
@@ -88,7 +104,7 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     }
   }
 
-  Color _colorFor(String type) {
+  static Color _colorForType(String type) {
     switch (type) {
       case 'Messages':
         return AppTheme.verifiedBadge;
@@ -106,11 +122,11 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     final filtered = _filtered;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(ref.watch(appStringsProvider).notifications),
         actions: [
           TextButton(
             onPressed: _loading ? null : _markAllRead,
-            child: const Text('Mark All Read'),
+            child: Text(ref.watch(appStringsProvider).markAllRead),
           ),
         ],
       ),
@@ -124,15 +140,30 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterChip('All'),
+                  _buildFilterChip(
+                    ref.watch(appStringsProvider).all,
+                    _NotifFilter.all,
+                  ),
                   const SizedBox(width: 6),
-                  _buildFilterChip('Unread'),
+                  _buildFilterChip(
+                    ref.watch(appStringsProvider).unread,
+                    _NotifFilter.unread,
+                  ),
                   const SizedBox(width: 6),
-                  _buildFilterChip('Messages'),
+                  _buildFilterChip(
+                    ref.watch(appStringsProvider).messages,
+                    _NotifFilter.messages,
+                  ),
                   const SizedBox(width: 6),
-                  _buildFilterChip('Jobs'),
+                  _buildFilterChip(
+                    ref.watch(appStringsProvider).jobsNotif,
+                    _NotifFilter.jobs,
+                  ),
                   const SizedBox(width: 6),
-                  _buildFilterChip('Reviews'),
+                  _buildFilterChip(
+                    ref.watch(appStringsProvider).reviews,
+                    _NotifFilter.reviews,
+                  ),
                 ],
               ),
             ),
@@ -141,41 +172,65 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.notifications_off_rounded,
-                                size: 48, color: AppTheme.textDisabled),
-                            SizedBox(height: 12),
-                            Text('No notifications',
-                                style: TextStyle(color: AppTheme.textSecondary)),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1, indent: 72),
-                        itemBuilder: (context, index) {
-                          final n = filtered[index];
-                          final isRead = n['is_read'] == true;
-                          return _NotificationTile(
-                            title: n['title'] as String? ?? '',
-                            body: n['body'] as String? ?? '',
-                            time: _formatTime(n['created_at']),
-                            type: n['type'] as String? ?? 'All',
-                            icon: _iconFor(n['type'] as String? ?? 'All'),
-                            iconColor: _colorFor(n['type'] as String? ?? 'All'),
-                            isRead: isRead,
-                            onTap: isRead
-                                ? null
-                                : () => _markRead(n['id'] as String),
-                          );
-                        },
-                      ),
+                : RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: filtered.isEmpty
+                        ? ListView(
+                            children: [
+                              SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.25,
+                              ),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.notifications_off_rounded,
+                                      size: 48,
+                                      color: AppTheme.textDisabled,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      ref
+                                          .watch(appStringsProvider)
+                                          .noNotifications,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1, indent: 72),
+                            itemBuilder: (context, index) {
+                              final n = filtered[index];
+                              final isRead = n['is_read'] == true;
+                              return _NotificationTile(
+                                title: n['title'] as String? ?? '',
+                                body: n['body'] as String? ?? '',
+                                time: _formatTime(n['created_at']),
+                                type: n['type'] as String? ?? 'All',
+                                icon: _iconForType(
+                                  n['type'] as String? ?? 'All',
+                                ),
+                                iconColor: _colorForType(
+                                  n['type'] as String? ?? 'All',
+                                ),
+                                isRead: isRead,
+                                onTap: isRead
+                                    ? null
+                                    : () => _markRead(n['id'] as String),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
@@ -187,22 +242,29 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     try {
       final dt = DateTime.parse(createdAt as String);
       final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) return 'just now';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      final s = ref.read(appStringsProvider);
+      if (diff.inMinutes < 1) return s.now;
+      if (diff.inMinutes < 60) {
+        final n = diff.inMinutes;
+        return '$n${s.minAbbrev}';
+      }
+      if (diff.inHours < 24) {
+        final n = diff.inHours;
+        return '$n${s.hoursAbbrev}';
+      }
       return '${dt.day}/${dt.month}/${dt.year}';
     } catch (_) {
       return '';
     }
   }
 
-  Widget _buildFilterChip(String label) {
-    final isSelected = _filter == label;
+  Widget _buildFilterChip(String label, _NotifFilter filterValue) {
+    final isSelected = _filter == filterValue;
     return ChoiceChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: isSelected,
       selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-      onSelected: (_) => setState(() => _filter = label),
+      onSelected: (_) => setState(() => _filter = filterValue),
       side: BorderSide(
         color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
       ),
@@ -261,10 +323,7 @@ class _NotificationTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             time,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textDisabled,
-            ),
+            style: const TextStyle(fontSize: 11, color: AppTheme.textDisabled),
           ),
         ],
       ),

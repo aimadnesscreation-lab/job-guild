@@ -6,9 +6,7 @@ class AuthRepository {
   AuthRepository(this._supabase);
 
   Future<void> signInWithOtp(String phoneNumber) async {
-    await _supabase.auth.signInWithOtp(
-      phone: phoneNumber,
-    );
+    await _supabase.auth.signInWithOtp(phone: phoneNumber);
   }
 
   Future<AuthResponse> verifyOtp(String phoneNumber, String token) async {

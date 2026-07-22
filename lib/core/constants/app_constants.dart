@@ -28,9 +28,6 @@ class AppConstants {
         : _openRouterApiKeyPlaceholder;
   }
 
-  static String get googleMapsApiKey =>
-      _env('GOOGLE_MAPS_API_KEY') ?? _googleMapsApiKey;
-
   /// True only when a real OpenRouter key (not the placeholder) is configured.
   /// Used to short-circuit the client-side AI tier instead of firing a
   /// doomed request that would always 401.
@@ -43,7 +40,6 @@ class AppConstants {
   static const String _supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6amZ1Z3N3dXd5aW5hZWF1aHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTE5MjQsImV4cCI6MjA5OTk2NzkyNH0.BJMENZ9Q8IvUIegjXmaDMVK9NYZHUkJ3-8ovHLJShP0';
   static const String _openRouterApiKeyPlaceholder = 'YOUR_OPENROUTER_API_KEY';
-  static const String _googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
 
   // App metadata
   static const String appName = 'Local Services Marketplace';
@@ -63,11 +59,13 @@ class AppConstants {
 
   // OpenRouter AI (replaces Claude — free models via OpenRouter)
   static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
-  // Free models — routes to any available free model
+  // Free auto-router — picks the best available free model automatically
   static const String openRouterFreeModel = 'openrouter/free';
-  // Preferred models for specific tasks
-  static const String openRouterJsonModel = 'mistralai/mistral-7b-instruct:free';
-  static const String openRouterTextModel = 'meta-llama/llama-3.1-8b-instruct:free';
+  // Google Gemma 4 — modern free model, reliable for JSON and text tasks
+  static const String openRouterJsonModel =
+      'google/gemma-4-26b-a4b-it:free';
+  static const String openRouterTextModel =
+      'google/gemma-4-26b-a4b-it:free';
 
   // Feature flags
   static const bool enableAiJobParsing = true;

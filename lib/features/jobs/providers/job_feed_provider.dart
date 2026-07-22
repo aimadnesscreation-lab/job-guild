@@ -35,14 +35,14 @@ final liveJobFeedProvider = StreamProvider<List<Job>>((ref) {
 /// Provider that filters jobs to only 'open' status for the worker feed.
 final openJobsProvider = Provider<AsyncValue<List<Job>>>((ref) {
   final allJobs = ref.watch(liveJobFeedProvider);
-  return allJobs.whenData(
-    (jobs) => jobs.where((j) => j.isOpen).toList(),
-  );
+  return allJobs.whenData((jobs) => jobs.where((j) => j.isOpen).toList());
 });
 
 /// Provider that filters jobs by employer ID for the employer dashboard.
-final employerJobsProvider =
-    Provider.family<AsyncValue<List<Job>>, String>((ref, employerId) {
+final employerJobsProvider = Provider.family<AsyncValue<List<Job>>, String>((
+  ref,
+  employerId,
+) {
   final allJobs = ref.watch(liveJobFeedProvider);
   return allJobs.whenData(
     (jobs) => jobs.where((j) => j.employerId == employerId).toList(),

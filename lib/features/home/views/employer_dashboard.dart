@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
+import 'package:local_services_marketplace/core/utils/responsive.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
+import 'package:local_services_marketplace/features/ratings/views/reviews_list_view.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import 'package:local_services_marketplace/features/jobs/providers/job_feed_provider.dart';
 import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';
@@ -30,48 +33,74 @@ class EmployerDashboard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── Stats Row ─────────────────────────────────────
-              Row(
-                children: [
-                  _StatCard(
-                    icon: Icons.work_outlined,
-                    value: '${active.length}',
-                    label: 'Active Jobs',
-                    color: AppTheme.primaryColor,
+              // ─── Stats Row (responsive) ─────────────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cols = Breakpoints.statsColumns(constraints.maxWidth);
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _StatCard(
+                        icon: Icons.work_outlined,
+                        value: '${active.length}',
+                        label: ref.watch(appStringsProvider).activeJobs,
+                        color: AppTheme.primaryColor,
+                        width: (constraints.maxWidth - (cols - 1) * 8) / cols,
+                      ),
+                      _StatCard(
+                        icon: Icons.people_outlined,
+                        value: '${active.length + completed.length}',
+                        label: ref.watch(appStringsProvider).jobsPosted,
+                        color: AppTheme.accentColor,
+                        width: (constraints.maxWidth - (cols - 1) * 8) / cols,
+                      ),
+                      _StatCard(
+                        icon: Icons.check_circle_outlined,
+                        value: '${completed.length}',
+                        label: ref.watch(appStringsProvider).completed,
+                        color: AppTheme.verifiedBadge,
+                        width: (constraints.maxWidth - (cols - 1) * 8) / cols,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // ─── Quick Actions ────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReviewsListView()),
                   ),
-                  const SizedBox(width: 8),
-                  _StatCard(
-                    icon: Icons.people_outlined,
-                    value: '${_totalApplicants(ref, jobs)}',
-                    label: 'Applicants',
-                    color: AppTheme.accentColor,
+                  icon: const Icon(Icons.star_rounded, size: 16),
+                  label: Text(
+                    ref.watch(appStringsProvider).myReviews,
+                    style: const TextStyle(fontSize: 13),
                   ),
-                  const SizedBox(width: 8),
-                  _StatCard(
-                    icon: Icons.check_circle_outlined,
-                    value: '${completed.length}',
-                    label: 'Completed',
-                    color: AppTheme.verifiedBadge,
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 20),
 
               // ─── Active Jobs ───────────────────────────────────
               Text(
-                'Active Jobs',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                ref.watch(appStringsProvider).activeJobs,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (active.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
-                    child: Text('No active jobs. Post a job to get started.',
-                        style: TextStyle(color: AppTheme.textSecondary)),
+                    child: Text(
+                      ref.watch(appStringsProvider).noActiveJobs,
+                      style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
                   ),
                 )
               else
@@ -80,19 +109,20 @@ class EmployerDashboard extends ConsumerWidget {
 
               // ─── Completed Jobs ───────────────────────────────
               Text(
-                'Completed Jobs',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                ref.watch(appStringsProvider).completed,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (completed.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
-                    child: Text('No completed jobs yet.',
-                        style: TextStyle(color: AppTheme.textSecondary)),
+                    child: Text(
+                      ref.watch(appStringsProvider).noCompletedJobs,
+                      style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
                   ),
                 )
               else
@@ -102,15 +132,28 @@ class EmployerDashboard extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('Error: $err')),
+      loading: () => Padding(
+        padding: const EdgeInsets.all(16),
+        child: const Column(
+          children: [
+            Row(
+              children: [
+                _ShimmerCard(),
+                SizedBox(width: 8),
+                _ShimmerCard(),
+                SizedBox(width: 8),
+                _ShimmerCard(),
+              ],
+            ),
+            SizedBox(height: 20),
+            _LoadingText(),
+          ],
+        ),
+      ),
+      error: (err, _) =>
+          Center(child: Text('${ref.watch(appStringsProvider).error}: $err')),
     );
   }
-}
-
-int _totalApplicants(WidgetRef ref, List<Job> jobs) {
-  return jobs.fold<int>(
-      0, (sum, j) => sum + (ref.read(_applicantCountProvider(j.id)).value ?? 0));
 }
 
 class _StatCard extends StatelessWidget {
@@ -118,17 +161,20 @@ class _StatCard extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
+  final double? width;
 
   const _StatCard({
     required this.icon,
     required this.value,
     required this.label,
     required this.color,
+    this.width,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return SizedBox(
+      width: width,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -150,7 +196,9 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 11, color: AppTheme.textSecondary),
+                fontSize: 11,
+                color: AppTheme.textSecondary,
+              ),
             ),
           ],
         ),
@@ -176,30 +224,43 @@ class _ActiveJobCard extends ConsumerWidget {
             color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.work_outlined,
-              color: AppTheme.primaryColor, size: 22),
+          child: const Icon(
+            Icons.work_outlined,
+            color: AppTheme.primaryColor,
+            size: 22,
+          ),
         ),
-        title: Text(job.title,
-            style: const TextStyle(fontSize: 14),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
+        title: Text(
+          job.title,
+          style: const TextStyle(fontSize: 14),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Row(
           children: [
-            Text('${applicantCount.value ?? 0} applicants',
-                style: const TextStyle(fontSize: 12, color: AppTheme.accentDark)),
+            Text(
+              '${applicantCount.value ?? 0} ${ref.watch(appStringsProvider).applicantCount}',
+              style: const TextStyle(fontSize: 12, color: AppTheme.accentDark),
+            ),
             const SizedBox(width: 8),
-            Text(job.budgetDisplay,
-                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text(
+              job.budgetDisplay,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right_rounded,
-            size: 18, color: AppTheme.textDisabled),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          size: 18,
+          color: AppTheme.textDisabled,
+        ),
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => JobDetailView(job: job),
-            ),
+            MaterialPageRoute(builder: (_) => JobDetailView(job: job)),
           );
         },
       ),
@@ -208,7 +269,38 @@ class _ActiveJobCard extends ConsumerWidget {
 }
 
 /// Lightweight applicant-count watcher for a single job.
-final _applicantCountProvider =
-    FutureProvider.family<int, String>((ref, jobId) async {
+final _applicantCountProvider = FutureProvider.family<int, String>((
+  ref,
+  jobId,
+) async {
   return ref.watch(supabaseRepositoryProvider).countApplicants(jobId);
 });
+
+class _ShimmerCard extends StatelessWidget {
+  const _ShimmerCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingText extends StatelessWidget {
+  const _LoadingText();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Loading your dashboard...',
+      style: const TextStyle(color: AppTheme.textSecondary),
+    );
+  }
+}

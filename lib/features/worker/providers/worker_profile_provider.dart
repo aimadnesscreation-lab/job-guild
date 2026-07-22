@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/services/ai_service_provider.dart';
 import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
-import 'package:local_services_marketplace/features/worker/repositories/worker_repository.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 
@@ -58,49 +58,41 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
   @override
   WorkerProfileState build() {
     // Seed from the real logged-in user's profile when available.
-    // myWorkerProfileProvider is a FutureProvider; we read its current value
-    // (null/placeholder until it resolves) and listen for the resolved
-    // profile so the form populates once Supabase responds.
-    // Seed from the real logged-in user's profile when available.
     // myWorkerProfileProvider is a FutureProvider; ref.watch gives us its
     // current AsyncValue so we can use the resolved profile synchronously
-    // (falling back to a placeholder until it loads).
+    // (falling back to an EMPTY placeholder bound to the real user id until
+    // it loads). We intentionally do NOT fabricate a name, bio, rating, or
+    // "verified" badge — those must come from real data, otherwise the form
+    // shows someone else's details before the user has set anything up.
     final asyncProfile = ref.watch(myWorkerProfileProvider);
     final real = asyncProfile.value;
 
+    final userId = ref.watch(currentUserProvider)?.id ?? 'user-placeholder';
+
     return WorkerProfileState(
-      profile: real ??
-          const WorkerProfile(
-            userId: 'user-placeholder',
-            fullName: 'Ahmed Khan',
-            headline: 'Experienced Plumber & Electrician',
-            bio:
-                'I have been working in home maintenance for over 8 years. Specializing in plumbing, electrical repairs, and general home improvement.',
-            yearsExperience: 8,
-            hourlyRatePkr: 500,
-            availabilityStatus: AvailabilityStatus.today,
-            serviceRadiusKm: 15,
-            averageRating: 4.5,
-            totalJobsCompleted: 127,
-            responseTimeAvgMinutes: 12,
-            categories: ['Plumbing', 'Electrical', 'Painting'],
-            isVerified: true,
+      profile:
+          real ??
+          WorkerProfile(
+            userId: userId,
+            // No name yet — the user hasn't set up a profile. The UI shows an
+            // empty state / "Your Name" placeholder instead of fake data.
+            fullName: '',
           ),
     );
   }
 
   // ─── Field updaters ──────────────────────────────────────────
 
+  void updateFullName(String value) {
+    state = state.copyWith(profile: state.profile.copyWith(fullName: value));
+  }
+
   void updateHeadline(String value) {
-    state = state.copyWith(
-      profile: state.profile.copyWith(headline: value),
-    );
+    state = state.copyWith(profile: state.profile.copyWith(headline: value));
   }
 
   void updateBio(String value) {
-    state = state.copyWith(
-      profile: state.profile.copyWith(bio: value),
-    );
+    state = state.copyWith(profile: state.profile.copyWith(bio: value));
   }
 
   void updateYearsExperience(int years) {
@@ -190,7 +182,8 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
       if (AppConstants.enableAiProfileGeneration && !AppConstants.useMockAi) {
         // Real OpenRouter API call
         final aiService = ref.read(aiServiceProvider);
-        final systemPrompt = 'You are a professional profile writer for a '
+        final systemPrompt =
+            'You are a professional profile writer for a '
             'local services marketplace in Pakistan. Write a 2-3 sentence '
             'professional bio based on the user\'s description. Keep it '
             'concise, positive, and focused on skills. Also suggest relevant '
@@ -201,7 +194,8 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
             'Moving, Healthcare, Beauty, Pet Care, General Labor. ';
 
         final result = await aiService.generateJson(
-          prompt: 'Generate a professional bio and suggest categories for '
+          prompt:
+              'Generate a professional bio and suggest categories for '
               'someone with this experience: "$rawInput"\n\n'
               'Return JSON with format: {"bio": "...", "categories": ["..."]}',
           systemPrompt: systemPrompt,
@@ -209,7 +203,7 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
         generatedBio = result['bio'] as String? ?? _mockTextResponse(rawInput);
         suggestedCategories =
             (result['categories'] as List?)?.cast<String>() ??
-                _inferCategories(rawInput);
+            _inferCategories(rawInput);
       } else {
         // Demo/mock mode
         await Future.delayed(const Duration(milliseconds: 800));
@@ -257,16 +251,37 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
     state = state.copyWith(isSaving: true, errorMessage: null);
     try {
       final repo = ref.read(workerRepositoryProvider);
+      if (repo == null) {
+        state = state.copyWith(
+          isSaving: false,
+          errorMessage: 'Not connected. Please check your network and retry.',
+        );
+        return;
+      }
       final userId = ref.read(currentUserProvider)?.id ?? state.profile.userId;
       final profile = userId != state.profile.userId
           ? state.profile.copyWith(userId: userId)
           : state.profile;
-      await repo?.updateWorkerProfile(userId, profile);
+      await repo.updateWorkerProfile(userId, profile);
+      // `full_name` lives on the `users` table, so persist it there too.
+      // This is best-effort — if it fails the profile data was already saved.
+      if (profile.fullName.trim().isNotEmpty) {
+        try {
+          await repo.updateUserName(userId, profile.fullName.trim());
+        } catch (_) {
+          // Name update is non-fatal.
+        }
+      }
       state = state.copyWith(isSaving: false);
     } catch (e) {
+      // Surface the real reason (e.g. PostgREST 400 with a column/constraint
+      // message) instead of a generic toast, so the failure is debuggable.
+      final message = e is PostgrestException
+          ? e.message
+          : e.toString().replaceFirst('Exception: ', '');
       state = state.copyWith(
         isSaving: false,
-        errorMessage: 'Failed to save profile. Please try again.',
+        errorMessage: 'Could not save: $message',
       );
     }
   }
@@ -314,5 +329,5 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
 
 final workerProfileProvider =
     NotifierProvider<WorkerProfileNotifier, WorkerProfileState>(() {
-  return WorkerProfileNotifier();
-});
+      return WorkerProfileNotifier();
+    });

@@ -67,17 +67,22 @@ class WorkerProfile {
     return WorkerProfile(
       userId: userId ?? this.userId,
       fullName: fullName ?? this.fullName,
-      profilePhotoUrl: clearProfilePhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
+      profilePhotoUrl: clearProfilePhoto
+          ? null
+          : (profilePhotoUrl ?? this.profilePhotoUrl),
       headline: clearHeadline ? null : (headline ?? this.headline),
       bio: clearBio ? null : (bio ?? this.bio),
       yearsExperience: yearsExperience ?? this.yearsExperience,
       hourlyRatePkr: hourlyRatePkr ?? this.hourlyRatePkr,
-      fixedRateNote: clearFixedRateNote ? null : (fixedRateNote ?? this.fixedRateNote),
+      fixedRateNote: clearFixedRateNote
+          ? null
+          : (fixedRateNote ?? this.fixedRateNote),
       availabilityStatus: availabilityStatus ?? this.availabilityStatus,
       serviceRadiusKm: serviceRadiusKm ?? this.serviceRadiusKm,
       averageRating: averageRating ?? this.averageRating,
       totalJobsCompleted: totalJobsCompleted ?? this.totalJobsCompleted,
-      responseTimeAvgMinutes: responseTimeAvgMinutes ?? this.responseTimeAvgMinutes,
+      responseTimeAvgMinutes:
+          responseTimeAvgMinutes ?? this.responseTimeAvgMinutes,
       portfolioMediaUrls: portfolioMediaUrls ?? this.portfolioMediaUrls,
       categories: categories ?? this.categories,
       isVerified: isVerified ?? this.isVerified,
@@ -111,8 +116,11 @@ class WorkerProfile {
     final user = json['users'] as Map<String, dynamic>?;
     return WorkerProfile(
       userId: json['id'] as String? ?? '',
-      fullName: user?['full_name'] as String? ?? json['full_name'] as String? ?? '',
-      profilePhotoUrl: user?['profile_photo_url'] as String? ?? json['profile_photo_url'] as String?,
+      fullName:
+          user?['full_name'] as String? ?? json['full_name'] as String? ?? '',
+      profilePhotoUrl:
+          user?['profile_photo_url'] as String? ??
+          json['profile_photo_url'] as String?,
       headline: json['headline'] as String?,
       bio: json['bio'] as String?,
       yearsExperience: json['years_experience'] as int? ?? 0,
@@ -126,36 +134,45 @@ class WorkerProfile {
       averageRating: (json['average_rating'] as num?)?.toDouble() ?? 0,
       totalJobsCompleted: json['total_jobs_completed'] as int? ?? 0,
       responseTimeAvgMinutes: json['response_time_avg_minutes'] as int? ?? 0,
-      portfolioMediaUrls: (json['portfolio_media'] as List<dynamic>?)
+      portfolioMediaUrls:
+          (json['portfolio_media'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      categories: (json['categories'] as List<dynamic>?)
+      categories:
+          (json['categories'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      isVerified: json['is_verified'] as bool? ?? false,
+      isVerified:
+          user?['is_verified'] as bool? ??
+          json['is_verified'] as bool? ??
+          false,
       isFeatured: json['is_featured'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': userId,
-        'headline': headline,
-        'bio': bio,
-        'years_experience': yearsExperience,
-        'hourly_rate_pkr': hourlyRatePkr,
-        'fixed_rate_note': fixedRateNote,
-        'availability_status': availabilityStatus.name,
-        'service_radius_km': serviceRadiusKm,
-        'average_rating': averageRating,
-        'total_jobs_completed': totalJobsCompleted,
-        'response_time_avg_minutes': responseTimeAvgMinutes,
-        'portfolio_media': portfolioMediaUrls,
-        if (categories.isNotEmpty) 'categories': categories,
-        'is_verified': isVerified,
-        'is_featured': isFeatured,
-      };
+    // NOTE: `full_name` and `is_verified` live on the `users` table, NOT
+    // `worker_profiles` (see supabase/migrations). They are intentionally
+    // excluded here — sending them causes PostgREST to reject the upsert
+    // with HTTP 400. The name is persisted via WorkerRepository.updateUserName.
+    //
+    // `average_rating`, `total_jobs_completed`, and
+    // `response_time_avg_minutes` are server-computed fields and are
+    // intentionally excluded — sending them would overwrite server data
+    // with client-default zero values on every save.
+    'id': userId,
+    'headline': headline,
+    'bio': bio,
+    'years_experience': yearsExperience,
+    'hourly_rate_pkr': hourlyRatePkr,
+    'fixed_rate_note': fixedRateNote,
+    'availability_status': availabilityStatus.name,
+    'service_radius_km': serviceRadiusKm,
+    'portfolio_media': portfolioMediaUrls,
+    'is_featured': isFeatured,
+  };
 
   /// Display a star rating string (e.g. "4.5 ⭐")
   String get ratingDisplay {

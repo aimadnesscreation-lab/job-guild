@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 
 /// Service for calling OpenRouter AI models (replaces Claude).
@@ -7,14 +7,12 @@ import 'package:local_services_marketplace/core/constants/app_constants.dart';
 class OpenRouterService {
   final String _apiKey;
   final String _baseUrl;
-  final HttpClient _httpClient;
+  final http.Client _httpClient;
 
-  OpenRouterService({
-    String? apiKey,
-    String? baseUrl,
-  })  : _apiKey = apiKey ?? AppConstants.openRouterApiKey,
-        _baseUrl = baseUrl ?? AppConstants.openRouterBaseUrl,
-        _httpClient = HttpClient();
+  OpenRouterService({String? apiKey, String? baseUrl})
+    : _apiKey = apiKey ?? AppConstants.openRouterApiKey,
+      _baseUrl = baseUrl ?? AppConstants.openRouterBaseUrl,
+      _httpClient = http.Client();
 
   /// Generate text response (e.g., bio writing).
   /// Uses the text model by default.
@@ -79,7 +77,7 @@ class OpenRouterService {
       messages.add({
         'role': 'user',
         'content':
-            '$prompt\n\nReturn ONLY valid JSON. No markdown fences (no \`\`\`). No explanation. Just the JSON object.',
+            '$prompt\n\nReturn ONLY valid JSON. No markdown fences (no ```). No explanation. Just the JSON object.',
       });
 
       final body = jsonEncode({
@@ -112,29 +110,28 @@ class OpenRouterService {
   /// Make HTTP POST request to OpenRouter API
   Future<String> _postRequest(String path, String body) async {
     final uri = Uri.parse('$_baseUrl$path');
-    final request = await _httpClient.postUrl(uri);
-
-    // OpenRouter required headers
-    request.headers.set('Content-Type', 'application/json');
-    request.headers.set('Authorization', 'Bearer $_apiKey');
-    request.headers.set('HTTP-Referer', 'https://localservices.app');
-    request.headers.set('X-Title', 'Local Services Marketplace');
-
-    request.write(body);
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
+    final response = await _httpClient.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_apiKey',
+        'HTTP-Referer': 'https://localservices.app',
+        'X-Title': 'Local Services Marketplace',
+      },
+      body: body,
+    );
 
     if (response.statusCode != 200) {
-      throw HttpException(
-        'OpenRouter API error ${response.statusCode}: $responseBody',
+      throw Exception(
+        'OpenRouter API error ${response.statusCode}: ${response.body}',
       );
     }
-    return responseBody;
+    return response.body;
   }
 
   /// Dispose the HTTP client
   void dispose() {
-    _httpClient.close(force: true);
+    _httpClient.close();
   }
 
   // ─── Mock fallbacks (used when API key not set or in test mode) ──────
@@ -148,23 +145,33 @@ class OpenRouterService {
   Map<String, dynamic> _mockJsonResponse(String input) {
     final lower = input.toLowerCase();
     String category = 'General Labor';
-    if (lower.contains('plumb')) category = 'Plumbing';
-    else if (lower.contains('electr')) category = 'Electrical';
-    else if (lower.contains('paint')) category = 'Painting';
-    else if (lower.contains('carpent')) category = 'Carpentry';
-    else if (lower.contains('clean')) category = 'Cleaning';
-    else if (lower.contains('tutor') || lower.contains('teach')) category = 'Tutor';
-    else if (lower.contains('mechanic')) category = 'Mechanic';
-    else if (lower.contains('cook')) category = 'Cook';
-    else if (lower.contains('move')) category = 'Moving';
+    if (lower.contains('plumb')) {
+      category = 'Plumbing';
+    } else if (lower.contains('electr')) {
+      category = 'Electrical';
+    } else if (lower.contains('paint')) {
+      category = 'Painting';
+    } else if (lower.contains('carpent')) {
+      category = 'Carpentry';
+    } else if (lower.contains('clean')) {
+      category = 'Cleaning';
+    } else if (lower.contains('tutor') || lower.contains('teach')) {
+      category = 'Tutor';
+    } else if (lower.contains('mechanic')) {
+      category = 'Mechanic';
+    } else if (lower.contains('cook')) {
+      category = 'Cook';
+    } else if (lower.contains('move')) {
+      category = 'Moving';
+    }
 
     return {
       'category': category,
       'urgency': lower.contains('urgent') || lower.contains('emergency')
           ? 'instant'
           : lower.contains('tomorrow') || lower.contains('next week')
-              ? 'scheduled'
-              : 'today',
+          ? 'scheduled'
+          : 'today',
       'suggested_budget_pkr': _estimateBudget(lower, category),
       'estimated_duration_hours': _estimateDuration(lower),
       'required_skills': [category],
@@ -179,9 +186,15 @@ class OpenRouterService {
     }
     // Default estimates by category
     const budgets = {
-      'Plumbing': 3000, 'Electrical': 3500, 'Painting': 4000,
-      'Carpentry': 3500, 'Cleaning': 1500, 'Tutor': 500,
-      'Mechanic': 3000, 'Moving': 5000, 'Cook': 2000,
+      'Plumbing': 3000,
+      'Electrical': 3500,
+      'Painting': 4000,
+      'Carpentry': 3500,
+      'Cleaning': 1500,
+      'Tutor': 500,
+      'Mechanic': 3000,
+      'Moving': 5000,
+      'Cook': 2000,
     };
     return budgets[category] ?? 2000;
   }

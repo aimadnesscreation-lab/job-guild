@@ -55,7 +55,10 @@ class Job {
     }
     // Try WKT string format
     if (coords is String) {
-      final match = RegExp(r'POINT\s*\(([^\s]+)\s+([^\s]+)\)', caseSensitive: false).firstMatch(coords);
+      final match = RegExp(
+        r'POINT\s*\(([^\s]+)\s+([^\s]+)\)',
+        caseSensitive: false,
+      ).firstMatch(coords);
       if (match != null) {
         return (_parseDouble(match.group(2)), _parseDouble(match.group(1)));
       }
@@ -77,7 +80,8 @@ class Job {
       description: json['description'] as String? ?? '',
       aiExtractedMetadata: json['ai_extracted_metadata'] != null
           ? JobAiMetadata.fromJson(
-              json['ai_extracted_metadata'] as Map<String, dynamic>)
+              json['ai_extracted_metadata'] as Map<String, dynamic>,
+            )
           : null,
       budgetAmount: json['budget_amount'] as int?,
       budgetType: Job._parseBudgetType(json['budget_type'] as String?),
@@ -100,22 +104,22 @@ class Job {
   /// For PostGIS geography columns, we send the coordinate as a WKT
   /// string "POINT(lng lat)" which PostgREST and PostGIS understand.
   Map<String, dynamic> toJson() => {
-        if (id.isNotEmpty) 'id': id,
-        'employer_id': employerId,
-        'category_id': categoryId,
-        'title': title,
-        'description': description,
-        if (aiExtractedMetadata != null)
-          'ai_extracted_metadata': aiExtractedMetadata!.toJson(),
-        if (budgetAmount != null) 'budget_amount': budgetAmount,
-        'budget_type': budgetType.name,
-        if (locationText != null) 'location_text': locationText,
-        'location_coords': 'POINT($lng $lat)',
-        'status': status.name,
-        'urgency': urgency.name,
-        if (scheduledFor != null) 'scheduled_for': scheduledFor!.toIso8601String(),
-        'created_at': createdAt.toIso8601String(),
-      };
+    if (id.isNotEmpty) 'id': id,
+    'employer_id': employerId,
+    'category_id': categoryId,
+    'title': title,
+    'description': description,
+    if (aiExtractedMetadata != null)
+      'ai_extracted_metadata': aiExtractedMetadata!.toJson(),
+    if (budgetAmount != null) 'budget_amount': budgetAmount,
+    'budget_type': budgetType.name,
+    if (locationText != null) 'location_text': locationText,
+    'location_coords': 'POINT($lng $lat)',
+    'status': status.name,
+    'urgency': urgency.name,
+    if (scheduledFor != null) 'scheduled_for': scheduledFor!.toIso8601String(),
+    'created_at': createdAt.toIso8601String(),
+  };
 
   Job copyWith({
     String? id,
@@ -233,7 +237,8 @@ class JobAiMetadata {
       urgency: json['urgency'] as String? ?? 'today',
       suggestedBudgetPkr: json['suggested_budget_pkr'] as int? ?? 0,
       estimatedDurationHours: json['estimated_duration_hours'] as int? ?? 2,
-      requiredSkills: (json['required_skills'] as List<dynamic>?)
+      requiredSkills:
+          (json['required_skills'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -241,12 +246,12 @@ class JobAiMetadata {
   }
 
   Map<String, dynamic> toJson() => {
-        'category': category,
-        'urgency': urgency,
-        'suggested_budget_pkr': suggestedBudgetPkr,
-        'estimated_duration_hours': estimatedDurationHours,
-        'required_skills': requiredSkills,
-      };
+    'category': category,
+    'urgency': urgency,
+    'suggested_budget_pkr': suggestedBudgetPkr,
+    'estimated_duration_hours': estimatedDurationHours,
+    'required_skills': requiredSkills,
+  };
 }
 
 enum JobStatus { open, hired, completed, cancelled, expired }
@@ -257,13 +262,35 @@ enum Urgency { instant, today, scheduled }
 
 /// Lookup map for category names → IDs
 const Map<String, int> categoryNameToId = {
-  'Home': 1, 'Plumbing': 13, 'Electrical': 14, 'Painting': 15,
-  'Carpentry': 16, 'Masonry': 17, 'Vehicles': 2, 'Mechanic': 18,
-  'Bike Repair': 19, 'Car Wash': 20, 'Construction': 3, 'Labor': 21,
-  'Welding': 22, 'Steel Fixing': 23, 'Education': 4, 'Tutor': 24,
-  'Language Teacher': 25, 'Technology': 5, 'Laptop Repair': 26,
-  'Mobile Repair': 27, 'Web Developer': 28, 'Events': 6,
-  'Photographer': 29, 'DJ': 30, 'Cook': 31, 'Cleaning': 7,
-  'Moving': 8, 'Healthcare': 9, 'Beauty': 10, 'Pet Care': 11,
+  'Home': 1,
+  'Plumbing': 13,
+  'Electrical': 14,
+  'Painting': 15,
+  'Carpentry': 16,
+  'Masonry': 17,
+  'Vehicles': 2,
+  'Mechanic': 18,
+  'Bike Repair': 19,
+  'Car Wash': 20,
+  'Construction': 3,
+  'Labor': 21,
+  'Welding': 22,
+  'Steel Fixing': 23,
+  'Education': 4,
+  'Tutor': 24,
+  'Language Teacher': 25,
+  'Technology': 5,
+  'Laptop Repair': 26,
+  'Mobile Repair': 27,
+  'Web Developer': 28,
+  'Events': 6,
+  'Photographer': 29,
+  'DJ': 30,
+  'Cook': 31,
+  'Cleaning': 7,
+  'Moving': 8,
+  'Healthcare': 9,
+  'Beauty': 10,
+  'Pet Care': 11,
   'General Labor': 12,
 };

@@ -33,24 +33,33 @@ class Message {
       id: json['id'] as String? ?? '',
       jobId: json['job_id'] as String? ?? '',
       senderId: json['sender_id'] as String? ?? '',
-      senderName: sender?['full_name'] as String? ?? json['sender_name'] as String? ?? '',
-      senderPhotoUrl: sender?['profile_photo_url'] as String? ?? json['sender_photo_url'] as String?,
+      senderName:
+          sender?['full_name'] as String? ??
+          json['sender_name'] as String? ??
+          '',
+      senderPhotoUrl:
+          sender?['profile_photo_url'] as String? ??
+          json['sender_photo_url'] as String?,
       contentType: _parseContentType(json['content_type'] as String?),
       content: json['content'] as String? ?? '',
-      sentAt: json['sent_at'] != null ? DateTime.parse(json['sent_at'] as String) : DateTime.now(),
-      readAt: json['read_at'] != null ? DateTime.parse(json['read_at'] as String) : null,
+      sentAt: json['sent_at'] != null
+          ? DateTime.parse(json['sent_at'] as String)
+          : DateTime.now(),
+      readAt: json['read_at'] != null
+          ? DateTime.parse(json['read_at'] as String)
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        if (id.isNotEmpty) 'id': id,
-        'job_id': jobId,
-        'sender_id': senderId,
-        'content_type': contentType.name,
-        'content': content,
-        'sent_at': sentAt.toIso8601String(),
-        if (readAt != null) 'read_at': readAt!.toIso8601String(),
-      };
+    if (id.isNotEmpty) 'id': id,
+    'job_id': jobId,
+    'sender_id': senderId,
+    'content_type': contentType.name,
+    'content': content,
+    'sent_at': sentAt.toIso8601String(),
+    if (readAt != null) 'read_at': readAt!.toIso8601String(),
+  };
 
   static MessageContentType _parseContentType(String? type) {
     switch (type) {

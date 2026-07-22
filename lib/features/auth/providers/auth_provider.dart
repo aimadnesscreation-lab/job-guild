@@ -67,10 +67,7 @@ class AuthNotifier extends Notifier<void> {
   }
 
   /// Verify OTP code and sign in
-  Future<void> verifyOtp({
-    required String phone,
-    required String otp,
-  }) async {
+  Future<void> verifyOtp({required String phone, required String otp}) async {
     try {
       final response = await Supabase.instance.client.auth.verifyOTP(
         phone: normalizePhone(phone),

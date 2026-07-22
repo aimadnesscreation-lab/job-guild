@@ -1,9 +1,16 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/worker/models/worker_profile_model.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_profile_provider.dart';
+import 'package:local_services_marketplace/features/worker/views/id_verification_view.dart';
 
 /// Editable worker profile screen.
 /// Allows the worker to manage their photo, headline, bio (with AI generation),
@@ -17,33 +24,73 @@ class EditWorkerProfileView extends ConsumerStatefulWidget {
 }
 
 class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
+  final _nameController = TextEditingController();
   final _headlineController = TextEditingController();
   final _bioController = TextEditingController();
   final _aiInputController = TextEditingController();
+  final _hourlyRateController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final profile = ref.read(workerProfileProvider.notifier);
       // Sync controllers with the current state after build
       final state = ref.read(workerProfileProvider);
+      _nameController.text = state.profile.fullName;
       _headlineController.text = state.profile.headline ?? '';
       _bioController.text = state.profile.bio ?? '';
+      _hourlyRateController.text =
+          state.profile.hourlyRatePkr?.toString() ?? '';
     });
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
     _headlineController.dispose();
     _bioController.dispose();
     _aiInputController.dispose();
+    _hourlyRateController.dispose();
     super.dispose();
+  }
+
+  // ─── Profile photo picker ──────────────────────────────
+
+  Future<void> _pickProfilePhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+    if (picked == null) return;
+
+    String url;
+    if (kIsWeb) {
+      // Web can't use a file path for NetworkImage, so embed the bytes as a
+      // base64 data URI. This displays immediately; it's persisted on Save via
+      // updateWorkerProfile (a real Supabase Storage upload is Phase 2).
+      final bytes = await picked.readAsBytes();
+      final mime = picked.mimeType ?? 'image/jpeg';
+      url = 'data:$mime;base64,${base64Encode(bytes)}';
+    } else {
+      url = picked.path;
+    }
+
+    if (context.mounted) {
+      ref.read(workerProfileProvider.notifier).setProfilePhotoUrl(url);
+    }
   }
 
   // ─── AI Bio Generation Dialog ────────────────────────────────
 
   void _showAiBioDialog() {
+    // Read localized strings BEFORE showing the bottom sheet, because
+    // the sheet's overlay context may not inherit Riverpod's ProviderScope
+    // in all environments (notably widget tests).  Passing strings as plain
+    // parameters makes _AiBioSheet a plain StatelessWidget.
+    final s = ref.read(appStringsProvider);
     _aiInputController.clear();
     showModalBottomSheet(
       context: context,
@@ -54,6 +101,11 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
       builder: (sheetContext) {
         return _AiBioSheet(
           aiInputController: _aiInputController,
+          title: s.letAiWriteProfileTitle,
+          description: s.letAiWriteProfileDesc,
+          example: s.letAiWriteProfileExample,
+          hintText: s.describeExperienceHint,
+          generateLabel: s.generateBio,
           onGenerate: () {
             final input = _aiInputController.text.trim();
             if (input.isNotEmpty) {
@@ -82,7 +134,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
             children: [
               Icon(Icons.auto_awesome, color: AppTheme.accentColor),
               const SizedBox(width: 8),
-              const Text('AI Generated Profile'),
+              Text(ref.read(appStringsProvider).aiGeneratedProfile),
             ],
           ),
           content: Consumer(
@@ -93,8 +145,8 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Suggested Bio:',
+                    Text(
+                      ref.read(appStringsProvider).suggestedBio,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textSecondary,
@@ -116,8 +168,8 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     if (state.aiSuggestedCategories != null &&
                         state.aiSuggestedCategories!.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      const Text(
-                        'Suggested Categories:',
+                      Text(
+                        ref.read(appStringsProvider).suggestedCategories,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: AppTheme.textSecondary,
@@ -128,12 +180,14 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                         spacing: 6,
                         runSpacing: 6,
                         children: state.aiSuggestedCategories!
-                            .map((cat) => Chip(
-                                  label: Text(cat),
-                                  backgroundColor:
-                                      AppTheme.primaryColor.withValues(alpha: 0.1),
-                                  side: BorderSide.none,
-                                ))
+                            .map(
+                              (cat) => Chip(
+                                label: Text(cat),
+                                backgroundColor: AppTheme.primaryColor
+                                    .withValues(alpha: 0.1),
+                                side: BorderSide.none,
+                              ),
+                            )
                             .toList(),
                       ),
                     ],
@@ -148,7 +202,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                 ref.read(workerProfileProvider.notifier).dismissAiSuggestion();
                 Navigator.pop(dialogContext);
               },
-              child: const Text('Dismiss'),
+              child: Text(ref.watch(appStringsProvider).dismiss),
             ),
             FilledButton(
               onPressed: () {
@@ -159,7 +213,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                 });
                 Navigator.pop(dialogContext);
               },
-              child: const Text('Apply'),
+              child: Text(ref.watch(appStringsProvider).apply),
             ),
           ],
         );
@@ -179,18 +233,18 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text('Add Portfolio Image'),
+          title: Text(ref.watch(appStringsProvider).addPortfolioImage),
           content: TextField(
             controller: urlController,
-            decoration: const InputDecoration(
-              hintText: 'Paste image URL',
-              labelText: 'Image URL',
+            decoration: InputDecoration(
+              hintText: ref.read(appStringsProvider).pasteImageUrl,
+              labelText: ref.read(appStringsProvider).imageUrlLabel,
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+              child: Text(ref.read(appStringsProvider).cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -202,7 +256,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                 }
                 Navigator.pop(dialogContext);
               },
-              child: const Text('Add'),
+              child: Text(ref.read(appStringsProvider).add),
             ),
           ],
         );
@@ -210,16 +264,36 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workerProfileProvider);
     final profile = state.profile;
+    final s = ref.watch(appStringsProvider);
+
+    // Show success SnackBar when save completes with no error.
+    // This tells the user the profile persisted despite the harmless
+    // 409 in the browser console (the INSERT attempt for an existing row).
+    ref.listen<WorkerProfileState>(workerProfileProvider, (prev, next) {
+      if (prev != null &&
+          prev.isSaving &&
+          !next.isSaving &&
+          next.errorMessage == null) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('${s.save} ✓'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Worker Profile'),
+        title: Text(ref.watch(appStringsProvider).workerProfile),
         actions: [
           TextButton(
             onPressed: state.isSaving
@@ -231,7 +305,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(s.save),
           ),
         ],
       ),
@@ -247,41 +321,53 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
               rating: profile.averageRating,
               totalJobs: profile.totalJobsCompleted,
               isVerified: profile.isVerified,
-              onTapPhoto: () {
-                // TODO: Implement image picker from camera/gallery
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Image picker coming soon')),
-                );
-              },
+              onTapPhoto: _pickProfilePhoto,
+            ),
+            const SizedBox(height: 16),
+
+            // ─── Name ───────────────────────────────────────
+            _SectionHeader(title: s.nameLabel, icon: Icons.badge_outlined),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _nameController,
+                decoration: InputDecoration(hintText: s.yourFullName),
+                maxLength: 60,
+                onChanged: (val) => ref
+                    .read(workerProfileProvider.notifier)
+                    .updateFullName(val),
+              ),
             ),
             const SizedBox(height: 16),
 
             // ─── Headline ─────────────────────────────────────
-            _SectionHeader(title: 'Headline', icon: Icons.short_text_rounded),
+            _SectionHeader(title: s.headline, icon: Icons.short_text_rounded),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _headlineController,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. Experienced Plumber & Electrician',
-                ),
+                decoration: InputDecoration(hintText: s.headlineHint),
                 maxLength: 100,
-                onChanged: (val) =>
-                    ref.read(workerProfileProvider.notifier).updateHeadline(val),
+                onChanged: (val) => ref
+                    .read(workerProfileProvider.notifier)
+                    .updateHeadline(val),
               ),
             ),
             const SizedBox(height: 16),
 
             // ─── Bio ──────────────────────────────────────────
             _SectionHeader(
-              title: 'Bio',
+              title: s.bio,
               icon: Icons.description_outlined,
               trailing: FilledButton.tonalIcon(
                 onPressed: () => _showAiBioDialog(),
                 icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text('Let AI write it'),
+                label: Text(s.letAiWrite),
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   textStyle: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -290,8 +376,8 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _bioController,
-                decoration: const InputDecoration(
-                  hintText: 'Describe your experience and skills...',
+                decoration: InputDecoration(
+                  hintText: s.bioHint,
                   alignLabelWithHint: true,
                 ),
                 maxLines: 4,
@@ -303,18 +389,21 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
 
             // AI generation loading indicator
             if (state.isGeneratingBio)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
-                      'Generating your profile...',
+                      s.generatingProfile,
                       style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   ],
@@ -324,18 +413,21 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
             // Show the "View Suggestion" button if AI generated something
             if (state.aiSuggestionText != null && !state.isGeneratingBio)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: TextButton.icon(
                   onPressed: _showAiSuggestionResult,
                   icon: const Icon(Icons.visibility_rounded, size: 18),
-                  label: const Text('View AI Suggestion'),
+                  label: Text(s.viewAiSuggestion),
                 ),
               ),
 
             const SizedBox(height: 16),
 
             // ─── Categories ───────────────────────────────────
-            _SectionHeader(title: 'Categories', icon: Icons.category_rounded),
+            _SectionHeader(title: s.categories, icon: Icons.category_rounded),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Wrap(
@@ -346,13 +438,17 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                   return FilterChip(
                     label: Text(cat),
                     selected: selected,
-                    onSelected: (_) =>
-                        ref.read(workerProfileProvider.notifier).toggleCategory(cat),
-                    selectedColor:
-                        AppTheme.primaryColor.withValues(alpha: 0.15),
+                    onSelected: (_) => ref
+                        .read(workerProfileProvider.notifier)
+                        .toggleCategory(cat),
+                    selectedColor: AppTheme.primaryColor.withValues(
+                      alpha: 0.15,
+                    ),
                     checkmarkColor: AppTheme.primaryColor,
                     side: BorderSide(
-                      color: selected ? AppTheme.primaryColor : AppTheme.borderColor,
+                      color: selected
+                          ? AppTheme.primaryColor
+                          : AppTheme.borderColor,
                     ),
                   );
                 }).toList(),
@@ -362,7 +458,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
 
             // ─── Experience & Rate ────────────────────────────
             _SectionHeader(
-              title: 'Experience & Rate',
+              title: s.experienceAndRate,
               icon: Icons.work_outline,
             ),
             Padding(
@@ -371,15 +467,18 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: profile.yearsExperience,
-                      decoration: const InputDecoration(
-                        labelText: 'Years Experience',
-                      ),
+                      isExpanded: true,
+                      initialValue: profile.yearsExperience,
+                      decoration: InputDecoration(labelText: s.yearsExperience),
                       items: List.generate(31, (i) => i)
-                          .map((y) => DropdownMenuItem(
-                                value: y,
-                                child: Text(y == 0 ? 'Less than 1' : '$y years'),
-                              ))
+                          .map(
+                            (y) => DropdownMenuItem(
+                              value: y,
+                              child: Text(
+                                y == 0 ? s.lessThan1Year : '$y ${s.years}',
+                              ),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) {
                         if (val != null) {
@@ -393,14 +492,12 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Rate (PKR/hr)',
+                      decoration: InputDecoration(
+                        labelText: s.hourlyRate,
                         prefixText: 'Rs. ',
                       ),
                       keyboardType: TextInputType.number,
-                      controller: TextEditingController(
-                        text: profile.hourlyRatePkr?.toString() ?? '',
-                      ),
+                      controller: _hourlyRateController,
                       onChanged: (val) {
                         final rate = int.tryParse(val);
                         ref
@@ -415,10 +512,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
             const SizedBox(height: 16),
 
             // ─── Service Radius ───────────────────────────────
-            _SectionHeader(
-              title: 'Service Radius',
-              icon: Icons.near_me_rounded,
-            ),
+            _SectionHeader(title: s.serviceRadius, icon: Icons.near_me_rounded),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -428,14 +522,15 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     children: [
                       Text(
                         '${profile.serviceRadiusKm} km',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: AppTheme.primaryColor,
                             ),
                       ),
                       const Spacer(),
                       Text(
-                        'Max: ${AppConstants.maxServiceRadiusKm} km',
+                        '${s.maxRadius} ${AppConstants.maxServiceRadiusKm} ${s.kmLabel}',
                         style: const TextStyle(
                           color: AppTheme.textDisabled,
                           fontSize: 12,
@@ -449,8 +544,9 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     max: AppConstants.maxServiceRadiusKm.toDouble(),
                     divisions: AppConstants.maxServiceRadiusKm - 1,
                     label: '${profile.serviceRadiusKm} km',
-                    onChanged: (val) =>
-                        ref.read(workerProfileProvider.notifier).updateServiceRadius(val.round()),
+                    onChanged: (val) => ref
+                        .read(workerProfileProvider.notifier)
+                        .updateServiceRadius(val.round()),
                   ),
                 ],
               ),
@@ -458,26 +554,25 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
             const SizedBox(height: 8),
 
             // ─── Availability ─────────────────────────────────
-            _SectionHeader(
-              title: 'Availability',
-              icon: Icons.schedule_rounded,
-            ),
+            _SectionHeader(title: s.availability, icon: Icons.schedule_rounded),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _AvailabilitySelector(
                 currentStatus: profile.availabilityStatus,
-                onChanged: (status) =>
-                    ref.read(workerProfileProvider.notifier).updateAvailability(status),
+                onChanged: (status) => ref
+                    .read(workerProfileProvider.notifier)
+                    .updateAvailability(status),
               ),
             ),
             const SizedBox(height: 16),
 
             // ─── Portfolio ────────────────────────────────────
             _SectionHeader(
-              title: 'Portfolio',
+              title: s.portfolio,
               icon: Icons.photo_library_outlined,
               trailing: TextButton.icon(
-                onPressed: profile.portfolioMediaUrls.length >=
+                onPressed:
+                    profile.portfolioMediaUrls.length >=
                         AppConstants.maxPortfolioImages
                     ? null
                     : _showAddPortfolioImageDialog,
@@ -488,24 +583,28 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
               ),
             ),
             if (profile.portfolioMediaUrls.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Text(
-                  'No portfolio images yet. Tap "Add" to showcase your work.',
+                  s.noPortfolioImages,
                   style: TextStyle(color: AppTheme.textDisabled),
                 ),
               )
             else
               _PortfolioGrid(
                 urls: profile.portfolioMediaUrls,
-                onRemove: (index) =>
-                    ref.read(workerProfileProvider.notifier).removePortfolioImage(index),
+                onRemove: (index) => ref
+                    .read(workerProfileProvider.notifier)
+                    .removePortfolioImage(index),
               ),
             const SizedBox(height: 16),
 
             // ─── Verification Status ──────────────────────────
             _SectionHeader(
-              title: 'Verification',
+              title: s.verification,
               icon: Icons.verified_outlined,
             ),
             Padding(
@@ -523,22 +622,25 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     size: 28,
                   ),
                   title: Text(
-                    profile.isVerified
-                        ? 'Verified Account'
-                        : 'Not Yet Verified',
+                    profile.isVerified ? s.verifiedAccount : s.notVerified,
                   ),
                   subtitle: Text(
                     profile.isVerified
-                        ? 'Your identity has been verified'
-                        : 'Verify your ID to earn a trusted badge',
+                        ? s.yourIdentityVerified
+                        : s.verifyIdBadge,
                   ),
                   trailing: profile.isVerified
                       ? null
                       : TextButton(
                           onPressed: () {
-                            // TODO: Navigate to ID verification flow
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IdVerificationView(),
+                              ),
+                            );
                           },
-                          child: const Text('Verify Now'),
+                          child: Text(s.verifyNow),
                         ),
                 ),
               ),
@@ -557,8 +659,11 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: AppTheme.errorColor, size: 20),
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppTheme.errorColor,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -581,7 +686,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
 // ─── Sub-widgets ────────────────────────────────────────────────────────
 
 /// Profile photo with overlay edit button and stats
-class _ProfilePhotoSection extends StatelessWidget {
+class _ProfilePhotoSection extends ConsumerWidget {
   final String? photoUrl;
   final String fullName;
   final double rating;
@@ -599,7 +704,7 @@ class _ProfilePhotoSection extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Column(
         children: [
@@ -611,11 +716,18 @@ class _ProfilePhotoSection extends StatelessWidget {
                   radius: 50,
                   backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                   backgroundImage: photoUrl != null
-                      ? NetworkImage(photoUrl!)
+                      ? (photoUrl!.startsWith('data:')
+                            ? MemoryImage(
+                                base64Decode(photoUrl!.split(',').last),
+                              )
+                            : NetworkImage(photoUrl!))
                       : null,
                   child: photoUrl == null
-                      ? const Icon(Icons.person_rounded,
-                          size: 50, color: AppTheme.primaryColor)
+                      ? const Icon(
+                          Icons.person_rounded,
+                          size: 50,
+                          color: AppTheme.primaryColor,
+                        )
                       : null,
                 ),
               ),
@@ -630,8 +742,11 @@ class _ProfilePhotoSection extends StatelessWidget {
                       color: AppTheme.primaryColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.camera_alt_rounded,
-                        size: 18, color: Colors.white),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -645,40 +760,50 @@ class _ProfilePhotoSection extends StatelessWidget {
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.verified_rounded,
-                        color: AppTheme.verifiedBadge, size: 22),
+                    child: const Icon(
+                      Icons.verified_rounded,
+                      color: AppTheme.verifiedBadge,
+                      size: 22,
+                    ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            fullName,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            fullName.isEmpty
+                ? ref.watch(appStringsProvider).yourName
+                : fullName,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.star_rounded,
-                  size: 16, color: AppTheme.accentColor),
+              const Icon(
+                Icons.star_rounded,
+                size: 16,
+                color: AppTheme.accentColor,
+              ),
               const SizedBox(width: 4),
               Text(
-                rating > 0 ? rating.toStringAsFixed(1) : 'No ratings',
+                rating > 0
+                    ? rating.toStringAsFixed(1)
+                    : ref.watch(appStringsProvider).noRatings,
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppTheme.accentDark,
                 ),
               ),
               const SizedBox(width: 16),
-              const Icon(Icons.work_history_rounded,
-                  size: 16, color: AppTheme.textSecondary),
+              const Icon(
+                Icons.work_history_rounded,
+                size: 16,
+                color: AppTheme.textSecondary,
+              ),
               const SizedBox(width: 4),
               Text(
-                '$totalJobs jobs',
+                '$totalJobs ${ref.watch(appStringsProvider).jobsLabel}',
                 style: const TextStyle(color: AppTheme.textSecondary),
               ),
             ],
@@ -718,7 +843,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -779,10 +904,7 @@ class _PortfolioGrid extends StatelessWidget {
   final List<String> urls;
   final ValueChanged<int> onRemove;
 
-  const _PortfolioGrid({
-    required this.urls,
-    required this.onRemove,
-  });
+  const _PortfolioGrid({required this.urls, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -807,10 +929,12 @@ class _PortfolioGrid extends StatelessWidget {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     color: AppTheme.surfaceColor,
-                    child: const Icon(Icons.broken_image_outlined,
-                        color: AppTheme.textDisabled),
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: AppTheme.textDisabled,
+                    ),
                   ),
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;
@@ -834,8 +958,11 @@ class _PortfolioGrid extends StatelessWidget {
                       color: Colors.black54,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close_rounded,
-                        size: 14, color: Colors.white),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -847,13 +974,28 @@ class _PortfolioGrid extends StatelessWidget {
   }
 }
 
-/// Bottom sheet for AI bio generation input
+/// Bottom sheet for AI bio generation input.
+///
+/// Receives ALL localized strings as constructor parameters so it does not
+/// need to access Riverpod providers directly — this makes it usable from
+/// overlay widgets (bottom sheets, dialogs) that may lack ProviderScope
+/// ancestry in test environments.
 class _AiBioSheet extends StatelessWidget {
   final TextEditingController aiInputController;
+  final String title;
+  final String description;
+  final String example;
+  final String hintText;
+  final String generateLabel;
   final VoidCallback onGenerate;
 
   const _AiBioSheet({
     required this.aiInputController,
+    required this.title,
+    required this.description,
+    required this.example,
+    required this.hintText,
+    required this.generateLabel,
     required this.onGenerate,
   });
 
@@ -886,9 +1028,9 @@ class _AiBioSheet extends StatelessWidget {
             children: [
               Icon(Icons.auto_awesome, color: AppTheme.accentColor),
               const SizedBox(width: 8),
-              const Text(
-                'Let AI write your profile',
-                style: TextStyle(
+              Text(
+                title,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -896,14 +1038,11 @@ class _AiBioSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Describe your experience in your own words, and we\'ll turn it into a professional bio.',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
+          Text(description, style: TextStyle(color: AppTheme.textSecondary)),
           const SizedBox(height: 8),
-          const Text(
-            'Example: "I worked in construction for 8 years, mostly plumbing and tiling."',
-            style: TextStyle(
+          Text(
+            example,
+            style: const TextStyle(
               fontSize: 12,
               color: AppTheme.textDisabled,
               fontStyle: FontStyle.italic,
@@ -912,8 +1051,8 @@ class _AiBioSheet extends StatelessWidget {
           const SizedBox(height: 12),
           TextField(
             controller: aiInputController,
-            decoration: const InputDecoration(
-              hintText: 'Describe your experience...',
+            decoration: InputDecoration(
+              hintText: hintText,
               alignLabelWithHint: true,
             ),
             maxLines: 3,
@@ -923,7 +1062,7 @@ class _AiBioSheet extends StatelessWidget {
           FilledButton.icon(
             onPressed: onGenerate,
             icon: const Icon(Icons.auto_awesome),
-            label: const Text('Generate Bio'),
+            label: Text(generateLabel),
           ),
         ],
       ),

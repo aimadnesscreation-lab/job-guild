@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
 import 'package:local_services_marketplace/features/chat/providers/chat_provider.dart';
 import 'package:local_services_marketplace/features/chat/views/chat_detail_view.dart';
@@ -11,26 +12,33 @@ class ChatListView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(chatProvider);
+    final s = ref.watch(appStringsProvider);
 
     if (state.conversations.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded,
-                size: 64, color: AppTheme.textDisabled),
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 64,
+              color: AppTheme.textDisabled,
+            ),
             const SizedBox(height: 16),
-            const Text(
-              'No conversations yet',
-              style: TextStyle(
+            Text(
+              s.noConversations,
+              style: const TextStyle(
                 fontSize: 16,
                 color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Post a job and chat with interested workers',
-              style: TextStyle(fontSize: 13, color: AppTheme.textDisabled),
+            Text(
+              s.noConvSubtitle,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textDisabled,
+              ),
             ),
           ],
         ),
@@ -40,7 +48,7 @@ class ChatListView extends ConsumerWidget {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: state.conversations.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+      separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
       itemBuilder: (context, index) {
         final conv = state.conversations[index];
         final isUnread = conv.unreadCount > 0;
@@ -73,7 +81,9 @@ class ChatListView extends ConsumerWidget {
                 timeStr,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isUnread ? AppTheme.primaryColor : AppTheme.textDisabled,
+                  color: isUnread
+                      ? AppTheme.primaryColor
+                      : AppTheme.textDisabled,
                 ),
               ),
             ],
@@ -87,7 +97,9 @@ class ChatListView extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: isUnread ? AppTheme.textPrimary : AppTheme.textSecondary,
+                    color: isUnread
+                        ? AppTheme.textPrimary
+                        : AppTheme.textSecondary,
                     fontWeight: isUnread ? FontWeight.w500 : FontWeight.normal,
                   ),
                 ),

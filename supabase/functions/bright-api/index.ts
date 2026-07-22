@@ -49,7 +49,8 @@ const OPENROUTER_BASE_URL =
 
 /**
  * Call OpenRouter chat completions API with a free model.
- * Uses mistral-7b-instruct:free by default (good for structured JSON output).
+ * Uses google/gemma-4-26b-a4b-it:free by default (modern, reliable for JSON output).
+ * Falls back to openrouter/free auto-router if rate-limited.
  */
 async function callOpenRouter(
   systemPrompt: string,
@@ -72,8 +73,8 @@ async function callOpenRouter(
       "X-Title": "Local Services Marketplace",
     },
     body: JSON.stringify({
-      // Use a free model — mistral-7b is reliable for structured extraction
-      model: "mistralai/mistral-7b-instruct:free",
+      // Google Gemma 4 — modern free model, reliable for structured JSON extraction
+      model: "google/gemma-4-26b-a4b-it:free",
       messages: [
         {
           role: "system",
@@ -93,9 +94,10 @@ async function callOpenRouter(
     const errorText = await response.text();
     console.error("[OpenRouter] API error:", response.status, errorText);
 
-    // If the free model is rate-limited, fall back to another free model
-    if (response.status === 429) {
-      console.log("[OpenRouter] Rate limited, retrying with different model...");
+    // If the primary model fails, retry with openrouter/free auto-router
+    // which automatically selects the best available free model
+    if (response.status === 429 || response.status === 503 || response.status === 502) {
+      console.log("[OpenRouter] Primary model failed, retrying with openrouter/free...");
       const retryResponse = await fetch(
         `${OPENROUTER_BASE_URL}/chat/completions`,
         {
@@ -107,11 +109,11 @@ async function callOpenRouter(
             "X-Title": "Local Services Marketplace",
           },
           body: JSON.stringify({
-            model: "meta-llama/llama-3.1-8b-instruct:free",
+            model: "openrouter/free",
             messages: [
               {
                 role: "system",
-                content: `${systemPrompt}\n\nReturn ONLY valid JSON.`,
+                content: `${systemPrompt}\n\nReturn ONLY valid JSON. No markdown.`,
               },
               { role: "user", content: userPrompt },
             ],
@@ -267,8 +269,8 @@ function fallbackParse(text: string): ParseResponse {
  * Estimate a reasonable budget based on category and any budget hints in text.
  */
 function estimateBudget(category: string, text: string): number {
-  // Try to extract a number from the text
-  const match = text.match(/(\d+)\s*(k|k|rs|pkr)?/i);
+  // Try to extract a budget hint from the text e.g. "5000", "5k", "3rs"
+  const match = text.match(/(\d+)\s*(k|rs|pkr)?/i);
   if (match) {
     const num = parseInt(match[1], 10);
     if (match[2]?.toLowerCase() === "k") return num * 1000;
