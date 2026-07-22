@@ -83,7 +83,9 @@ class Job {
               json['ai_extracted_metadata'] as Map<String, dynamic>,
             )
           : null,
-      budgetAmount: json['budget_amount'] as int?,
+      budgetAmount: json['budget_amount'] is int
+          ? json['budget_amount'] as int
+          : (json['budget_amount'] as num?)?.toInt(),
       budgetType: Job.parseBudgetType(json['budget_type'] as String?),
       locationText: json['location_text'] as String?,
       lat: parsedLat,
@@ -118,10 +120,8 @@ class Job {
     'status': status.name,
     'urgency': urgency.name,
     if (scheduledFor != null) 'scheduled_for': scheduledFor!.toIso8601String(),
-    // Only send created_at when we are updating an existing record. New jobs
-    // should use the database default (NOW()) to avoid timezone drift from
-    // the client device clock.
-    if (id.isNotEmpty) 'created_at': createdAt.toIso8601String(),
+    // NOTE: created_at is intentionally NOT sent — the database default (NOW())
+    // handles inserts, and updates should never overwrite the creation timestamp.
   };
 
   Job copyWith({

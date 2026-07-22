@@ -385,7 +385,13 @@ class WorkerDashboard extends ConsumerWidget {
             if (status == currentStatus) return;
 
             final userId = profile?.userId;
-            if (userId == null || userId.isEmpty) return;
+            // Guard against placeholder user IDs (e.g. 'user-placeholder'
+            // set when the profile hasn't loaded yet).
+            if (userId == null ||
+                userId.isEmpty ||
+                userId == 'user-placeholder') {
+              return;
+            }
 
             try {
               await ref
@@ -443,6 +449,7 @@ class WorkerDashboard extends ConsumerWidget {
     final budgetAmount = jobData['budget_amount'];
     return Job(
       id: app['job_id'] as String? ?? '',
+      employerId: jobData['employer_id'] as String? ?? '',
       title: jobData['title'] as String? ?? '',
       description: jobData['description'] as String? ?? '',
       categoryId: jobData['category_id'] as int? ?? 1,

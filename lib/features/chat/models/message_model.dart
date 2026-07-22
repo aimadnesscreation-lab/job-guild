@@ -103,4 +103,33 @@ class Conversation {
     this.unreadCount = 0,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? DateTime.now();
+
+  Conversation copyWith({
+    String? id,
+    String? jobId,
+    String? jobTitle,
+    String? otherUserId,
+    String? otherUserName,
+    String? otherUserPhotoUrl,
+    Message? lastMessage,
+    int? unreadCount,
+    DateTime? updatedAt,
+    bool clearOtherUserPhotoUrl = false,
+    bool clearLastMessage = false,
+  }) {
+    return Conversation(
+      id: id ?? this.id,
+      jobId: jobId ?? this.jobId,
+      jobTitle: jobTitle ?? this.jobTitle,
+      otherUserId: otherUserId ?? this.otherUserId,
+      otherUserName: otherUserName ?? this.otherUserName,
+      otherUserPhotoUrl: clearOtherUserPhotoUrl
+          ? null
+          : (otherUserPhotoUrl ?? this.otherUserPhotoUrl),
+      lastMessage:
+          clearLastMessage ? null : (lastMessage ?? this.lastMessage),
+      unreadCount: unreadCount ?? this.unreadCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

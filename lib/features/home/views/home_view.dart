@@ -266,8 +266,6 @@ class _HomeFeedTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(liveJobFeedProvider);
-        // Wait for the rebuilt stream to emit at least once (or error) before
-        // the refresh indicator dismisses, instead of an arbitrary delay.
         final completer = Completer<void>();
         bool hadError = false;
         Object? capturedError;
@@ -278,9 +276,6 @@ class _HomeFeedTab extends ConsumerWidget {
               hadError = true;
               capturedError = next.error;
             }
-            // Complete when the stream emits a value or error. Skip transient
-            // loading states to avoid hanging the refresh spinner when the
-            // provider transitions through loading → data.
             if (next.isLoading) return;
             if (!completer.isCompleted) {
               completer.complete();
@@ -289,7 +284,6 @@ class _HomeFeedTab extends ConsumerWidget {
         );
         try {
           await completer.future.timeout(const Duration(seconds: 5));
-          // Surface a stream error to the user so a failed refresh isn't silent.
           if (hadError && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -301,8 +295,7 @@ class _HomeFeedTab extends ConsumerWidget {
             );
           }
         } catch (_) {
-          // Timeout or other failure — the stream will keep trying in the
-          // background, so just let the indicator finish.
+          // Timeout — stream keeps trying in background.
         } finally {
           sub.close();
         }
@@ -570,17 +563,16 @@ class _RealtimeJobCard extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      categoryNameToId.entries
-                              .firstWhere(
-                                (e) => e.value == job.categoryId,
-                                orElse: () => const MapEntry('', 0),
-                              )
-                              .key
-                              .isNotEmpty
-                          ? categoryNameToId.entries
-                                .firstWhere((e) => e.value == job.categoryId)
-                                .key
-                          : 'Cat #${job.categoryId}',
+                      (() {
+                        final entry = categoryNameToId.entries
+                            .firstWhere(
+                              (e) => e.value == job.categoryId,
+                              orElse: () => const MapEntry('', 0),
+                            );
+                        return entry.key.isNotEmpty
+                            ? entry.key
+                            : 'Cat #${job.categoryId}';
+                      })(),
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,

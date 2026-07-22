@@ -38,7 +38,8 @@ class SupabaseRepository {
       final list = response;
       return list.map((j) => Job.fromJson(j)).toList();
     } catch (e) {
-      return _mockJobs;
+      debugPrint('[Jobs] getNearbyJobs error: $e');
+      rethrow;
     }
   }
 
@@ -94,6 +95,13 @@ class SupabaseRepository {
     // Non-completed status updates are safe to apply directly.
     if (status != JobStatus.completed) {
       await client.from('jobs').update({'status': status.name}).eq('id', jobId);
+    } else {
+      // If we reached here for a completed status, the RPC failed but we
+      // caught the error. Throw so callers can show a user-facing error.
+      throw Exception(
+        'Cannot complete job: the required database function is not available. '
+        'Please contact support.',
+      );
     }
   }
 
@@ -114,18 +122,36 @@ class SupabaseRepository {
     });
   }
 
-  Future<void> hireWorker(String jobId, String workerId) async {
+  /// Hire a worker: updates application and job to 'hired' status.
+  /// Uses a best-effort two-step approach with verification.
+  /// Returns whether the hire was successful.
+  Future<bool> hireWorker(String jobId, String workerId) async {
     final client = _client;
-    if (client == null) return;
+    if (client == null) return false;
 
-    // Atomically update the application to 'hired' — only if the worker
-    // has actually applied (row exists). If no row matches, do nothing.
+    // Step 1: Update the application.
     await client
         .from('applications')
         .update({'status': 'hired'})
         .eq('job_id', jobId)
-        .eq('worker_id', workerId);
+        .eq('worker_id', workerId)
+        .neq('status', 'hired');
+
+    // Step 2: Update the job.
     await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
+
+    // Step 3: Verify both updates actually took effect.
+    final jobCheck = await client
+        .from('jobs')
+        .select('status')
+        .eq('id', jobId)
+        .maybeSingle();
+    if (jobCheck == null || jobCheck['status'] != 'hired') {
+      debugPrint('[Hire] Job status verification failed — status is '
+          '${jobCheck?['status']}');
+      return false;
+    }
+    return true;
   }
 
   /// Fetch the current worker's own applications, joined with job details

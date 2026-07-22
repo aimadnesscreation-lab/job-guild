@@ -41,18 +41,18 @@ class AuthNotifier extends Notifier<void> {
   @override
   void build() {}
 
-  /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx)
+  /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx).
+  /// Throws [FormatException] if the number is not a valid Pakistani mobile.
   static String normalizePhone(String phone) {
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     // Pakistani mobile numbers are +92 followed by exactly 10 digits,
     // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
-      // Only 12-digit 92-prefixed numbers are valid Pakistani mobile numbers
-      // (92 + 10-digit local number). Anything else (e.g. 11 digits) is
-      // ambiguous — we fall through to the catch-all and let Supabase auth
-      // handle validation rather than silently producing an invalid number.
       if (digits.length == 12) return '+$digits';
-      return '+$digits';
+      throw FormatException(
+        'Invalid Pakistani mobile number: $phone. '
+        'Expected 12 digits starting with 92 (e.g. 923001234567).',
+      );
     }
     if (digits.startsWith('0')) {
       final withoutLeading = digits.substring(1);

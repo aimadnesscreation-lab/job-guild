@@ -1,13 +1,16 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 import 'package:local_services_marketplace/core/utils/responsive.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/utils/location_utils.dart';
@@ -64,14 +67,16 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
     _messageController.clear();
     await ref.read(chatProvider.notifier).sendMessage(text);
 
-    // Scroll to bottom
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    // Scroll to bottom AFTER the new message has been laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   /// Pick and send an image from gallery or camera
@@ -376,12 +381,18 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
             ListTile(
               leading: const Icon(Icons.flag_outlined),
               title: Text(ref.watch(appStringsProvider).reportUser),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                _reportUser(context);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.block_outlined),
               title: Text(ref.watch(appStringsProvider).blockUser),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                _blockUser(context);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.work_outline),
@@ -409,6 +420,103 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
         ),
       ),
     );
+  }
+
+  /// Opens a dialog to submit a report against the other user.
+  void _reportUser(BuildContext context) async {
+    final reasonController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ref.read(appStringsProvider).reportUser),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Describe the issue...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.read(appStringsProvider).cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, reasonController.text),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+    reasonController.dispose();
+    if (result == null || result.trim().isEmpty) return;
+
+    try {
+      final repo = ref.read(supabaseRepositoryProvider);
+      final currentUserId = ref.read(currentUserProvider)?.id;
+      await repo.submitReport(
+        reporterId: currentUserId ?? '',
+        reportedUserId: _otherUserId,
+        jobId: widget.conversationId,
+        reason: result.trim(),
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report submitted. Thank you.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit report: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  /// Block the other user — persists to a local block list.
+  void _blockUser(BuildContext context) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final blockedKey = 'blocked_users';
+      final blockedJson = prefs.getString(blockedKey);
+      final blockedUsers = blockedJson != null
+          ? List<String>.from(jsonDecode(blockedJson) as List)
+          : <String>[];
+      final otherId = _otherUserId;
+      if (otherId.isEmpty || blockedUsers.contains(otherId)) return;
+      blockedUsers.add(otherId);
+      await prefs.setString(blockedKey, jsonEncode(blockedUsers));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User blocked. You will no longer receive messages from them.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to block user: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  /// The user ID of the person on the other side of this conversation.
+  String get _otherUserId {
+    final state = ref.read(chatProvider);
+    final conv = state.conversations
+        .where((c) => c.id == widget.conversationId)
+        .firstOrNull;
+    return conv?.otherUserId ?? '';
   }
 
   void _showAttachmentOptions(BuildContext context) {
@@ -624,7 +732,7 @@ class _MessageBubble extends StatelessWidget {
                       fontSize: 15,
                       color: isMine
                           ? AppTheme.textPrimary
-                          : AppTheme.textPrimary,
+                          : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -703,6 +811,7 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
 
   Future<void> _startRecording() async {
     await ref.read(voiceRecorderProvider.notifier).startRecording();
+    if (!mounted) return;
     _pulseController.repeat(reverse: true);
   }
 
@@ -830,20 +939,24 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
           // fires stop before startRecording's async setup completes).
           GestureDetector(
             onLongPressStart: (_) async {
+              // Set the flag BEFORE awaiting so onLongPressEnd can observe
+              // even on quick releases.
+              _recordingStarted = true;
               try {
                 await _startRecording();
-                _recordingStarted = true; // only after setup succeeds
               } catch (_) {
-                _recordingStarted = false;
+                if (mounted) _recordingStarted = false;
               }
             },
             onLongPressEnd: (_) async {
+              if (!mounted) return;
               if (_recordingStarted) {
                 _recordingStarted = false;
                 await _stopAndSend();
               }
             },
             onLongPressCancel: () async {
+              if (!mounted) return;
               if (_recordingStarted) {
                 _recordingStarted = false;
                 await _cancel();
@@ -961,8 +1074,11 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
       }
     });
 
-    // Set source
-    _player.setSourceUrl(widget.url);
+    // Set source with error handling for expired/invalid URLs.
+    // Can't await in initState, so we handle errors via the state listener.
+    _player.setSourceUrl(widget.url).catchError((_) {
+      if (mounted) setState(() => _playerState = PlayerState.stopped);
+    });
   }
 
   @override

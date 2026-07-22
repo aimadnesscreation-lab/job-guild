@@ -134,9 +134,9 @@ function fallbackParse(text: string): ParseResponse {
   else if (lower.includes("paint")) category = "Painting";
   else if (lower.includes("carpent")) category = "Carpentry";
   else if (lower.includes("mason") || lower.includes("brick")) category = "Masonry";
+  else if (lower.includes("car wash")) category = "Car Wash";
   else if (lower.includes("mechanic") || lower.includes("car")) category = "Mechanic";
   else if (lower.includes("bike") || lower.includes("motor")) category = "Bike Repair";
-  else if (lower.includes("car wash")) category = "Car Wash";
   else if (lower.includes("welding") || lower.includes("weld")) category = "Welding";
   else if (lower.includes("steel")) category = "Steel Fixing";
   else if (lower.includes("tutor") || lower.includes("teach")) category = "Tutor";

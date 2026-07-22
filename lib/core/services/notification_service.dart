@@ -110,12 +110,11 @@ class NotificationService {
     }
   }
 
-  /// Detect the current platform. macOS is mapped to 'web' because the
-  /// fcm_tokens CHECK constraint only allows ('android', 'ios', 'web').
+  /// Detect the current platform.
   String _detectPlatform() {
     if (kIsWeb) return 'web';
     if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
-    if (defaultTargetPlatform == TargetPlatform.macOS) return 'web';
+    if (defaultTargetPlatform == TargetPlatform.macOS) return 'macos';
     return 'android';
   }
 

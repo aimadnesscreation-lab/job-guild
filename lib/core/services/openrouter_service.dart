@@ -42,7 +42,8 @@ class OpenRouterService {
         'max_tokens': maxTokens,
       });
 
-      final response = await _postRequest('/chat/completions', body);
+      final response = await _postRequest('/chat/completions', body)
+          .timeout(const Duration(seconds: 15));
       final data = jsonDecode(response) as Map<String, dynamic>;
       final choices = data['choices'] as List;
       if (choices.isEmpty) throw Exception('No response from AI');
@@ -88,7 +89,8 @@ class OpenRouterService {
         'max_tokens': maxTokens,
       });
 
-      final response = await _postRequest('/chat/completions', body);
+      final response = await _postRequest('/chat/completions', body)
+          .timeout(const Duration(seconds: 15));
       final data = jsonDecode(response) as Map<String, dynamic>;
       final choices = data['choices'] as List;
       if (choices.isEmpty) throw Exception('No response from AI');

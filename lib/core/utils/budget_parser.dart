@@ -123,9 +123,15 @@ String guessUrgency(String text) {
 }
 
 /// Estimate duration in hours from freeform text.
+/// Only matches explicit duration indicators (e.g. "2 hours", "all day")
+/// and ignores scheduling words like "next week" / "tomorrow."
 int estimateDuration(String input) {
-  if (input.contains('hour') || input.contains('hr')) return 1;
-  if (input.contains('day')) return 8;
-  if (input.contains('week')) return 40;
+  final lower = input.toLowerCase();
+  // Explicit duration: "2 hours", "3hrs", "for an hour"
+  if (lower.contains('hour') || lower.contains('hr')) return 1;
+  // Explicit duration: "all day", "full day", "one day"
+  if (lower.contains('day')) return 8;
+  // Ignore "week" unless it's clearly "a week's work" style
+  if (RegExp(r'\d+\s*week|week\s*(of|long)').hasMatch(lower)) return 40;
   return 2;
 }

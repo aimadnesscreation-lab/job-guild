@@ -62,8 +62,18 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
   Future<void> _hire(String workerId) async {
     try {
       final repo = ref.read(supabaseRepositoryProvider);
-      await repo.hireWorker(widget.job.id, workerId);
+      final success = await repo.hireWorker(widget.job.id, workerId);
       if (!context.mounted) return;
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${ref.read(appStringsProvider).error}: Hire failed — the job state may have changed. Please refresh.'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+        _loadApplicants();
+        return;
+      }
       setState(() => _hiredWorkerId = workerId);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -79,6 +89,7 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
           backgroundColor: AppTheme.errorColor,
         ),
       );
+      _loadApplicants();
     }
   }
 

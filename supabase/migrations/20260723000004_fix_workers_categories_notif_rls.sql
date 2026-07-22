@@ -65,4 +65,4 @@ $$ LANGUAGE plpgsql;
 CREATE POLICY "System can insert notifications"
   ON public.notifications
   FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (auth.uid() = user_id);

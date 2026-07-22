@@ -63,8 +63,9 @@ class ChatNotifier extends Notifier<ChatState> {
 
   /// Cache of sender profiles keyed by user id, so realtime inserts can be
   /// enriched without refetching the whole thread (realtime payloads don't
-  /// include joined relation data).
+  /// include joined relation data). Capped at 100 entries to bound memory.
   final Map<String, Map<String, dynamic>> _senderCache = {};
+  static const int _maxSenderCacheSize = 100;
 
   /// Localized label for the current user in optimistic chat messages.
   String get _currentUserDisplayName => ref.read(appStringsProvider).you;
@@ -170,13 +171,15 @@ class ChatNotifier extends Notifier<ChatState> {
       final query = client
           .from('messages')
           .select('*, jobs!inner(title, employer_id)');
+      // Only fetch messages for jobs the user is actually associated with.
+      // This prevents phantom conversations from cancelled jobs or deleted
+      // applications where the user sent a message but is no longer a party.
       if (jobIds.isEmpty) {
+        // Fallback: user has no associated jobs (no employer jobs, no
+        // applications). Fetch only messages they sent themselves.
         query.eq('sender_id', userId);
       } else {
-        // Build a proper PostgREST `in` filter string:
-        //   job_id.in.(id1,id2,id3)
-        final jobIdFilter = jobIds.map((id) => id).join(',');
-        query.or('sender_id.eq.$userId,job_id.in.($jobIdFilter)');
+        query.filter('job_id', 'in', jobIds.toList());
       }
       final response = await query.order('sent_at', ascending: false);
 
@@ -231,7 +234,11 @@ class ChatNotifier extends Notifier<ChatState> {
           for (final app in _safeList(appsData)) {
             final jid = app['job_id'] as String?;
             final wid = app['worker_id'] as String?;
-            if (jid != null && wid != null && employerOnlyJobIds.contains(jid)) {
+            // Only take the FIRST applicant for each job (don't overwrite).
+            if (jid != null &&
+                wid != null &&
+                employerOnlyJobIds.contains(jid) &&
+                !jobIdToOtherId.containsKey(jid)) {
               jobIdToOtherId[jid] = wid;
               uniqueOtherIds.add(wid);
             }
@@ -386,13 +393,7 @@ class ChatNotifier extends Notifier<ChatState> {
     if (existingIdx >= 0) {
       // Update existing conversation — replace preview and bump to top.
       final conv = state.conversations[existingIdx];
-      final updated = Conversation(
-        id: conv.id,
-        jobId: conv.jobId,
-        jobTitle: conv.jobTitle,
-        otherUserId: conv.otherUserId,
-        otherUserName: conv.otherUserName,
-        otherUserPhotoUrl: conv.otherUserPhotoUrl,
+      final updated = conv.copyWith(
         lastMessage: Message(
           content: content,
           sentAt: sentAt,
@@ -484,13 +485,7 @@ class ChatNotifier extends Notifier<ChatState> {
     if (idx < 0) return;
 
     final conv = state.conversations[idx];
-    final updated = Conversation(
-      id: conv.id,
-      jobId: conv.jobId,
-      jobTitle: conv.jobTitle,
-      otherUserId: conv.otherUserId,
-      otherUserName: conv.otherUserName,
-      otherUserPhotoUrl: conv.otherUserPhotoUrl,
+    final updated = conv.copyWith(
       lastMessage: Message(
         content: content,
         sentAt: now,
@@ -584,6 +579,10 @@ class ChatNotifier extends Notifier<ChatState> {
             .select('full_name, profile_photo_url')
             .eq('id', senderId)
             .single();
+        // Evict oldest entries if cache exceeds max size.
+        if (_senderCache.length >= _maxSenderCacheSize) {
+          _senderCache.remove(_senderCache.keys.first);
+        }
         _senderCache[senderId] = sender;
       } catch (_) {
         sender = null;
@@ -713,7 +712,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
       state = state.copyWith(isSending: false, clearError: true);
     } catch (e) {
-      // Save to offline queue
+      // Save to offline queue with retry tracking.
       await _addToOfflineQueue({
         'id': messageId,
         'job_id': conversationId,
@@ -722,6 +721,7 @@ class ChatNotifier extends Notifier<ChatState> {
         if (imageUrl != null)
           'metadata': jsonEncode({'type': 'image', 'url': imageUrl}),
         'failed_at': DateTime.now().toIso8601String(),
+        'retry_count': 0,
       });
       state = state.copyWith(
         isSending: false,
@@ -767,8 +767,27 @@ class ChatNotifier extends Notifier<ChatState> {
       if (currentUserId == null) return;
 
       final remaining = <Map<String, dynamic>>[];
+      const maxRetries = 3;
+      const ttl = Duration(hours: 24);
+      final now = DateTime.now();
 
       for (final msg in queue) {
+        // Discard messages past TTL
+        final failedAt = msg['failed_at'] as String?;
+        if (failedAt != null) {
+          final failedTime = DateTime.tryParse(failedAt);
+          if (failedTime != null && now.difference(failedTime) > ttl) {
+            debugPrint('[OfflineQueue] Discarding expired message');
+            continue;
+          }
+        }
+
+        // Discard messages that have exceeded max retries
+        final retryCount = (msg['retry_count'] as num?)?.toInt() ?? 0;
+        if (retryCount >= maxRetries) {
+          debugPrint('[OfflineQueue] Discarding message after $maxRetries retries');
+          continue;
+        }
         // SECURITY: never send a queued message on behalf of a different
         // user. Discard messages queued by another account.
         final queuedUserId = msg['queued_user_id'] as String?;
@@ -793,9 +812,11 @@ class ChatNotifier extends Notifier<ChatState> {
             debugPrint('[OfflineQueue] Discarding message for deleted job');
             continue;
           }
-          remaining.add(msg);
+          remaining.add(Map<String, dynamic>.from(msg)
+            ..['retry_count'] = ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1);
         } catch (e) {
-          remaining.add(msg);
+          remaining.add(Map<String, dynamic>.from(msg)
+            ..['retry_count'] = ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1);
         }
       }
 
@@ -867,6 +888,7 @@ class ChatNotifier extends Notifier<ChatState> {
         'content_type': 'voice',
         'metadata': jsonEncode({'type': 'voice', 'url': audioUrl}),
         'failed_at': DateTime.now().toIso8601String(),
+        'retry_count': 0,
       });
       state = state.copyWith(
         isSending: false,
@@ -882,17 +904,7 @@ class ChatNotifier extends Notifier<ChatState> {
     // 1. Optimistic local update — clear the unread badge immediately.
     final localList = state.conversations.map((c) {
       if (c.id == conversationId) {
-        return Conversation(
-          id: c.id,
-          jobId: c.jobId,
-          jobTitle: c.jobTitle,
-          otherUserId: c.otherUserId,
-          otherUserName: c.otherUserName,
-          otherUserPhotoUrl: c.otherUserPhotoUrl,
-          lastMessage: c.lastMessage,
-          unreadCount: 0,
-          updatedAt: c.updatedAt,
-        );
+        return c.copyWith(unreadCount: 0);
       }
       return c;
     }).toList();

@@ -9,6 +9,7 @@ import 'package:local_services_marketplace/features/settings/views/reports_view.
 import 'package:url_launcher/url_launcher.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
 import 'package:local_services_marketplace/features/worker/views/id_verification_view.dart';
+import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
 
 /// Settings screen — language, notification preferences, service radius,
 /// account, verification, logout, report/block management, delete account.
@@ -356,7 +357,14 @@ class _AccountHeader extends ConsumerWidget {
       ),
       subtitle: Text(phone),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const EditWorkerProfileView(),
+          ),
+        );
+      },
     );
   }
 }
