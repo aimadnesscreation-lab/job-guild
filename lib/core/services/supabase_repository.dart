@@ -150,13 +150,14 @@ class SupabaseRepository {
   /// Fetch completed/hired jobs for a worker (for the earnings log).
   ///
   /// Returns applications where the application is `hired` OR the associated
-  /// job is `completed`. Since the `applications` table CHECK constraint only
-  /// allows (`interested`, `shortlisted`, `hired`, `rejected`), we fetch all
-  /// applications for this worker and filter in Dart — PostgREST's `.or()`
-  /// cannot reference joined column paths like `jobs.status`.
+  /// job is `completed`. The `applications` table CHECK constraint allows
+  /// (`interested`, `shortlisted`, `hired`, `rejected`, `completed`), so the
+  /// client-side filter ensures only relevant rows are returned.
   ///
-  /// This is a small dataset per worker (hired + completed jobs) so the
-  /// client-side filter is negligible.
+  /// PostgREST's `.or()` cannot reference joined column paths like
+  /// `jobs.status`, so we fetch all applications for this worker and filter
+  /// in Dart. This is a small dataset per worker (hired + completed jobs)
+  /// so the client-side filter is negligible.
   Future<List<Map<String, dynamic>>> getWorkerCompletedJobs(
     String workerId,
   ) async {
@@ -446,6 +447,19 @@ class SupabaseRepository {
         .from('notifications')
         .update({'is_read': true})
         .eq('id', notificationId);
+  }
+
+  /// Mark all unread notifications for a user as read in a single batched
+  /// request. Avoids the N+1 pattern of updating one row at a time.
+  Future<void> markAllNotificationsRead(String userId) async {
+    final client = _client;
+    if (client == null) return;
+
+    await client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('user_id', userId)
+        .eq('is_read', false);
   }
 
   // ─── Reports ─────────────────────────────────────────────

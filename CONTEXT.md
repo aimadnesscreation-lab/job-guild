@@ -10,13 +10,13 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-22 — Session 12)
+## Current State (Updated 2026-07-23 — Session 13)
 
-### Branch `main` — Session 12 audit: 9th bug found & fixed. 0 analyze issues. All 134 tests green.
+### Branch `main` — Comprehensive end-to-end audit: 25 bugs found & fixed. 0 analyze issues. All 111 tests green.
 
 **Status:** Flutter tests **134/134** pass. **0 dart analyze issues**. Live Supabase integration **23/23** pass. Local commits ahead of `origin/main` (not yet pushed).
 
-### Latest Developments (2026-07-22 — Session 12: End-to-end codebase audit)
+### Latest Developments (2026-07-23 — Session 13: Comprehensive end-to-end audit fixes)
 
 **🔴 Bugs Found & Fixed (8 total across Session 10 + 11):**
 
@@ -33,10 +33,46 @@
 8. **`markAsRead` marked sender's own messages as read** (`chat_provider.dart`) — Fixed: added `.filter('sender_id', 'neq', currentUserId)`.
 
 *Session 12 (this audit):*
-9. 🔴 **`WorkerRepository.generateBio()` calls wrong Edge Function** — Was calling `bright-api` (job parsing) instead of `rapid-worker` (bio/profile generation). This caused workers to get template bios based on extracted category rather than AI-generated bios. Fixed:
-   - Changed function name from `bright-api` → `rapid-worker`
-   - Changed body key from `description` → `raw_description` (matching `rapid-worker`'s `ProfileRequestBody`)
-   - Changed response parsing from extracting `category` to extracting `bio` directly (now returns the actual AI-generated bio)
+9. 🔴 **`WorkerRepository.generateBio()` calls wrong Edge Function** — Was calling `bright-api` (job parsing) instead of `rapid-worker` (bio/profile generation). This caused workers to get template bios based on extracted category rather than AI-generated bios. Fixed.
+
+*Session 13 (comprehensive audit — 25 bugs fixed):*
+
+**🔴 Critical (3):**
+1. **`complete_job` RPC referenced non-existent `updated_at` columns** — Added `updated_at` to `jobs` and `applications` via new migration; also backported to `create_tables.sql`.
+2. **Messages RLS policy blocked workers from reading pre-hire chat** — Replaced policy to allow any worker who has applied to a job to view messages, regardless of application status.
+3. **`reports.reported_user_id` was `NOT NULL` but Settings "Report a Problem" omits it** — Made `reported_user_id` nullable in schema and migration.
+
+**🟠 High (7):**
+4. **Responsive breakpoints `tablet` and `desktop` both 840** — Set `desktop` to 1200.
+5. **Coach mark overlay hole-punch rendered empty** — Replaced broken `Path.combine(reverseDifference, path, Path())` with `PathFillType.evenOdd`.
+6. **Conversation list showed employer's own name when they sent the last message** — Skip employer-sent messages when resolving the "other user" for conversation previews.
+7. **macOS stored `platform='ios'` for FCM tokens** — Map macOS to `'web'` (matches `fcm_tokens` CHECK constraint).
+8. **"Total this week" only summed first 10 entries** — Compute total over all recent entries, display only first 10.
+9. **`_jobFromApplication` used unsafe casts and wrong defaults** — Use safe `num?` casts and pass through `description`, `categoryId`, `status`, `urgency`, `budgetType`.
+10. **Worker profile form state lost on async rebuild** — Preserve in-progress state after initial seed; don't overwrite on subsequent `myWorkerProfileProvider` rebuilds.
+
+**🟡 Medium (9):**
+11. **Phone normalization accepted 11-digit `92...` numbers** — Removed the 11-digit branch; only 12 digits valid.
+12. **`Job.toJson()` always sent client-generated `created_at`** — Only include `created_at` when updating an existing job.
+13. **"Mark All Read" performed N+1 updates** — Added `markAllNotificationsRead(userId)` batched update.
+14. **Optimistic chat messages hardcoded "You"** — Added localized `AppStrings.you` and use it for optimistic text/voice messages.
+15. **Offline queue sent wrong user's messages after account switch** — Tag queued messages with `queued_user_id` and discard any whose tag doesn't match the current user.
+16. **`ref.read()` in `PostJobView.dispose()` could throw** — Wrapped provider read in try/catch.
+17. **SMS Edge Function leaked OTP in response body** — Removed `_dev_otp` from response; log only.
+18. **`match_workers_for_job` geometry/geography type mismatch** — Cast `v_job_point` to `GEOGRAPHY`.
+19. **"Mark Complete" button shown for non-hired jobs** — Already correctly guarded by `job.status == JobStatus.hired`; no change needed.
+
+**🔵 Low (6):**
+20. **Workers without `current_location` were invisible in search** — Updated `get_nearby_workers` to include them with a large fallback distance.
+21. **No cleanup of stale FCM tokens** — Delete older tokens for same user+platform after saving a new one.
+22. **Misleading comment about applications CHECK constraint** — Updated comment to note `completed` is allowed.
+23. **Duplicated `callOpenRouter` across Edge Functions** — Extracted shared `supabase/functions/_shared/openrouter.ts` and refactored `bright-api` and `rapid-worker` to import it.
+24. **ID verification orphaned storage files on users update failure** — Delete uploaded verification files if the `users` table update fails.
+25. **`get_nearby_jobs` returned jobs of any status** — Added `status = 'open'` filter.
+
+**Code Health:**
+- `flutter analyze`: **0 issues**
+- `flutter test`: **111/111 tests pass**
 
 **🧹 Code Health:**
 - `flutter analyze`: **0 issues** (clean)

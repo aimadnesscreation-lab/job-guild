@@ -126,8 +126,9 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
       await uploadFile(idFileName, _idFrontImage!);
 
       String? selfieUrl;
+      String? selfieFileName;
       if (_selfieImage != null) {
-        final selfieFileName =
+        selfieFileName =
             'verification/$userId/selfie_${DateTime.now().millisecondsSinceEpoch}.jpg';
         await uploadFile(selfieFileName, _selfieImage!);
         selfieUrl = client.storage
@@ -140,14 +141,28 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
           .getPublicUrl(idFileName);
 
       // Update user's verification status
-      await client
-          .from('users')
-          .update({
-            'id_verification_status': 'pending',
-            'id_document_url': idUrl,
-            if (selfieUrl != null) 'selfie_url': selfieUrl,
-          })
-          .eq('id', userId);
+      try {
+        await client
+            .from('users')
+            .update({
+              'id_verification_status': 'pending',
+              'id_document_url': idUrl,
+              if (selfieUrl != null) 'selfie_url': selfieUrl,
+            })
+            .eq('id', userId);
+      } catch (e) {
+        // If the users table update fails, clean up the uploaded verification
+        // files so they do not become orphaned in storage.
+        try {
+          await client.storage.from('verification_docs').remove([idFileName]);
+          if (selfieFileName != null) {
+            await client.storage.from('verification_docs').remove([selfieFileName]);
+          }
+        } catch (_) {
+          // Best-effort cleanup; original error is more important.
+        }
+        rethrow;
+      }
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

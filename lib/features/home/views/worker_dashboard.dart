@@ -252,25 +252,40 @@ class WorkerDashboard extends ConsumerWidget {
                 );
               }                  final now = DateTime.now();
                   final sevenDaysAgo = now.subtract(const Duration(days: 7));
-                  int totalEarnings = 0;
+
+                  // Compute the full earnings total over the last 7 days
+                  // first, then only display the 10 most recent entries.
+                  final recentEntries = completed.where((entry) {
+                    final jobData =
+                        entry['jobs'] as Map<String, dynamic>? ?? {};
+                    final updatedAt = jobData['updated_at'] as String?;
+                    final createdAt = jobData['created_at'] as String?;
+                    final date = DateTime.tryParse(updatedAt ?? '') ??
+                        DateTime.tryParse(createdAt ?? '');
+                    return date != null &&
+                        date.isAfter(sevenDaysAgo) &&
+                        date.isBefore(now.add(const Duration(days: 1)));
+                  }).toList();
+
+                  final totalEarnings = recentEntries.fold<int>(
+                    0,
+                    (sum, entry) {
+                      final jobData =
+                          entry['jobs'] as Map<String, dynamic>? ?? {};
+                      final amount = jobData['budget_amount'] as num? ?? 0;
+                      return sum + amount.toInt();
+                    },
+                  );
+
+                  final displayEntries = recentEntries.take(10);
+
                   return Column(
                     children: [
-                      ...completed.where((entry) {
-                        final jobData =
-                            entry['jobs'] as Map<String, dynamic>? ?? {};
-                        final updatedAt = jobData['updated_at'] as String?;
-                        final createdAt = jobData['created_at'] as String?;
-                        final date = DateTime.tryParse(updatedAt ?? '') ??
-                            DateTime.tryParse(createdAt ?? '');
-                        return date != null &&
-                            date.isAfter(sevenDaysAgo) &&
-                            date.isBefore(now.add(const Duration(days: 1)));
-                      }).take(10).map((entry) {
+                      ...displayEntries.map((entry) {
                         final jobData =
                             entry['jobs'] as Map<String, dynamic>? ?? {};
                         final title = jobData['title'] as String? ?? '';
-                        final amount = jobData['budget_amount'] as int? ?? 0;
-                        totalEarnings += amount;
+                        final amount = jobData['budget_amount'] as num? ?? 0;
                         final updatedAt = jobData['updated_at'] as String?;
                         final createdAt = jobData['created_at'] as String?;
                         final dateStr = _formatDate(
@@ -282,7 +297,7 @@ class WorkerDashboard extends ConsumerWidget {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: _EarningEntry(
                         jobTitle: title,
-                        amount: 'PKR $amount',
+                        amount: 'PKR ${amount.toInt()}',
                         date: dateStr,
                       ),
                     );
@@ -425,11 +440,17 @@ class WorkerDashboard extends ConsumerWidget {
   /// Build a minimal Job from an application record for navigation.
   static Job _jobFromApplication(Map<String, dynamic> app) {
     final jobData = app['jobs'] as Map<String, dynamic>? ?? {};
+    final budgetAmount = jobData['budget_amount'];
     return Job(
       id: app['job_id'] as String? ?? '',
       title: jobData['title'] as String? ?? '',
-      budgetAmount: jobData['budget_amount'] as int?,
+      description: jobData['description'] as String? ?? '',
+      categoryId: jobData['category_id'] as int? ?? 1,
+      budgetAmount: budgetAmount is int ? budgetAmount : (budgetAmount as num?)?.toInt(),
+      budgetType: Job.parseBudgetType(jobData['budget_type'] as String?),
       locationText: jobData['location_text'] as String?,
+      status: Job.parseJobStatus(jobData['status'] as String?),
+      urgency: Job.parseUrgency(jobData['urgency'] as String?),
     );
   }
 

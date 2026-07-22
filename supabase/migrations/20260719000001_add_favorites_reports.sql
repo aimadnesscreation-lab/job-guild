@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.favorites (
 CREATE TABLE IF NOT EXISTS public.reports (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     reporter_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-    reported_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    reported_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     job_id UUID REFERENCES public.jobs(id) ON DELETE SET NULL,
     reason TEXT NOT NULL,
     details TEXT,

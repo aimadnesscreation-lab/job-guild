@@ -83,7 +83,13 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
     _descriptionController.dispose();
     _budgetController.dispose();
     if (widget.resetOnInit) {
-      ref.read(postJobProvider.notifier).resetForm();
+      // The provider may already be disposed by the time dispose() runs,
+      // so guard against reads that could throw.
+      try {
+        ref.read(postJobProvider.notifier).resetForm();
+      } catch (_) {
+        // Provider scope is gone; form state is already being torn down.
+      }
     }
     super.dispose();
   }

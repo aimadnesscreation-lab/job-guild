@@ -43,14 +43,15 @@ serve(async (req) => {
     console.log(`[SMS Hook] Message: ${payload.message}`);
 
     if (provider === "log") {
-      // DEVELOPMENT MODE: Just log the OTP
+      // DEVELOPMENT MODE: Just log the OTP.
       // Check Supabase Dashboard > Edge Functions > send-sms > Logs
-      // or Supabase Dashboard > Auth > Logs for the OTP code
+      // or Supabase Dashboard > Auth > Logs for the OTP code.
+      // Do NOT return the OTP in the response body to avoid leaking it.
+      console.log(`[SMS Hook] OTP for ${payload.phone}: ${otp}`);
       return new Response(
         JSON.stringify({
           success: true,
-          message: `[DEV MODE] OTP for ${payload.phone}: ${otp}`,
-          _dev_otp: otp,
+          message: "[DEV MODE] OTP logged to Edge Function logs",
         }),
         { headers: { "Content-Type": "application/json" } },
       );

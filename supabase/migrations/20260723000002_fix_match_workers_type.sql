@@ -1,25 +1,9 @@
--- Migration: Smart matching — weighted scoring function for worker-job matching
+-- Migration: Fix return type mismatch in match_workers_for_job (2026-07-23)
 --
--- Scores eligible workers for a given job by combining:
---   - Distance match (max 40 points — within radius = full, then decays)
---   - Rating (max 25 points — 5 pts per star)
---   - Completed jobs in category (max 15 points — 1 pt per job, cap 15)
---   - Availability match (max 10 points — full if available, 5 if busy, 0 if offline)
---   - Response speed (max 10 points — <5 min = 10, <15 = 7, <30 = 5, <60 = 3)
---
--- Returns: TABLE with worker_id, score, and breakdown fields for transparency.
+-- The function declared distance_km as NUMERIC but the RETURN QUERY
+-- selected the raw double precision value. Cast it explicitly to NUMERIC.
 
--- Migration: Smart matching — weighted scoring function for worker-job matching
---
--- Scores eligible workers for a given job by combining:
---   - Category match (required — 0 score if not matched)
---   - Distance match (max 40 points — within radius = full, then decays)
---   - Rating (max 25 points — 5 pts per star)
---   - Completed jobs in category (max 15 points — 1 pt per job, cap 15)
---   - Availability match (max 10 points — full if available, 5 if busy, 0 if offline)
---   - Response speed (max 10 points — <5 min = 10, <15 = 7, <30 = 5, <60 = 3)
---
--- Returns: TABLE with worker_id, score breakdown, and human-readable match_reason.
+DROP FUNCTION IF EXISTS match_workers_for_job(UUID);
 
 CREATE OR REPLACE FUNCTION match_workers_for_job(
   p_job_id UUID
@@ -44,7 +28,6 @@ DECLARE
   v_employer_id UUID;
   v_job_point GEOGRAPHY;
 BEGIN
-  -- Get job location and category; support both PostGIS geography and legacy columns
   SELECT
     COALESCE(ST_Y(j.location_coords::geometry), 31.5204),
     COALESCE(ST_X(j.location_coords::geometry), 74.3587),
@@ -69,12 +52,10 @@ BEGIN
       wp.total_jobs_completed,
       wp.availability_status,
       wp.response_time_avg_minutes,
-      -- Compute distance inline using the user's PostGIS current_location
       COALESCE(
         ST_Distance(u.current_location, v_job_point) / 1000.0,
         999999
       ) AS distance_km,
-      -- Check if worker offers the job's category
       EXISTS (
         SELECT 1 FROM worker_categories wc
         JOIN categories c ON wc.category_id = c.id
@@ -88,13 +69,9 @@ BEGIN
   worker_scores AS (
     SELECT
       wd.user_id,
-      -- Category match: 0 score if worker doesn't offer this category
       CASE WHEN wd.has_category THEN 1 ELSE 0 END AS category_match,
-      -- Distance score: full points (40) if within radius, linear decay after
       GREATEST(0, 40 * (1.0 - GREATEST(0, wd.distance_km - wd.service_radius_km) / GREATEST(wd.service_radius_km, 1))) AS raw_distance_score,
-      -- Rating score: 5 pts per star, max 25
       LEAST(25, COALESCE(wd.average_rating, 0) * 5) AS raw_rating_score,
-      -- Experience score: 1 pt per completed job in this category, cap 15
       LEAST(15, COALESCE((
         SELECT COUNT(*) FROM applications a
         JOIN jobs j ON a.job_id = j.id
@@ -102,13 +79,11 @@ BEGIN
           AND a.status = 'completed'
           AND j.category_id = v_job_category_id
       ), 0)) AS raw_experience_score,
-      -- Availability score
       CASE
         WHEN wd.availability_status = 'offline' THEN 0
         WHEN wd.availability_status = 'busy' THEN 5
         ELSE 10
       END AS raw_availability_score,
-      -- Response speed score
       CASE
         WHEN wd.response_time_avg_minutes IS NULL THEN 5
         WHEN wd.response_time_avg_minutes < 5 THEN 10
@@ -125,7 +100,6 @@ BEGIN
   )
   SELECT
     ws.user_id,
-    -- If no category match, score is 0 (worker doesn't offer this service)
     CASE WHEN ws.category_match = 1
       THEN ROUND((ws.raw_distance_score + ws.raw_rating_score + ws.raw_experience_score + ws.raw_availability_score + ws.raw_response_score)::NUMERIC, 1)
       ELSE 0

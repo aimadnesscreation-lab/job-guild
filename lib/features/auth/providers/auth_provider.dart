@@ -44,9 +44,10 @@ class AuthNotifier extends Notifier<void> {
   /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx)
   static String normalizePhone(String phone) {
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    // Pakistani mobile numbers are +92 followed by exactly 10 digits,
+    // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
       if (digits.length == 12) return '+$digits';
-      if (digits.length == 11) return '+$digits';
     }
     if (digits.startsWith('0')) {
       final withoutLeading = digits.substring(1);

@@ -7,11 +7,11 @@ class Breakpoints {
   /// Phone-portrait (< 600dp) — single-column layouts.
   static const double phone = 600;
 
-  /// Tablet-portrait (600–840dp) — two-column / wider cards.
+  /// Tablet-portrait (600–1200dp) — two-column / wider cards.
   static const double tablet = 840;
 
-  /// Desktop (> 840dp) — multi-column grids, max-width containers.
-  static const double desktop = 840;
+  /// Desktop (≥ 1200dp) — multi-column grids, max-width containers.
+  static const double desktop = 1200;
 
   /// Helper: true when screen is at least tablet width.
   static bool isTablet(double width) => width >= phone;

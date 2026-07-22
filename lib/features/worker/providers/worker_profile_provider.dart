@@ -55,6 +55,11 @@ class WorkerProfileState {
 }
 
 class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
+  /// Whether the notifier has already been seeded from the async profile
+  /// provider. This prevents in-progress form edits from being overwritten
+  /// when the FutureProvider re-emits after the initial load.
+  bool _seeded = false;
+
   @override
   WorkerProfileState build() {
     // Seed from the real logged-in user's profile when available.
@@ -69,6 +74,14 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
 
     final userId = ref.watch(currentUserProvider)?.id ?? 'user-placeholder';
 
+    // Preserve in-progress edits across rebuilds of the watched provider.
+    // Once we have a real profile (or the fallback), keep that state so
+    // unsaved form changes are not silently discarded.
+    if (_seeded) {
+      return state;
+    }
+
+    _seeded = true;
     return WorkerProfileState(
       profile:
           real ??

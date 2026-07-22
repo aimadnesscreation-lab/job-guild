@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     status TEXT DEFAULT 'open' CHECK (status IN ('open', 'hired', 'completed', 'cancelled', 'expired')),
     urgency TEXT DEFAULT 'today' CHECK (urgency IN ('instant', 'today', 'scheduled')),
     scheduled_for TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 7. Create Job Applications Table
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.applications (
     status TEXT DEFAULT 'interested' CHECK (status IN ('interested', 'shortlisted', 'hired', 'rejected', 'completed')),
     message TEXT,
     applied_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(job_id, worker_id)
 );
 
@@ -153,9 +155,9 @@ CREATE POLICY "Workers can apply to jobs" ON public.applications FOR INSERT WITH
 
 -- Messages: Only participants can view/insert
 CREATE POLICY "Participants can view messages" ON public.messages FOR SELECT USING (
-    auth.uid() = sender_id OR 
+    auth.uid() = sender_id OR
     EXISTS (SELECT 1 FROM public.jobs WHERE id = job_id AND employer_id = auth.uid()) OR
-    EXISTS (SELECT 1 FROM public.applications WHERE job_id = public.messages.job_id AND worker_id = auth.uid() AND status = 'hired')
+    EXISTS (SELECT 1 FROM public.applications WHERE job_id = public.messages.job_id AND worker_id = auth.uid())
 );
 CREATE POLICY "Participants can insert messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
@@ -214,11 +216,12 @@ BEGIN
   RETURN QUERY
   SELECT *
   FROM jobs
-  WHERE st_dwithin(
-    location_coords,
-    st_setsrid(st_makepoint(lng, lat), 4326)::geography,
-    radius_km * 1000
-  )
+  WHERE status = 'open'
+    AND st_dwithin(
+      location_coords,
+      st_setsrid(st_makepoint(lng, lat), 4326)::geography,
+      radius_km * 1000
+    )
   ORDER BY location_coords <-> st_setsrid(st_makepoint(lng, lat), 4326)::geography;
 END;
 $$ LANGUAGE plpgsql;
@@ -241,27 +244,30 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    u.id, 
-    u.full_name, 
-    u.profile_photo_url, 
-    wp.headline, 
-    wp.bio, 
-    wp.average_rating, 
+  SELECT
+    u.id,
+    u.full_name,
+    u.profile_photo_url,
+    wp.headline,
+    wp.bio,
+    wp.average_rating,
     wp.total_jobs_completed,
-    st_distance(u.current_location, st_setsrid(st_makepoint(lng, lat), 4326)::geography) as distance_meters,
+    COALESCE(
+      st_distance(u.current_location, st_setsrid(st_makepoint(lng, lat), 4326)::geography),
+      999999
+    ) as distance_meters,
     wp.availability_status as availability,
     (SELECT c.name_en FROM worker_categories wc JOIN categories c ON wc.category_id = c.id WHERE wc.worker_id = wp.id LIMIT 1) as category,
     u.is_verified,
     wp.hourly_rate_pkr
   FROM users u
   JOIN worker_profiles wp ON u.id = wp.id
-  WHERE u.current_location IS NOT NULL
-  AND st_dwithin(
-    u.current_location,
-    st_setsrid(st_makepoint(lng, lat), 4326)::geography,
-    radius_km * 1000
-  )
+  WHERE u.current_location IS NULL
+    OR st_dwithin(
+      u.current_location,
+      st_setsrid(st_makepoint(lng, lat), 4326)::geography,
+      radius_km * 1000
+    )
   ORDER BY distance_meters;
 END;
 $$ LANGUAGE plpgsql;

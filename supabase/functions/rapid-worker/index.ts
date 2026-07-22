@@ -17,6 +17,7 @@
 // }
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 interface ProfileRequestBody {
   raw_description: string;
@@ -37,94 +38,6 @@ const VALID_CATEGORIES = [
   "Cleaning", "Moving", "Healthcare", "Beauty", "Pet Care",
   "General Labor",
 ];
-
-const OPENROUTER_BASE_URL =
-  Deno.env.get("OPENROUTER_BASE_URL") || "https://openrouter.ai/api/v1";
-
-const APP_REFERER = Deno.env.get("SUPABASE_URL") || "https://localservices.app";
-
-/**
- * Call OpenRouter chat completions API.
- * Uses google/gemma-4-26b-a4b-it:free for text generation (profiles).
- * Falls back to openrouter/free auto-router if rate-limited.
- */
-async function callOpenRouter(
-  systemPrompt: string,
-  userPrompt: string,
-): Promise<string> {
-  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY environment variable is not set.");
-  }
-
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,            "HTTP-Referer": APP_REFERER,
-      "X-Title": "Local Services Marketplace",
-    },
-    body: JSON.stringify({
-      // Google Gemma 4 — modern free model, reliable for profile generation
-      model: "google/gemma-4-26b-a4b-it:free",
-      messages: [
-        {
-          role: "system",
-          content: `${systemPrompt}\n\nReturn ONLY valid JSON. No markdown fences. No explanation. Just the raw JSON object.`,
-        },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.5,
-      max_tokens: 600,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[OpenRouter] API error:", response.status, errorText);
-
-    // Rate-limit or server error fallback
-    if (response.status === 429 || response.status === 503 || response.status === 502) {
-      console.log("[rapid-worker] Primary model failed, retrying with openrouter/free...");
-      const retryResponse = await fetch(
-        `${OPENROUTER_BASE_URL}/chat/completions`,
-        {
-          method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": APP_REFERER,
-        "X-Title": "Local Services Marketplace",
-      },
-          body: JSON.stringify({
-            model: "openrouter/free",
-            messages: [
-              {
-                role: "system",
-                content: `${systemPrompt}\n\nReturn ONLY valid JSON.`,
-              },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.5,
-            max_tokens: 600,
-          }),
-        },
-      );
-      if (!retryResponse.ok) {
-        throw new Error(
-          `OpenRouter API error (retry): ${retryResponse.status}`,
-        );
-      }
-      const retryData = await retryResponse.json();
-      return retryData.choices?.[0]?.message?.content || "";
-    }
-
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || "";
-}
 
 /**
  * Extract JSON from LLM response, stripping markdown fences.
@@ -238,7 +151,10 @@ serve(async (req) => {
     let result: ProfileResponse;
 
     try {
-      const rawResponse = await callOpenRouter(systemPrompt, userPrompt);
+      const rawResponse = await callOpenRouter(systemPrompt, userPrompt, {
+        temperature: 0.5,
+        maxTokens: 600,
+      });
       console.log(`[rapid-worker] LLM response: "${rawResponse.substring(0, 150)}..."`);
       result = extractJson(rawResponse);
 

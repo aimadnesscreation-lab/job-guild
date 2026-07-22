@@ -79,12 +79,14 @@ class NotificationService {
     }
   }
 
-  /// Save (or update) the FCM token in the fcm_tokens table
+  /// Save (or update) the FCM token in the fcm_tokens table.
+  /// Removes any previously-stored tokens for this user on the same
+  /// platform so stale tokens do not accumulate over time.
   Future<void> _saveTokenToSupabase(String userId, String token) async {
     try {
       final client = Supabase.instance.client;
 
-      // Upsert: if a token for this user+platform exists, update it; else insert
+      // Upsert: if this exact token exists, update it; else insert.
       final platform = _detectPlatform();
       await client.from('fcm_tokens').upsert({
         'user_id': userId,
@@ -93,17 +95,27 @@ class NotificationService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'token');
 
+      // Clean up other tokens for this user+platform so only the latest one
+      // remains and stale tokens are not targeted by future pushes.
+      await client
+          .from('fcm_tokens')
+          .delete()
+          .eq('user_id', userId)
+          .eq('platform', platform)
+          .neq('token', token);
+
       debugPrint('[FCM] Token saved to Supabase for user $userId');
     } catch (e) {
       debugPrint('[FCM] Failed to save token to Supabase: $e');
     }
   }
 
-  /// Detect the current platform
+  /// Detect the current platform. macOS is mapped to 'web' because the
+  /// fcm_tokens CHECK constraint only allows ('android', 'ios', 'web').
   String _detectPlatform() {
     if (kIsWeb) return 'web';
     if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
-    if (defaultTargetPlatform == TargetPlatform.macOS) return 'ios';
+    if (defaultTargetPlatform == TargetPlatform.macOS) return 'web';
     return 'android';
   }
 

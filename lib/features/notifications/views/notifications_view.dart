@@ -66,9 +66,7 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
     final userId = ref.read(currentUserProvider)?.id;
     if (userId == null) return;
     final repo = ref.read(supabaseRepositoryProvider);
-    for (final n in _items.where((n) => n['is_read'] != true)) {
-      await repo.markNotificationRead(n['id'] as String);
-    }
+    await repo.markAllNotificationsRead(userId);
     if (context.mounted) {
       setState(() {
         _items = _items.map((n) => {...n, 'is_read': true}).toList();

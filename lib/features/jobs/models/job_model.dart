@@ -84,12 +84,12 @@ class Job {
             )
           : null,
       budgetAmount: json['budget_amount'] as int?,
-      budgetType: Job._parseBudgetType(json['budget_type'] as String?),
+      budgetType: Job.parseBudgetType(json['budget_type'] as String?),
       locationText: json['location_text'] as String?,
       lat: parsedLat,
       lng: parsedLng,
-      status: Job._parseJobStatus(json['status'] as String?),
-      urgency: Job._parseUrgency(json['urgency'] as String?),
+      status: Job.parseJobStatus(json['status'] as String?),
+      urgency: Job.parseUrgency(json['urgency'] as String?),
       scheduledFor: json['scheduled_for'] != null
           ? DateTime.parse(json['scheduled_for'] as String)
           : null,
@@ -118,7 +118,10 @@ class Job {
     'status': status.name,
     'urgency': urgency.name,
     if (scheduledFor != null) 'scheduled_for': scheduledFor!.toIso8601String(),
-    'created_at': createdAt.toIso8601String(),
+    // Only send created_at when we are updating an existing record. New jobs
+    // should use the database default (NOW()) to avoid timezone drift from
+    // the client device clock.
+    if (id.isNotEmpty) 'created_at': createdAt.toIso8601String(),
   };
 
   Job copyWith({
@@ -181,7 +184,7 @@ class Job {
     return 0;
   }
 
-  static BudgetType _parseBudgetType(String? type) {
+  static BudgetType parseBudgetType(String? type) {
     switch (type) {
       case 'fixed':
         return BudgetType.fixed;
@@ -192,7 +195,7 @@ class Job {
     }
   }
 
-  static JobStatus _parseJobStatus(String? status) {
+  static JobStatus parseJobStatus(String? status) {
     switch (status) {
       case 'open':
         return JobStatus.open;
@@ -209,7 +212,7 @@ class Job {
     }
   }
 
-  static Urgency _parseUrgency(String? urgency) {
+  static Urgency parseUrgency(String? urgency) {
     switch (urgency) {
       case 'instant':
         return Urgency.instant;

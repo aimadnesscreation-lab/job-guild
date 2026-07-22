@@ -18,6 +18,7 @@
 // }
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 interface ParseRequestBody {
   description: string;
@@ -43,102 +44,6 @@ const VALID_CATEGORIES = [
 ] as const;
 
 const VALID_URGENCIES = ["instant", "today", "scheduled"] as const;
-
-const OPENROUTER_BASE_URL =
-  Deno.env.get("OPENROUTER_BASE_URL") || "https://openrouter.ai/api/v1";
-
-const APP_REFERER = Deno.env.get("SUPABASE_URL") || "https://localservices.app";
-
-/**
- * Call OpenRouter chat completions API with a free model.
- * Uses google/gemma-4-26b-a4b-it:free by default (modern, reliable for JSON output).
- * Falls back to openrouter/free auto-router if rate-limited.
- */
-async function callOpenRouter(
-  systemPrompt: string,
-  userPrompt: string,
-): Promise<string> {
-  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
-  if (!apiKey) {
-    throw new Error(
-      "OPENROUTER_API_KEY environment variable is not set. " +
-        "Run: supabase secrets set OPENROUTER_API_KEY=<your-key>",
-    );
-  }
-
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,            "HTTP-Referer": APP_REFERER,
-      "X-Title": "Local Services Marketplace",
-    },
-    body: JSON.stringify({
-      // Google Gemma 4 — modern free model, reliable for structured JSON extraction
-      model: "google/gemma-4-26b-a4b-it:free",
-      messages: [
-        {
-          role: "system",
-          content:
-            `${systemPrompt}\n\n` +
-            "IMPORTANT: Return ONLY valid JSON. No markdown fences. No explanation. " +
-            "No backticks. Just the raw JSON object.",
-        },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 400,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[OpenRouter] API error:", response.status, errorText);
-
-    // If the primary model fails, retry with openrouter/free auto-router
-    // which automatically selects the best available free model
-    if (response.status === 429 || response.status === 503 || response.status === 502) {
-      console.log("[OpenRouter] Primary model failed, retrying with openrouter/free...");
-      const retryResponse = await fetch(
-        `${OPENROUTER_BASE_URL}/chat/completions`,
-        {
-          method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": APP_REFERER,
-        "X-Title": "Local Services Marketplace",
-      },
-          body: JSON.stringify({
-            model: "openrouter/free",
-            messages: [
-              {
-                role: "system",
-                content: `${systemPrompt}\n\nReturn ONLY valid JSON. No markdown.`,
-              },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.1,
-            max_tokens: 400,
-          }),
-        },
-      );
-      if (!retryResponse.ok) {
-        throw new Error(
-          `OpenRouter API error (retry): ${retryResponse.status}`,
-        );
-      }
-      const retryData = await retryResponse.json();
-      return retryData.choices?.[0]?.message?.content || "";
-    }
-
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  return content.trim();
-}
 
 /**
  * Parse the raw LLM response text into a structured JSON object.

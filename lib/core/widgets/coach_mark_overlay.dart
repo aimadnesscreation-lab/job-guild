@@ -289,11 +289,11 @@ class _CoachMarkPainter extends CustomPainter {
         Rect.fromCircle(center: highlightCenter, radius: highlightRadius + 6),
       );
 
-    // Use even-odd reverse-difference to create the hole punch
-    canvas.drawPath(
-      Path.combine(PathOperation.reverseDifference, path, Path()),
-      overlayPaint,
-    );
+    // Use even-odd fill to create the hole punch. The rect and oval are
+    // both added to the same path; the even-odd fill rule leaves the oval
+    // transparent while painting everything else.
+    path.fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, overlayPaint);
 
     // Glowing ring around the highlight
     final ringPaint = Paint()

@@ -213,6 +213,8 @@ class AppStrings {
       _t('View Job Details', 'نوکری کی تفصیلات دیکھیں');
   String get failedToSend => _t('Failed to send:', 'بھیجنے میں ناکام:');
   String get isTyping => _t('is typing...', 'ٹائپ کر رہا ہے...');
+  /// Localized "You" shown for optimistic/outgoing chat messages.
+  String get you => _t('You', 'آپ');
   String get gallery => _t('Gallery', 'گیلری');
   String get camera => _t('Camera', 'کیمرہ');
   String get voice => _t('Voice', 'آواز');

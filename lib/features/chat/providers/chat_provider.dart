@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/features/chat/models/message_model.dart';
 
 /// State for the chat feature
@@ -64,6 +65,9 @@ class ChatNotifier extends Notifier<ChatState> {
   /// enriched without refetching the whole thread (realtime payloads don't
   /// include joined relation data).
   final Map<String, Map<String, dynamic>> _senderCache = {};
+
+  /// Localized label for the current user in optimistic chat messages.
+  String get _currentUserDisplayName => ref.read(appStringsProvider).you;
 
   /// Job IDs relevant to the current user (posted as employer + applied as
   /// worker). Cached so the global Realtime subscription can filter incoming
@@ -185,14 +189,22 @@ class ChatNotifier extends Notifier<ChatState> {
 
       for (final msg in data) {
         final jobId = msg['job_id'] as String? ?? '';
-        if (jobId.isEmpty || jobIdToOtherId.containsKey(jobId)) continue;
+        if (jobId.isEmpty) continue;
 
         final job = msg['jobs'] as Map<String, dynamic>? ?? {};
         final employerId = job['employer_id'] as String? ?? '';
         final isEmployer = employerId == userId;
-        final otherId = isEmployer
-            ? (msg['sender_id'] as String?) ?? ''
-            : employerId;
+        final senderId = msg['sender_id'] as String? ?? '';
+
+        // For an employer, the "other user" is the worker. Skip messages
+        // sent by the employer and wait until we see a message from the
+        // worker, otherwise the conversation card would show the employer's
+        // own name.
+        if (isEmployer && senderId == userId) continue;
+
+        if (jobIdToOtherId.containsKey(jobId)) continue;
+
+        final otherId = isEmployer ? senderId : employerId;
 
         jobIdToOtherId[jobId] = otherId;
         jobIdToIsEmployer[jobId] = isEmployer;
@@ -643,7 +655,7 @@ class ChatNotifier extends Notifier<ChatState> {
       id: messageId,
       jobId: conversationId,
       senderId: userId,
-      senderName: 'You',
+      senderName: _currentUserDisplayName,
       contentType: _parseContentType(contentType),
       content: content,
       sentAt: DateTime.now(),
@@ -696,7 +708,11 @@ class ChatNotifier extends Notifier<ChatState> {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getString('message_queue');
       final queue = existing != null ? _safeList(jsonDecode(existing)) : <Map<String, dynamic>>[];
-      queue.add(msg);
+      // Tag queued messages with the current user so they are not sent on
+      // behalf of a different account after logout/login.
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final taggedMsg = {...msg, 'queued_user_id': userId};
+      queue.add(taggedMsg);
       await prefs.setString('message_queue', jsonEncode(queue));
       debugPrint('[OfflineQueue] Message queued. Queue size: ${queue.length}');
     } catch (e) {
@@ -725,6 +741,13 @@ class ChatNotifier extends Notifier<ChatState> {
       final remaining = <Map<String, dynamic>>[];
 
       for (final msg in queue) {
+        // SECURITY: never send a queued message on behalf of a different
+        // user. Discard messages queued by another account.
+        final queuedUserId = msg['queued_user_id'] as String?;
+        if (queuedUserId != null && queuedUserId != currentUserId) {
+          debugPrint('[OfflineQueue] Discarding message from different user');
+          continue;
+        }
         try {
           await client.from('messages').insert({
             'id': msg['id'] as String?,
@@ -776,7 +799,7 @@ class ChatNotifier extends Notifier<ChatState> {
       id: messageId,
       jobId: conversationId,
       senderId: userId,
-      senderName: 'You',
+      senderName: _currentUserDisplayName,
       contentType: MessageContentType.voice,
       content: audioUrl,
       sentAt: DateTime.now(),
