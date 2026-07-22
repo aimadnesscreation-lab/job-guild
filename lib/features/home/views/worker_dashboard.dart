@@ -26,6 +26,7 @@ class WorkerDashboard extends ConsumerWidget {
     final completedJobsAsync = ref.watch(workerCompletedJobsProvider);
     final chatState = ref.watch(chatProvider);
     final s = ref.watch(appStringsProvider);
+    final profile = profileAsync.asData?.value;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -131,6 +132,39 @@ class WorkerDashboard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
+
+          // ─── Offline Warning Banner ────────────────────────
+          if (profile != null &&
+              profile.availabilityStatus == AvailabilityStatus.offline)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Card(
+                margin: EdgeInsets.zero,
+                color: AppTheme.errorColor.withValues(alpha: 0.05),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.visibility_off,
+                    color: AppTheme.errorColor,
+                  ),
+                  title: const Text(
+                    'You are currently invisible to employers',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Toggle availability to start receiving job matches.',
+                  ),
+                  trailing: TextButton(
+                    onPressed: () => _showAvailabilitySheet(
+                      context,
+                      ref,
+                      profile,
+                      s,
+                    ),
+                    child: const Text('Update'),
+                  ),
+                ),
+              ),
+            ),
 
           // ─── Recent Applications ───────────────────────────
           Text(

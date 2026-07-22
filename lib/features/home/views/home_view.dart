@@ -22,7 +22,7 @@ import 'package:local_services_marketplace/features/worker/views/edit_worker_pro
 import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';
 import 'package:local_services_marketplace/features/jobs/views/job_detail_worker_view.dart';
 import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
-import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
+
 import 'package:local_services_marketplace/core/widgets/shimmer_loading.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/features/ratings/views/reviews_list_view.dart';
@@ -139,8 +139,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
         index: _currentTabIndex,
         children: const [
           _HomeFeedTab(),
-          SearchWorkersView(),
-          PostJobView(),
+          SearchWorkersContent(),
+          _PostJobRoute(),
           ChatListView(),
           _DashboardContainer(),
         ],
@@ -253,7 +253,7 @@ class _HomeFeedTab extends ConsumerWidget {
     // Employer mode: show worker search/browse (embedded without its own AppBar
     // because this screen already provides the main AppBar).
     if (role == AppRole.employer) {
-      return const SearchWorkersView(showAppBar: false);
+      return const SearchWorkersContent();
     }
 
     // Worker mode: show live job feed
@@ -266,7 +266,14 @@ class _HomeFeedTab extends ConsumerWidget {
         ref.invalidate(liveJobFeedProvider);
         // Wait for the rebuilt stream to emit at least once before the
         // refresh indicator dismisses, instead of an arbitrary half-second delay.
-        await ref.read(liveJobFeedProvider.future);
+        try {
+          await ref
+              .read(liveJobFeedProvider.future)
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {
+          // Ignore timeout/errors; the stream will continue loading in the
+          // background.
+        }
       },
       child: ListView(
         padding: Breakpoints.horizontalPadding(width),
@@ -617,30 +624,21 @@ class _DashboardContainerState extends ConsumerState<_DashboardContainer>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final ProviderSubscription<AppRole> _roleSub;
-  late final ProviderSubscription<AsyncValue<WorkerProfile?>> _profileSub;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Sync with global role provider
+    // Sync the dashboard tab controller with the global role provider.
     _roleSub = ref.listenManual(currentRoleProvider, (_, next) {
       final target = next == AppRole.worker ? 1 : 0;
       if (_tabController.index != target) _tabController.index = target;
-    });
-    // Also sync from worker profile
-    _profileSub = ref.listenManual(myWorkerProfileProvider, (_, next) {
-      final isWorker = next.value != null;
-      if (isWorker) {
-        ref.read(currentRoleProvider.notifier).setRole(AppRole.worker);
-      }
     });
   }
 
   @override
   void dispose() {
     _roleSub.close();
-    _profileSub.close();
     _tabController.dispose();
     super.dispose();
   }

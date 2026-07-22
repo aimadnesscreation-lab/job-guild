@@ -10,18 +10,18 @@ import 'package:local_services_marketplace/features/worker/models/worker_profile
 /// Search and browse workers screen with filters: category, distance,
 /// price range, rating, availability, verified-only. Backed by the live
 /// nearby-workers query (PostGIS), with local filtering on top.
-class SearchWorkersView extends ConsumerStatefulWidget {
-  /// When false, the embedded instance (e.g. employer home tab) will not show
-  /// its own AppBar, letting the parent screen provide one instead.
-  final bool showAppBar;
-
-  const SearchWorkersView({super.key, this.showAppBar = true});
+/// Content-only widget for searching workers. Embed this directly when a parent
+/// [Scaffold] is already present (e.g. the employer home tab). For a standalone
+/// route, use [SearchWorkersView] which wraps this in a [Scaffold].
+class SearchWorkersContent extends ConsumerStatefulWidget {
+  const SearchWorkersContent({super.key});
 
   @override
-  ConsumerState<SearchWorkersView> createState() => _SearchWorkersViewState();
+  ConsumerState<SearchWorkersContent> createState() =>
+      _SearchWorkersContentState();
 }
 
-class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
+class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
   final _searchController = TextEditingController();
   String _selectedCategory = 'All';
   double _maxDistance = 15;
@@ -96,14 +96,8 @@ class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(nearbyWorkersProvider);
-    return Scaffold(
-      appBar: widget.showAppBar
-          ? AppBar(
-              title: Text(ref.watch(appStringsProvider).findWorkersTitle),
-            )
-          : null,
-      body: Column(
-        children: [
+    return Column(
+      children: [
           // ─── Search Bar ────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(16),
@@ -242,8 +236,7 @@ class _SearchWorkersViewState extends ConsumerState<SearchWorkersView> {
                   ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   void _showRatingFilter() {
@@ -676,6 +669,21 @@ class _FilterChip extends StatelessWidget {
       backgroundColor: isSelected
           ? AppTheme.primaryColor.withValues(alpha: 0.08)
           : null,
+    );
+  }
+}
+
+/// Standalone route that wraps [SearchWorkersContent] in its own [Scaffold].
+class SearchWorkersView extends ConsumerWidget {
+  const SearchWorkersView({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(ref.watch(appStringsProvider).findWorkersTitle),
+      ),
+      body: const SearchWorkersContent(),
     );
   }
 }

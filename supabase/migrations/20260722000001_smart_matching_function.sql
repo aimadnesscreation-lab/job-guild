@@ -15,7 +15,7 @@
 --   - Category match (required — 0 score if not matched)
 --   - Distance match (max 40 points — within radius = full, then decays)
 --   - Rating (max 25 points — 5 pts per star)
---   - Completed jobs in category (max 15 points — 1 pt per job, cap 15, min 2 for new workers)
+--   - Completed jobs in category (max 15 points — 1 pt per job, cap 15)
 --   - Availability match (max 10 points — full if available, 5 if busy, 0 if offline)
 --   - Response speed (max 10 points — <5 min = 10, <15 = 7, <30 = 5, <60 = 3)
 --
@@ -94,7 +94,7 @@ BEGIN
       GREATEST(0, 40 * (1.0 - GREATEST(0, wd.distance_km - wd.service_radius_km) / GREATEST(wd.service_radius_km, 1))) AS raw_distance_score,
       -- Rating score: 5 pts per star, max 25
       LEAST(25, COALESCE(wd.average_rating, 0) * 5) AS raw_rating_score,
-      -- Experience score: 1 pt per completed job in this category, cap 15; min 2 for new workers
+      -- Experience score: 1 pt per completed job in this category, cap 15
       LEAST(15, COALESCE((
         SELECT COUNT(*) FROM applications a
         JOIN jobs j ON a.job_id = j.id
