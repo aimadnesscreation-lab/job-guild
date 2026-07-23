@@ -122,11 +122,22 @@ class SupabaseRepository {
     final client = _client;
     if (client == null) return;
 
-    await client.from('applications').insert({
-      'job_id': jobId,
-      'worker_id': workerId,
-      if (message != null) 'message': message,
-    });
+    try {
+      await client.from('applications').insert({
+        'job_id': jobId,
+        'worker_id': workerId,
+        if (message != null) 'message': message,
+      });
+    } on PostgrestException catch (e) {
+      // 23505 = unique_violation — the worker already applied (double-tap
+      // or race between hasApplied and applyForJob). Treat as success since
+      // the application already exists.
+      if (e.code == '23505') {
+        debugPrint('[applyForJob] Duplicate application ignored (already applied)');
+        return;
+      }
+      rethrow;
+    }
   }
 
   /// Hire a worker: updates application and job to 'hired' status.

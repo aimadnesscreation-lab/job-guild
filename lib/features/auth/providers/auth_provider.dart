@@ -29,28 +29,35 @@ class AuthNotifier extends Notifier<void> {
     required String fullName,
     required String initialRole,
   }) async {
-    final isEmployer = initialRole == 'employer';
-    final isWorker = initialRole == 'worker';
+    try {
+      final isEmployer = initialRole == 'employer';
+      final isWorker = initialRole == 'worker';
 
-    final response = await Supabase.instance.client.auth.signUp(
-      email: email,
-      password: password,
-      data: {
-        'full_name': fullName,
-        'is_employer': isEmployer,
-        'is_worker': isWorker,
-      },
-    );
-    if (response.session == null && response.user == null) {
-      throw Exception(
-        'Sign-up failed. Please try again.',
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'is_employer': isEmployer,
+          'is_worker': isWorker,
+        },
       );
+      if (response.session == null && response.user == null) {
+        throw Exception(
+          'Sign-up failed. Please try again.',
+        );
+      }
+      // If user was created but session is null, email confirmation is required.
+      if (response.user != null && response.session == null) {
+        return 'Account created! Please check your email to confirm your account before signing in.';
+      }
+      return null; // signed in immediately (email confirmation disabled)
+    } on AuthException catch (e) {
+      debugPrint('[Auth] Email sign-up failed: ${e.message}');
+      throw Exception('Sign-up failed: ${e.message}');
+    } on SocketException {
+      throw Exception('Network error: Please check your connection.');
     }
-    // If user was created but session is null, email confirmation is required.
-    if (response.user != null && response.session == null) {
-      return 'Account created! Please check your email to confirm your account before signing in.';
-    }
-    return null; // signed in immediately (email confirmation disabled)
   }
 
   /// Sign in with email + password.

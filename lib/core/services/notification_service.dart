@@ -148,9 +148,40 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 });
 
 /// Initialize Firebase and FCM at app startup — call this in main()
+///
+/// On web, FlutterFire requires FirebaseOptions (the browser lacks
+/// google-services.json / GoogleService-Info.plist). We pass null for
+/// mobile platforms where the native config files are auto-detected;
+/// on web the null causes the crash, so we read FirebaseOptions from
+/// environment variables as a best-effort fallback.
 Future<void> initializeFirebase() async {
   try {
-    await Firebase.initializeApp();
+    if (kIsWeb) {
+      // Web requires explicit FirebaseOptions — read from env vars.
+      final apiKey = const String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '');
+      final appId = const String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
+      final messagingSenderId = const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: '');
+      final projectId = const String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+      final authDomain = const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: '');
+
+      if (apiKey.isEmpty || appId.isEmpty) {
+        debugPrint('Firebase web options not configured via --dart-define — skipping Firebase init on web');
+        return;
+      }
+
+      await Firebase.initializeApp(
+        options: FirebaseOptions(
+          apiKey: apiKey,
+          appId: appId,
+          messagingSenderId: messagingSenderId,
+          projectId: projectId,
+          authDomain: authDomain,
+        ),
+      );
+    } else {
+      // Mobile / desktop — native config files present
+      await Firebase.initializeApp();
+    }
     debugPrint('Firebase initialized successfully');
   } catch (e, st) {
     debugPrint('Firebase init error: $e');

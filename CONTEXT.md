@@ -10,11 +10,40 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-30 — Session 38: .env Bundling Fix + Web Server)
+## Current State (Updated 2026-07-30 — Session 39: End-to-End Audit + 3 Bug Fixes)
 
 ### Session 38: .env Asset Bundling Fix — Supabase Config Not Loading in Web Build
 
-*Session 38 (fixed `flutter_dotenv` `.env` file not being bundled in web builds, causing "Supabase not configured" and cascading 404 errors):*
+### Session 39: End-to-End Audit — 3 Critical Bugs Fixed
+
+*Session 39 (comprehensive end-to-end codebase audit from console logs, found and fixed 3 bugs):*
+
+**Console Errors Addressed:**
+1. `Firebase init error: Null check operator used on a null value` — Web Firebase init crash
+2. `POST https://.../rest/v1/applications 409 (Conflict)` — Duplicate application race condition
+3. Unhandled `AuthException` during email sign-up
+
+**🔴 Bugs Found & Fixed:**
+1. **🔴 BUG-39-01 — Firebase.initializeApp() crashes on web with null check error** — `initializeFirebase()` called `Firebase.initializeApp()` without `FirebaseOptions`. On web, FlutterFire requires explicit options (no native config files). **Fix:** Added `kIsWeb` branch that reads FirebaseOptions from `--dart-define` env vars, gracefully skipping Firebase if web options aren't configured.
+
+2. **🔴 BUG-39-02 — 409 Conflict on duplicate application insert** — `applyForJob()` in `SupabaseRepository` did a plain `.insert()` without handling unique constraint violations. If the user double-tapped "I'm Interested", the second insert hit the `(job_id, worker_id)` unique constraint and threw a 409. **Fix:** Added `PostgrestException` handler for code `'23505'` (unique_violation) that treats it as a no-op (application already exists).
+
+3. **🔴 BUG-39-03 — signUpWithEmail() missing try-catch for AuthException** — Unlike `signInWithEmail()`, the `signUpWithEmail()` method had no error handling, so auth failures (e.g., email already registered) threw unhandled exceptions. **Fix:** Wrapped in try-catch with `AuthException` and `SocketException` handling, matching the existing pattern in `signInWithEmail()`.
+
+**Changes Made:**
+| File | Changes |
+|------|---------|
+| `lib/core/services/notification_service.dart` | `initializeFirebase()` now checks `kIsWeb` and passes `FirebaseOptions` from `--dart-define`; gracefully skips if web options are absent |
+| `lib/core/services/supabase_repository.dart` | `applyForJob()` catches `PostgrestException` with code `'23505'` to prevent 409 crashes on duplicate application |
+| `lib/features/auth/providers/auth_provider.dart` | `signUpWithEmail()` wrapped in try-catch with `AuthException` and `SocketException` handling |
+
+**Code Health:**
+- `flutter test`: **140/140 pass** ✅
+- All existing tests continue to pass after fixes ✅
+
+---
+
+*Previous Session 38 (fixed `flutter_dotenv` `.env` file not being bundled in web builds, causing "Supabase not configured" and cascading 404 errors):*
 
 **Problem:** The web app showed "Supabase is not configured" because `flutter_dotenv` loads `.env` from `assets/.env`, but:
 - No `assets/` directory existed in the project
