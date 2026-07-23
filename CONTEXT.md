@@ -10,7 +10,7 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-24 — Session 25/26)
+## Current State (Updated 2026-07-24 — Session 27)
 
 ### Edge Functions: Deployed ✅ (2026-07-24)
 
@@ -30,7 +30,30 @@ All 4 Edge Functions deployed to Supabase project `izjfugswuwyinaeauhvz`:
 
 ---
 
-### Branch `main` — All bugs fixed, CI/CD pipeline green, APK build verified, Edge Functions deployed ✅.
+### Latest Developments (2026-07-24 — Session 27: Web App Deployment & Testing)
+
+*Session 27 (Web app release build, Cloud Shell proxy issues, .env asset fix):*
+
+🌐 **Web App Live on Cloud Shell:**
+1. **FIX — Release build stuck on debug DDC** — Old `flutter run -d web-server` Dart shelf process was hogging port 8080 serving debug DDC modules (100MB+). Killed the process, rebuilt with `flutter build web --release` (3.7MB dart2js), served via Python HTTP server with `nohup`.
+2. **FIX — Cloud Shell proxy cache** — Proxy was caching stale debug build files (`ddc_module_loader.js`, `dwds/src/injected/client.js`). Required killing all old servers and starting fresh Python HTTP server.
+3. **FIX — PWA manifest CORS error** — Removed `<link rel="manifest" href="manifest.json">` from `web/index.html`. Cloud Shell proxy redirects manifest requests to auth, causing CORS errors.
+4. **FIX — `.env` 404 ("Supabase not configured")** — Created `.env` with Supabase credentials in `build/web/assets/` (Flutter web loads assets from `assets/` directory, not root). Also kept `.env` at `build/web/` root.
+5. **FIX — Service worker caching** — Deleted `flutter_service_worker.js` from build output to prevent aggressive caching of stale debug builds.
+
+**Changed Files:**
+| File | Changes |
+|------|---------|
+| `web/index.html` | Remove PWA manifest link (CORS fix) |
+
+**Web App URL:** `https://8080-cs-648655131005-default.cs-asia-southeast1-bool.cloudshell.dev`
+Run: `cd build/web && nohup python3 -m http.server 8080 &` to start.
+
+**Known Issue:** WebGL warning (CPU-only rendering) on Cloud Shell due to proxy not passing GPU. App functions correctly with software rendering.
+
+---
+
+### Branch `main` — All bugs fixed, CI/CD green, APK verified, Edge Functions deployed, Web app tested ✅.
 
 ### Latest Developments (2026-07-24 — Session 25: CI/CD + APK Build Fixes)
 
