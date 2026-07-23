@@ -62,10 +62,12 @@ class ChatNotifier extends Notifier<ChatState> {
   /// and updates the conversation previews in realtime.
   RealtimeChannel? _conversationsChannel;
 
+import 'dart:collection';
+...
   /// Cache of sender profiles keyed by user id, so realtime inserts can be
   /// enriched without refetching the whole thread (realtime payloads don't
   /// include joined relation data). Capped at 100 entries to bound memory.
-  final Map<String, Map<String, dynamic>> _senderCache = {};
+  final LinkedHashMap<String, Map<String, dynamic>> _senderCache = LinkedHashMap();
   static const int _maxSenderCacheSize = 100;
 
   /// Localized label for the current user in optimistic chat messages.
@@ -608,7 +610,7 @@ class ChatNotifier extends Notifier<ChatState> {
         if (_senderCache.length >= _maxSenderCacheSize) {
           _senderCache.remove(_senderCache.keys.first);
         }
-        _senderCache[senderId] = sender;
+        _senderCache[senderId] = sender!;
       } catch (_) {
         sender = null;
       }

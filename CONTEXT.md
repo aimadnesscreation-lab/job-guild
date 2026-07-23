@@ -29,6 +29,7 @@
 
 🟡 **Medium:**
 6. **POLISH — Linter Cleanups** — Removed unnecessary `// ignore_for_file: use_build_context_synchronously` in `language_selection_view.dart` because the code already includes proper `context.mounted` checks.
+7. **FIX — ChatProvider Memory Leak** — Optimized `_senderCache` by switching to `LinkedHashMap` and implementing proper LRU eviction, fixing unbounded growth.
 
 **Changed Files:**
 | File | Changes |
@@ -38,6 +39,7 @@
 | `lib/features/auth/providers/auth_provider.dart` | #4 (Auth API patterns, network handling) |
 | `lib/features/auth/views/language_selection_view.dart` | #6 (Linter ignore removal) |
 | `lib/features/jobs/models/job_model.dart` | #5 (Job location default) |
+| `lib/features/chat/providers/chat_provider.dart` | #7 (ChatProvider cache optimization) |
 
 
 *Session 20 (Final Remediation Pass):*
