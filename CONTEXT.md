@@ -19,7 +19,7 @@
 **Audit Summary:** Codebase continues in excellent health. Found 3 Dart bugs + 4 test misalignments. All fixed with 0 regressions.
 
 🔴 **Critical (2):**
-1. **🔴 BUG-35-01 — `p_is_featured` passed as `null` to `upsert_worker_profile` RPC** (`worker_repository.dart`) — `WorkerProfile.toJson()` correctly excludes `is_featured` (admin-managed flag), but `updateWorkerProfile()` passed `payload['is_featured']` (always null) as `p_is_featured`, silently wiping the admin-set featured status on every worker profile save. **Fix:** Removed `p_is_featured` from the RPC params entirely — the RPC's `COALESCE` logic (from BUG-34-01 migration) now preserves the current value when the param is omitted.
+1. **🔴 BUG-35-01 — `p_is_featured` passed as `null` to `upsert_worker_profile` RPC** (`worker_repository.dart`) — `WorkerProfile.toJson()` correctly excludes `is_featured` (admin-managed flag), but `updateWorkerProfile()` passed `payload['is_featured']` (always null) as `p_is_featured`, silently wiping the admin-set featured status on every worker profile save. **Fix:** Changed to `'p_is_featured': profile.isFeatured` — passes the real current value from the profile object (read from DB on load), preserving the admin-set flag via the RPC's `COALESCE` logic.
 2. **🔴 BUG-35-02 — `_saveCategories` `.not()` filter used wrong value format** (`worker_repository.dart`) — The Supabase Dart client's `.not('category_id', 'in', newCategoryIds)` passed a raw `List<int>`, but PostgREST expects a Postgres array literal string like `'(1,2,3)'`. This caused stale categories to never be pruned. **Fix:** Format IDs as `'(1,2,3)'` string.
 
 🟡 **Test Fixes (4):**

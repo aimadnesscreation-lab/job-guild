@@ -79,9 +79,11 @@ class WorkerRepository {
     // through to the upsert pattern below.
     bool rpcSucceeded = false;
     try {
-      // NOTE: `p_is_featured` is intentionally excluded — it is an
-      // admin-managed flag that should never be overwritten by client-side
-      // profile saves (see WorkerProfile.toJson which also excludes it).
+      // `p_is_featured` is an admin-managed flag that should never be
+      // overwritten by client-side profile saves. We pass `profile.isFeatured`
+      // (the value read from the DB on profile load) so the RPC preserves it
+      // via COALESCE(EXCLUDED.is_featured, worker_profiles.is_featured).
+      // Using `payload['is_featured']` is wrong because toJson() excludes it.
       await _supabase.rpc(
         'upsert_worker_profile',
         params: {
@@ -94,6 +96,7 @@ class WorkerRepository {
           'p_availability_status': payload['availability_status'],
           'p_service_radius_km': payload['service_radius_km'],
           'p_portfolio_media': payload['portfolio_media'],
+          'p_is_featured': profile.isFeatured,
         },
       );
       rpcSucceeded = true;

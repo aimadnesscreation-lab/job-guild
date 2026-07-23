@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
@@ -11,15 +12,22 @@ import 'package:local_services_marketplace/core/constants/app_constants.dart';
 /// 4. Data fetching from categories and jobs works
 /// 5. Realtime subscriptions can be established
 void main() {
-    if (!AppConstants.isSupabaseConfigured) {
-    // ignore: avoid_print
-    print('Skipping Supabase connection tests: credentials not configured');
-    return;
-  }
-
   late SupabaseClient supabase;
+  var _configured = false;
 
-  setUpAll(() {
+  setUpAll(() async {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {
+      // .env file is optional — _configured stays false, tests skip gracefully
+    }
+
+    _configured = AppConstants.isSupabaseConfigured;
+    if (!_configured) {
+      debugPrint('Skipping Supabase connection tests: credentials not configured');
+      return;
+    }
+
     // Import credentials from app_constants to avoid drift
     supabase = SupabaseClient(
       AppConstants.supabaseUrl,
@@ -28,17 +36,19 @@ void main() {
   });
 
   tearDownAll(() {
-    supabase.dispose();
+    if (_configured) supabase.dispose();
   });
 
   group('Supabase Live Connection', () {
     test('1. Client initializes and connects', () {
+      if (!_configured) return;
       expect(supabase, isNotNull);
       expect(supabase.auth, isNotNull);
       expect(supabase.from('users'), isNotNull);
     });
 
     test('2. Categories table has seed data', () async {
+      if (!_configured) return;
       final response = await supabase
           .from('categories')
           .select('*')
@@ -60,12 +70,14 @@ void main() {
     });
 
     test('3. Users table has RLS enabled and is queryable', () async {
+      if (!_configured) return;
       final response = await supabase.from('users').select('count');
       expect(response, isA<List>());
       debugPrint('✅ Users table accessible with RLS');
     });
 
     test('4. Worker profiles table structure is correct', () async {
+      if (!_configured) return;
       final response = await supabase
           .from('worker_profiles')
           .select('*')
@@ -79,6 +91,7 @@ void main() {
     });
 
     test('5. Jobs PostGIS RPC function works', () async {
+      if (!_configured) return;
       final nearbyJobs = await supabase.rpc(
         'get_nearby_jobs',
         params: {'lat': 31.5204, 'lng': 74.3587, 'radius_km': 50.0},
@@ -89,12 +102,14 @@ void main() {
     });
 
     test('6. Reviews table structure is correct', () async {
+      if (!_configured) return;
       final response = await supabase.from('reviews').select('*').limit(1);
       expect(response, isA<List>());
       debugPrint('✅ Reviews table accessible');
     });
 
     test('7. Auth endpoint reachable', () async {
+      if (!_configured) return;
       final session = supabase.auth.currentSession;
       debugPrint(
         '✅ Auth reachable (session: ${session != null ? 'active' : 'none'})',
@@ -103,6 +118,7 @@ void main() {
     });
 
     test('8. Realtime channel can be created', () async {
+      if (!_configured) return;
       final channel = supabase.channel('test-connection');
       expect(channel, isNotNull);
       channel.onPostgresChanges(
