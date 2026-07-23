@@ -15,98 +15,142 @@ class OpenRouterService {
       _baseUrl = baseUrl ?? AppConstants.openRouterBaseUrl,
       _httpClient = http.Client();
 
-  /// Generate text response (e.g., bio writing).
-  /// Uses the text model by default.
+  /// Generate text response with retry logic for transient failures.
   Future<String> generateText({
     required String prompt,
     String? systemPrompt,
     String model = AppConstants.openRouterTextModel,
     double temperature = 0.7,
     int maxTokens = 500,
+    int retries = 1,
   }) async {
     if (AppConstants.useMockAi || !AppConstants.isOpenRouterConfigured) {
       return _mockTextResponse(prompt);
     }
 
     try {
-      final messages = <Map<String, String>>[];
-      if (systemPrompt != null) {
-        messages.add({'role': 'system', 'content': systemPrompt});
-      }
-      messages.add({'role': 'user', 'content': prompt});
-
-      final body = jsonEncode({
-        'model': model,
-        'messages': messages,
-        'temperature': temperature,
-        'max_tokens': maxTokens,
-      });
-
-      final response = await _postRequest('/chat/completions', body)
-          .timeout(const Duration(seconds: 15));
-      final data = jsonDecode(response) as Map<String, dynamic>;
-      final choices = data['choices'] as List;
-      if (choices.isEmpty) throw Exception('No response from AI');
-      return choices[0]['message']['content'] as String;
+      return await _callWithRetry(() => _doGenerateText(
+        prompt: prompt,
+        systemPrompt: systemPrompt,
+        model: model,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      ), retries);
     } catch (e) {
-      // Fallback to mock on error
+      debugPrint('[OpenRouter] Text generation failed after retries: $e');
       return _mockTextResponse(prompt);
     }
   }
 
-  /// Generate structured JSON response (e.g., job parsing).
-  /// Uses the JSON-capable model.
+  Future<String> _doGenerateText({
+    required String prompt,
+    String? systemPrompt,
+    required String model,
+    required double temperature,
+    required int maxTokens,
+  }) async {
+    final messages = <Map<String, String>>[];
+    if (systemPrompt != null) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    messages.add({'role': 'user', 'content': prompt});
+
+    final body = jsonEncode({
+      'model': model,
+      'messages': messages,
+      'temperature': temperature,
+      'max_tokens': maxTokens,
+    });
+
+    final response = await _postRequest('/chat/completions', body)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(response) as Map<String, dynamic>;
+    final choices = data['choices'] as List;
+    if (choices.isEmpty) throw Exception('No response from AI');
+    return choices[0]['message']['content'] as String;
+  }
+
+  /// Generate structured JSON response with retry logic for transient failures.
   Future<Map<String, dynamic>> generateJson({
     required String prompt,
     String? systemPrompt,
     String model = AppConstants.openRouterJsonModel,
-    double temperature = 0.1, // Low temp for deterministic JSON
+    double temperature = 0.1,
     int maxTokens = 500,
+    int retries = 1,
   }) async {
     if (AppConstants.useMockAi || !AppConstants.isOpenRouterConfigured) {
       return _mockJsonResponse(prompt);
     }
 
     try {
-      final messages = <Map<String, String>>[];
-      if (systemPrompt != null) {
-        messages.add({
-          'role': 'system',
-          'content':
-              '$systemPrompt\n\nIMPORTANT: Return ONLY valid JSON. No markdown, no code fences, no additional text.',
-        });
-      }
-      messages.add({
-        'role': 'user',
-        'content':
-            '$prompt\n\nReturn ONLY valid JSON. No markdown fences (no ```). No explanation. Just the JSON object.',
-      });
-
-      final body = jsonEncode({
-        'model': model,
-        'messages': messages,
-        'temperature': temperature,
-        'max_tokens': maxTokens,
-      });
-
-      final response = await _postRequest('/chat/completions', body)
-          .timeout(const Duration(seconds: 15));
-      final data = jsonDecode(response) as Map<String, dynamic>;
-      final choices = data['choices'] as List;
-      if (choices.isEmpty) throw Exception('No response from AI');
-
-      final content = choices[0]['message']['content'] as String;
-      // Strip any markdown fences if the model ignored instructions
-      final cleaned = content
-          .replaceAll(RegExp(r'^```json\s*', multiLine: true), '')
-          .replaceAll(RegExp(r'^```\s*', multiLine: true), '')
-          .replaceAll(RegExp(r'\s*```$', multiLine: true), '')
-          .trim();
-
-      return jsonDecode(cleaned) as Map<String, dynamic>;
+      return await _callWithRetry(() => _doGenerateJson(
+        prompt: prompt,
+        systemPrompt: systemPrompt,
+        model: model,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      ), retries);
     } catch (e) {
-      // Fallback to mock on error
+      debugPrint('[OpenRouter] JSON generation failed after retries: $e');
       return _mockJsonResponse(prompt);
+    }
+  }
+
+  Future<Map<String, dynamic>> _doGenerateJson({
+    required String prompt,
+    String? systemPrompt,
+    required String model,
+    required double temperature,
+    required int maxTokens,
+  }) async {
+    final messages = <Map<String, String>>[];
+    if (systemPrompt != null) {
+      messages.add({
+        'role': 'system',
+        'content':
+            '$systemPrompt\n\nIMPORTANT: Return ONLY valid JSON. No markdown, no code fences.',
+      });
+    }
+    messages.add({
+      'role': 'user',
+      'content':
+          '$prompt\n\nReturn ONLY valid JSON. No markdown, no code fences.',
+    });
+
+    final body = jsonEncode({
+      'model': model,
+      'messages': messages,
+      'temperature': temperature,
+      'max_tokens': maxTokens,
+    });
+
+    final response = await _postRequest('/chat/completions', body)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(response) as Map<String, dynamic>;
+    final choices = data['choices'] as List;
+    if (choices.isEmpty) throw Exception('No response from AI');
+
+    final content = choices[0]['message']['content'] as String;
+    final cleaned = content
+        .replaceAll(RegExp(r'^```json\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^```\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\s*```$', multiLine: true), '')
+        .trim();
+
+    return jsonDecode(cleaned) as Map<String, dynamic>;
+  }
+
+  /// Retry helper for API calls
+  Future<T> _callWithRetry<T>(Future<T> Function() call, int retries) async {
+    try {
+      return await call();
+    } catch (e) {
+      if (retries > 0 && e is Exception && e.toString().contains('HTTP 429')) {
+        await Future.delayed(const Duration(seconds: 2));
+        return _callWithRetry(call, retries - 1);
+      }
+      rethrow;
     }
   }
 
