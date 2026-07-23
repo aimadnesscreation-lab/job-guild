@@ -24,9 +24,12 @@
 🔴 **Bug Found & Fixed:**
 1. **🔴 BUG-38-01 — `.env` not bundled in web builds** — Missing `assets/` directory and `pubspec.yaml` asset declaration caused `dotenv.load()` to fail, making `AppConstants.isSupabaseConfigured` return `false`. This prevented the entire Supabase-backed app from loading.
 
+2. **🔴 BUG-38-02 — Flutter web service-worker cached old manifest without `.env`** — Even after bundling `.env`, the Flutter web service worker may serve the old `AssetManifest.bin.json` (from cache) which doesn't know about `.env`. The Flutter engine then fails to resolve `assets/.env` to the actual server path `assets/assets/.env`. **Fix:** Added `String.fromEnvironment()` fallback in `AppConstants._env()` so `--dart-define` values work even when dotenv asset loading fails.
+
 **Changes Made:**
 | File | Changes |
 |------|---------|
+| `lib/core/constants/app_constants.dart` | `_env()` now falls back to `String.fromEnvironment(key)` when `dotenv` isn't available |
 | `pubspec.yaml` | Added `assets:` → `- assets/.env` under `flutter:` section |
 | `.gitignore` | Added `assets/.env` (explicit, though redundant with existing `.env` pattern) |
 | `assets/.env` | Created by copying root `.env` into new `assets/` directory |
@@ -35,4 +38,5 @@
 - `flutter analyze`: **2 info-level issues** (pre-existing) ✅
 - `flutter test`: **140/140 pass** ✅
 - Web server running on **port 8080** (tmux session) ✅
+- Web build includes `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` ✅
 - `.env` bundled at `build/web/assets/assets/.env` and registered in `AssetManifest.bin.json` ✅

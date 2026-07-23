@@ -13,8 +13,20 @@ class AppConstants {
   /// helper returns null in that case so the `??` fallbacks below actually
   /// apply — otherwise the app would crash at startup instead of using
   /// source-controlled defaults.
-  static String? _env(String key) =>
-      dotenv.isInitialized ? dotenv.env[key] : null;
+  /// Reads an env var from: (1) dotenv (runtime `assets/.env`), or (2)
+  /// `--dart-define` (compile-time, preferred for web builds).
+  ///
+  /// The `--dart-define` fallback ensures web builds work even when the
+  /// Flutter service-worker hasn't updated the asset manifest for `.env`.
+  static String? _env(String key) {
+    if (dotenv.isInitialized) {
+      final value = dotenv.env[key];
+      if (value != null && value.isNotEmpty) return value;
+    }
+    // Fallback: compile-time --dart-define (always available in web release builds)
+    final fromDefine = String.fromEnvironment(key, defaultValue: '');
+    return fromDefine.isNotEmpty ? fromDefine : null;
+  }
 
   static String get supabaseUrl {
     // Return an empty string when .env is not loaded (e.g. widget tests).
