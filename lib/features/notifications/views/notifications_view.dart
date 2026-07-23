@@ -81,21 +81,33 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
       case _NotifFilter.unread:
         return _items.where((n) => n['is_read'] != true).toList();
       case _NotifFilter.messages:
-        return _items.where((n) => n['type'] == 'Messages').toList();
+        return _items.where((n) {
+          final t = (n['type'] as String?)?.toLowerCase();
+          return t == 'messages' || t == 'message';
+        }).toList();
       case _NotifFilter.jobs:
-        return _items.where((n) => n['type'] == 'Jobs').toList();
+        return _items.where((n) {
+          final t = (n['type'] as String?)?.toLowerCase();
+          return t == 'jobs' || t == 'job';
+        }).toList();
       case _NotifFilter.reviews:
-        return _items.where((n) => n['type'] == 'Reviews').toList();
+        return _items.where((n) {
+          final t = (n['type'] as String?)?.toLowerCase();
+          return t == 'reviews' || t == 'review';
+        }).toList();
     }
   }
 
   static IconData _iconForType(String type) {
-    switch (type) {
-      case 'Messages':
+    switch (type.toLowerCase()) {
+      case 'messages':
+      case 'message':
         return Icons.chat_rounded;
-      case 'Jobs':
+      case 'jobs':
+      case 'job':
         return Icons.work_rounded;
-      case 'Reviews':
+      case 'reviews':
+      case 'review':
         return Icons.rate_review_rounded;
       default:
         return Icons.notifications_rounded;
@@ -103,12 +115,15 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
   }
 
   static Color _colorForType(String type) {
-    switch (type) {
-      case 'Messages':
+    switch (type.toLowerCase()) {
+      case 'messages':
+      case 'message':
         return AppTheme.verifiedBadge;
-      case 'Jobs':
+      case 'jobs':
+      case 'job':
         return AppTheme.primaryColor;
-      case 'Reviews':
+      case 'reviews':
+      case 'review':
         return AppTheme.accentColor;
       default:
         return AppTheme.accentDark;

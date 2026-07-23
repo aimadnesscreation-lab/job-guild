@@ -204,6 +204,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
                           onTap: () {
                             _showFullScreenImage(
                               context,
+                              ref,
                               p.portfolioMediaUrls[index],
                             );
                           },
@@ -373,13 +374,14 @@ void _showReportUserDialog(
   String reportedUserId,
   String reportedUserName,
 ) {
+  final s = ref.read(appStringsProvider);
   final reasons = [
-    'Fake profile',
-    'Harassment',
-    'Spam',
-    'Inappropriate content',
-    'Scam',
-    'Other',
+    s.reportReasonFakeProfile,
+    s.reportReasonHarassment,
+    s.reportReasonSpam,
+    s.reportInappropriateContent,
+    s.reportReasonScam,
+    s.reportReasonOther,
   ];
   String selectedReason = reasons.first;
   final detailsController = TextEditingController();
@@ -395,7 +397,7 @@ void _showReportUserDialog(
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Report $reportedUserName',
+                s.reportTitle(reportedUserName),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -406,15 +408,15 @@ void _showReportUserDialog(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Why are you reporting this user?',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              Text(
+                s.reportWhyReason,
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 // ignore: deprecated_member_use
                 value: selectedReason,
-                decoration: const InputDecoration(labelText: 'Reason'),
+                decoration: InputDecoration(labelText: s.reportReasonLabel),
                 items: reasons
                     .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                     .toList(),
@@ -427,9 +429,9 @@ void _showReportUserDialog(
               const SizedBox(height: 12),
               TextField(
                 controller: detailsController,
-                decoration: const InputDecoration(
-                  labelText: 'Details (optional)',
-                  hintText: 'Describe the issue...',
+                decoration: InputDecoration(
+                  labelText: s.reportDetailsOptionalLabel,
+                  hintText: s.reportDetailsHint,
                   alignLabelWithHint: true,
                 ),
                 maxLines: 3,
@@ -469,7 +471,7 @@ void _showReportUserDialog(
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Failed to submit report: $e'),
+                  content: Text('${s.reportSubmitFailed}$e'),
                   backgroundColor: AppTheme.errorColor,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -484,7 +486,8 @@ void _showReportUserDialog(
 }
 
 /// Show a full-screen image viewer for the given image URL.
-void _showFullScreenImage(BuildContext context, String imageUrl) {
+void _showFullScreenImage(BuildContext context, WidgetRef ref, String imageUrl) {
+  final s = ref.read(appStringsProvider);
   Navigator.push(
     context,
     MaterialPageRoute(
@@ -494,7 +497,7 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           elevation: 0,
-          title: const Text('Portfolio Image'),
+          title: Text(s.portfolioImageDialog),
           actions: [
             IconButton(
               icon: const Icon(Icons.close_rounded),
@@ -515,18 +518,18 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
                   child: CircularProgressIndicator(color: Colors.white),
                 );
               },
-              errorBuilder: (_, _, _) => const Column(
+              errorBuilder: (_, _, _) => Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.broken_image_outlined,
                     size: 64,
                     color: Colors.white38,
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
-                    'Could not load image',
-                    style: TextStyle(color: Colors.white54),
+                    s.imageLoadFailed,
+                    style: const TextStyle(color: Colors.white54),
                   ),
                 ],
               ),
@@ -631,7 +634,7 @@ class _PublicProfileHeader extends ConsumerWidget {
                 const SizedBox(width: 4),                  Text(
                   distanceKm != null
                       ? '${distanceKm!.toStringAsFixed(1)} ${ref.watch(appStringsProvider).kmAway}'
-                      : 'Nearby',
+                      : ref.watch(appStringsProvider).nearbyFallback,
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,

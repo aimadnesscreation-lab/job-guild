@@ -17,6 +17,62 @@ class AuthNotifier extends Notifier<void> {
   @override
   void build() {}
 
+  // ─── Email Auth ──────────────────────────────────────────
+
+  /// Sign up with email + password, storing the role in user metadata so the
+  /// database trigger can create the public.users row with the correct flags.
+  /// Returns null on success, or an "email confirmation" message if the user
+  /// needs to verify their email.
+  Future<String?> signUpWithEmail({
+    required String email,
+    required String password,
+    required String fullName,
+    required String initialRole,
+  }) async {
+    final isEmployer = initialRole == 'employer';
+    final isWorker = initialRole == 'worker';
+
+    final response = await Supabase.instance.client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'full_name': fullName,
+        'is_employer': isEmployer,
+        'is_worker': isWorker,
+      },
+    );
+    if (response.session == null && response.user == null) {
+      throw Exception(
+        'Sign-up failed. Please try again.',
+      );
+    }
+    // If user was created but session is null, email confirmation is required.
+    if (response.user != null && response.session == null) {
+      return 'Account created! Please check your email to confirm your account before signing in.';
+    }
+    return null; // signed in immediately (email confirmation disabled)
+  }
+
+  /// Sign in with email + password.
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } on AuthException catch (e) {
+      debugPrint('[Auth] Email sign-in failed: ${e.message}');
+      throw Exception('Sign-in failed: ${e.message}');
+    } on SocketException {
+      throw Exception('Network error: Please check your connection.');
+    }
+  }
+
+  // ─── Phone OTP Auth ─────────────────────────────────────
+
   /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx).
   /// Throws [FormatException] if the number is not a valid Pakistani mobile.
   static String normalizePhone(String phone) {
@@ -45,11 +101,20 @@ class AuthNotifier extends Notifier<void> {
     );
   }
 
-  /// Send OTP code to the given phone number
-  Future<void> sendOtp({required String phone}) async {
+  /// Send OTP code to the given phone number.
+  /// [initialRole] is passed as metadata so the DB trigger can set
+  /// is_employer/is_worker on the public.users row at creation time.
+  Future<void> sendOtp({required String phone, String? initialRole}) async {
+    final Map<String, dynamic>? data = initialRole != null
+        ? {
+            'is_employer': initialRole == 'employer',
+            'is_worker': initialRole == 'worker',
+          }
+        : null;
     try {
       await Supabase.instance.client.auth.signInWithOtp(
         phone: normalizePhone(phone),
+        data: data,
       );
     } catch (e) {
       throw Exception('Failed to send OTP: $e');

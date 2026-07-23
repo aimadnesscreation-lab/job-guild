@@ -621,5 +621,62 @@ void main() {
         );
       });
     });
+
+    // ─── Role Management ──────────────────────────────────────
+
+    group('updateUserRole', () {
+      test('silently succeeds when client is null', () async {
+        await expectLater(
+          repo.updateUserRole('user-1', isWorker: true),
+          completes,
+        );
+      });
+
+      test('handles isEmployer flag', () async {
+        await expectLater(
+          repo.updateUserRole('user-1', isEmployer: true),
+          completes,
+        );
+      });
+
+      test('handles isWorker flag', () async {
+        await expectLater(
+          repo.updateUserRole('user-1', isWorker: true),
+          completes,
+        );
+      });
+
+      test('handles both flags simultaneously', () async {
+        await expectLater(
+          repo.updateUserRole('user-1', isEmployer: true, isWorker: true),
+          completes,
+        );
+      });
+
+      test('handles neither flag as no-op', () async {
+        await expectLater(
+          repo.updateUserRole('user-1'),
+          completes,
+        );
+      });
+
+      test('handles setting isEmployer to false', () async {
+        await expectLater(
+          repo.updateUserRole('user-1', isEmployer: false),
+          completes,
+        );
+      });
+
+      test('works with different user IDs', () async {
+        await expectLater(
+          repo.updateUserRole('user-abc-123', isWorker: true),
+          completes,
+        );
+        await expectLater(
+          repo.updateUserRole('user-xyz-456', isEmployer: true),
+          completes,
+        );
+      });
+    });
   });
 }

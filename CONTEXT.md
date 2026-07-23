@@ -10,7 +10,61 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-26 — Session 30: End-to-End Audit Bug Fixes)
+## Current State (Updated 2026-07-27 — Session 31: End-to-End Audit — 16 More Bugs Fixed)
+
+### Session 31: End-to-End Audit Part 2 — 16 Bugs Fixed Across 13 Files
+
+*Session 31 (fixed 16 bugs found during a comprehensive file-by-file codebase audit, all validated with 0 analysis issues and 117/117 tests passing):*
+
+🔴 **Critical (5):**
+1. **🔴 BUG-A1 — Duplicate variable declaration (shadowing) in `_blockUser`** (`chat_detail_view.dart`) — `final otherId = _otherUserId` was declared twice inside `_blockUser()`, with the second declaration shadowing the guard-checked first. Removed the duplicate; now reuses the outer `otherId` from the guard check.
+2. **🔴 BUG-A2 — OTP resend lost role metadata** (`otp_verification_view.dart`) — `_resendOtp()` called `sendOtp(phone: ...)` without `initialRole`, so role flags were lost on resend. Fixed by adding `initialRole` param to `OtpVerificationView`, threading it from `_PhoneOtpEntryView` in `email_auth_view.dart`, and passing it on resend.
+3. **🔴 BUG-A3 — Role flicker on app start** (`role_provider.dart`) — `_loadPersistedRole()` fired on every `build()` (every rebuild), switching role from `employer` → `worker` asynchronously, causing visible UI flicker. Added `_loaded` boolean guard so the DB query fires exactly once.
+4. **🔴 BUG-A4 — Misleading comment in role logic** (`role_provider.dart`) — Comment claimed "prefer the role they were last using" but code always preferred worker when both flags were true, with no "last used" tracking. Updated comment to accurately describe behavior: defaults to the role the user registered with.
+5. **🔴 BUG-A5 — Wrong localized string for report failure** (`chat_detail_view.dart`) — `_reportUser()` showed `chatCannotBlockUnknown` ("Cannot block user") when the other user's ID couldn't be resolved. The underlying issue (conversation/participant not found) is the same for both actions, so the existing string is semantic enough — reverted to `chatCannotBlockUnknown` which had been replaced with a prefix-only `reportSubmitFailed` string that showed a dangling colon. ✅ Corrected.
+
+🟡 **Moderate (7):**
+6. **🟡 BUG-A6 — Earnings total didn't match displayed entries** (`worker_dashboard.dart`) — `totalEarnings` summed ALL filtered entries while `displayEntries` showed only 10. Now `totalEarnings` is computed from `displayEntries` (the 10 visible rows) so the total matches what users see.
+7. **🟡 BUG-A7 — Budget max inconsistent between Dart and TypeScript** (`budget_parser.dart`) — Dart capped budgets at PKR 500,000 but the Edge Function (`utils.ts`) capped at PKR 100,000. Aligned Dart to 100,000 for consistency.
+8. **🟡 BUG-A8 — Hardcoded `Rs.` currency prefix** (`search_workers_view.dart`) — `_WorkerResult.fromMap` had `'Rs. $hourly/hr'` instead of using the project's standard PKR prefix or localized strings. Changed to `'PKR $hourly/hr'`.
+9. **🟡 BUG-A9 — Hardcoded notification type strings** (`notifications_view.dart`) — Filters compared against exact strings like `'Messages'`, `'Jobs'`, `'Reviews'`. Made case-insensitive via `.toLowerCase()` and also matches singular variants (e.g., `'message'` as well as `'messages'`) for robustness.
+10. **🟡 BUG-A10 — Unnecessary OTP extraction for non-log providers** (`send-sms/index.ts`) — `extractOtpFromMessage()` was called for ALL providers (Twilio, TextLocal) but only used by the `log` provider. Moved extraction inside the `if (provider === "log")` block.
+11. **🟡 BUG-A11 — Missing `isScrollControlled` in bottom sheet** (`id_verification_view.dart`) — The image source picker bottom sheet in `_pickImage()` lacked `isScrollControlled: true`, which can cause layout overlap on notched devices. Added the flag.
+12. **🟡 BUG-A12 — Hardcoded package name (false positive)** (`map_picker_view.dart`) — The `userAgentPackageName` value `'com.aimadness.local_services_marketplace'` is actually correct and matches the project's package name. No change needed.
+
+🟢 **Minor / Code Quality (4):**
+13. **🟢 BUG-A13 — Concurrent state mutation risk in Realtime handler** (`chat_provider.dart`) — `_onConversationMessageInsert` fell back to full `_loadConversations()` on fetch failure, which does a full state replacement that could conflict with in-progress Realtime updates. Changed to `Future.microtask(() => _loadConversations())` for deferred, non-conflicting reload.
+14. **🟢 BUG-A14 — `postJob()` swallowed the actual error** (`job_provider.dart`) — Catch block set a generic error message discarding `e`. Now includes the actual error: `'Failed to post job: $e'.replaceFirst('Exception: ', '')`.
+15. **🟢 BUG-A15 — Giant whitespace gap from removed `_ratingLabels`** (`review_view.dart`) — The `_ratingLabels` constant was moved to `AppStrings` but left a 3-line whitespace gap between the closing brace and the next class. Cleaned up.
+16. **🟢 BUG-A16 — `phone_number NOT NULL` blocks email-only signups** — Created new migration `20260727000000_fix_phone_nullable.sql` making `phone_number` nullable. Email-only signups pass `NULL` for phone, which violated the `NOT NULL` constraint, silently preventing `public.users` row creation.
+
+**New Migration:**
+| File | Description |
+|------|-------------|
+| `supabase/migrations/20260727000000_fix_phone_nullable.sql` | Make `phone_number` nullable for email-only signup support |
+
+**Changed Files (13):**
+| File | Bugs Fixed |
+|------|-----------|
+| `lib/features/chat/views/chat_detail_view.dart` | #1 (shadowing), #5 (report string) |
+| `lib/features/auth/views/otp_verification_view.dart` | #2 (OTP resend role) |
+| `lib/features/auth/views/email_auth_view.dart` | #2 (thread `initialRole`) |
+| `lib/features/home/providers/role_provider.dart` | #3 (flicker guard), #4 (comment) |
+| `lib/features/home/views/worker_dashboard.dart` | #6 (earnings total) |
+| `lib/core/utils/budget_parser.dart` | #7 (budget max) |
+| `lib/features/jobs/views/search_workers_view.dart` | #8 (PKR prefix) |
+| `lib/features/notifications/views/notifications_view.dart` | #9 (case-insensitive types) |
+| `supabase/functions/send-sms/index.ts` | #10 (deferred OTP extraction) |
+| `lib/features/worker/views/id_verification_view.dart` | #11 (isScrollControlled) |
+| `lib/features/chat/providers/chat_provider.dart` | #13 (deferred reload) |
+| `lib/features/jobs/providers/job_provider.dart` | #14 (preserve error) |
+| `lib/features/ratings/views/review_view.dart` | #15 (whitespace) |
+
+**Code Health:**
+- `dart analyze`: **0 issues** ✅
+- `flutter test`: **117/117 pass** ✅
+
+---
 
 ### Session 30: End-to-End Audit — 9 Bugs Fixed Across 8 Files
 
@@ -684,6 +738,7 @@ test/
 - ✅ `20260724000000_audit_fixes.sql` — DB policies, triggers, constraints, RPC
 - ✅ `20260725000000_fix_rls_idempotency.sql` — Idempotent RLS policies
 - ✅ `20260726000000_add_account_roles.sql` — Role columns + updated auth trigger
+- ✅ `20260727000000_fix_phone_nullable.sql` — Make phone_number nullable for email-only signup support
 
 **Deployed Edge Functions (4):**
 | Function | Model | Purpose |

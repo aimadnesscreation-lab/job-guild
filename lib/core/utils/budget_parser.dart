@@ -45,7 +45,7 @@ int estimateBudget(String input, String category) {
 
         // Skip values that are too small or too large to be budgets.
         if (scaled < 100) { continue; }
-        if (scaled > 500000) { continue; }
+        if (scaled > 100000) { continue; }
 
         // Skip numbers that might be phone numbers (10-12 digits starting 03 or 92)
         final rawStr = match.group(0)!;

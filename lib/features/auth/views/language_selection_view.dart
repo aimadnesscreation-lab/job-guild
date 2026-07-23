@@ -3,11 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/constants/app_constants.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
-import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
-import 'package:local_services_marketplace/features/auth/views/otp_verification_view.dart';
+import 'package:local_services_marketplace/features/auth/views/role_selection_view.dart';
 
-/// Onboarding screen for language selection (Urdu / English)
-/// and phone number entry for OTP-based authentication.
+/// Onboarding screen for language selection (Urdu / English).
+/// After selecting a language, the user proceeds to role selection.
 class LanguageSelectionView extends ConsumerStatefulWidget {
   const LanguageSelectionView({super.key});
 
@@ -18,57 +17,21 @@ class LanguageSelectionView extends ConsumerStatefulWidget {
 
 class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
   String _selectedLanguage = 'en';
-  final _phoneController = TextEditingController();
-  bool _showPhoneInput = false;
-
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    super.dispose();
-  }
+  bool _showContinue = false;
 
   void _onLanguageSelected(String lang) {
     setState(() {
       _selectedLanguage = lang;
-      _showPhoneInput = true;
+      _showContinue = true;
     });
     ref.read(localeProvider.notifier).setLocale(lang);
   }
 
-  bool _isLoading = false;
-
-  void _onContinue() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.read(appStringsProvider).emptyPhoneError)),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    // Normalize phone for consistent display in OTP view
-    final normalizedPhone = AuthNotifier.normalizePhone(phone);
-    try {
-      await ref.read(authProvider.notifier).sendOtp(phone: phone);
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OtpVerificationView(phoneNumber: normalizedPhone),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${ref.read(appStringsProvider).failedToSendCode} $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
-    } finally {
-      if (context.mounted) setState(() => _isLoading = false);
-    }
+  void _onContinue() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const RoleSelectionView()),
+    );
   }
 
   @override
@@ -109,8 +72,8 @@ class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
                 ).textTheme.bodyLarge?.copyWith(color: AppTheme.textSecondary),
               ),
               const Spacer(flex: 1),
-              // Language selection (shown before phone input)
-              if (!_showPhoneInput) ...[
+              // Language selection (shown before continue)
+              if (!_showContinue) ...[
                 _LanguageCard(
                   emoji: '🇬🇧',
                   title: 'English',
@@ -127,41 +90,21 @@ class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
                   onTap: () => _onLanguageSelected('ur'),
                 ),
               ],
-              // Phone input (shown after language selection)
-              if (_showPhoneInput) ...[
+              // Continue button (shown after language selection)
+              if (_showContinue) ...[
                 Text(
                   _selectedLanguage == 'ur'
-                      ? 'اپنا فون نمبر درج کریں'
-                      : ref.watch(appStringsProvider).enterPhone,
+                      ? 'اپنا اکاؤنٹ بنائیں'
+                      : 'Create your account',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    prefixText: '+92 ',
-                    hintText: ref.watch(appStringsProvider).phoneHint,
-                    labelText: _selectedLanguage == 'ur'
-                        ? 'فون نمبر'
-                        : ref.watch(appStringsProvider).phoneLabel,
-                  ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: _isLoading ? null : _onContinue,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.arrow_forward_rounded),
+                  onPressed: _onContinue,
+                  icon: const Icon(Icons.arrow_forward_rounded),
                   label: Text(
                     _selectedLanguage == 'ur'
                         ? 'جاری رکھیں'
@@ -172,7 +115,7 @@ class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
                 TextButton(
                   onPressed: () {
                     setState(() {
-                      _showPhoneInput = false;
+                      _showContinue = false;
                     });
                   },
                   child: Text(ref.watch(appStringsProvider).goBack),

@@ -303,13 +303,13 @@ class _ShimmerCard extends StatelessWidget {
   }
 }
 
-class _LoadingText extends StatelessWidget {
+class _LoadingText extends ConsumerWidget {
   const _LoadingText();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Text(
-      'Loading your dashboard...',
+      ref.watch(appStringsProvider).dashboardLoading,
       style: const TextStyle(color: AppTheme.textSecondary),
     );
   }

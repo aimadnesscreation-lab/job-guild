@@ -572,6 +572,24 @@ class SupabaseRepository {
     }
   }
 
+  /// Enable or disable a role on the user's account.
+  /// Pass [isEmployer] and/or [isWorker] to set the corresponding flag.
+  Future<void> updateUserRole(
+    String userId, {
+    bool? isEmployer,
+    bool? isWorker,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+
+    final payload = <String, dynamic>{};
+    if (isEmployer != null) payload['is_employer'] = isEmployer;
+    if (isWorker != null) payload['is_worker'] = isWorker;
+    if (payload.isNotEmpty) {
+      await client.from('users').update(payload).eq('id', userId);
+    }
+  }
+
   /// Persist settings (only the columns that exist on the users table).
   Future<void> saveUserSettings(
     String userId,

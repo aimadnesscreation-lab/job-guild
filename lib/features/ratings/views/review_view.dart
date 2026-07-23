@@ -106,7 +106,7 @@ class _ReviewViewState extends ConsumerState<ReviewView>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to submit review: $e'),
+          content: Text('${ref.read(appStringsProvider).reviewSubmitFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -234,7 +234,7 @@ class _ReviewViewState extends ConsumerState<ReviewView>
             const SizedBox(height: 8),
             Text(
               _rating > 0
-                  ? _ratingLabels[_rating - 1]
+                  ? ref.watch(appStringsProvider).ratingLabels[_rating - 1]
                   : ref.watch(appStringsProvider).tapStarToRate,
               style: TextStyle(
                 color: _rating > 0
@@ -291,14 +291,6 @@ class _ReviewViewState extends ConsumerState<ReviewView>
       ),
     );
   }
-
-  static const _ratingLabels = [
-    'Poor — Needs improvement',
-    'Fair — Below average',
-    'Good — Satisfactory',
-    'Very Good — Above average',
-    'Excellent — Outstanding!',
-  ];
 }
 
 /// Reusable star rating display widget (read-only, for profile cards)

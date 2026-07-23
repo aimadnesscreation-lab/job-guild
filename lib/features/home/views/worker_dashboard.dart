@@ -146,13 +146,11 @@ class WorkerDashboard extends ConsumerWidget {
                     Icons.visibility_off,
                     color: AppTheme.errorColor,
                   ),
-                  title: const Text(
-                    'You are currently invisible to employers',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  title: Text(
+                    s.workerOfflineTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(
-                    'Toggle availability to start receiving job matches.',
-                  ),
+                  subtitle: Text(s.workerOfflineSubtitle),
                   trailing: TextButton(
                     onPressed: () => _showAvailabilitySheet(
                       context,
@@ -160,7 +158,7 @@ class WorkerDashboard extends ConsumerWidget {
                       profile,
                       s,
                     ),
-                    child: const Text('Update'),
+                    child: Text(s.updateAvailability),
                   ),
                 ),
               ),
@@ -269,7 +267,11 @@ class WorkerDashboard extends ConsumerWidget {
                         date.isBefore(now.add(const Duration(days: 1)));
                   }).toList();
 
-                  final totalEarnings = recentEntries.fold<int>(
+                  final displayEntries = recentEntries.take(10).toList();
+
+                  // Total should match only the displayed entries so the
+                  // user can verify the sum against what they see.
+                  final totalEarnings = displayEntries.fold<int>(
                     0,
                     (sum, entry) {
                       final jobData =
@@ -278,8 +280,6 @@ class WorkerDashboard extends ConsumerWidget {
                       return sum + amount.toInt();
                     },
                   );
-
-                  final displayEntries = recentEntries.take(10);
 
                   return Column(
                     children: [
@@ -470,8 +470,8 @@ class WorkerDashboard extends ConsumerWidget {
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inMinutes < 1) return s.now;
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inHours < 24) return s.relativeHoursAgo(diff.inHours);
+    if (diff.inDays < 7) return s.relativeDaysAgo(diff.inDays);
     return '${dt.day}/${dt.month}';
   }
 }
@@ -480,7 +480,7 @@ class WorkerDashboard extends ConsumerWidget {
 
 /// Bottom sheet that lets the worker quickly pick an availability status
 /// without navigating to the full profile editor.
-class _AvailabilitySheet extends StatelessWidget {
+class _AvailabilitySheet extends ConsumerWidget {
   final AvailabilityStatus currentStatus;
   final ValueChanged<AvailabilityStatus> onSelect;
 
@@ -490,7 +490,8 @@ class _AvailabilitySheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Column(
@@ -518,7 +519,7 @@ class _AvailabilitySheet extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Set Availability',
+                s.setAvailabilityTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -527,7 +528,7 @@ class _AvailabilitySheet extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Let nearby employers know when you can work',
+            s.letEmployersKnow,
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -573,9 +574,9 @@ class _AvailabilitySheet extends StatelessWidget {
           Center(
             child: TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: AppTheme.textSecondary),
+              child: Text(
+                s.cancel,
+                style: const TextStyle(color: AppTheme.textSecondary),
               ),
             ),
           ),

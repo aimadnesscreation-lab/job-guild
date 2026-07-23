@@ -132,7 +132,7 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to post job: $error'),
+              content: Text('${ref.read(appStringsProvider).jobPostFailed}$error'),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -392,8 +392,8 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
                         icon: const Icon(Icons.calendar_month_rounded),
                         label: Text(
                           state.draftJob.scheduledFor != null
-                              ? 'Scheduled: ${state.draftJob.scheduledFor!.toLocal().toString().split(' ')[0]}'
-                              : 'Pick a Date',
+                              ? '${ref.watch(appStringsProvider).scheduledPrefix} ${state.draftJob.scheduledFor!.toLocal().toString().split(' ')[0]}'
+                              : ref.watch(appStringsProvider).pickDate,
                         ),
                       ),
                     ),

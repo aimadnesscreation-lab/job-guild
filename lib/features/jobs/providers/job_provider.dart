@@ -250,7 +250,7 @@ class PostJobNotifier extends Notifier<PostJobState> {
     } catch (e) {
       state = state.copyWith(
         isPosting: false,
-        errorMessage: 'Failed to post job. Please try again.',
+        errorMessage: 'Failed to post job: $e'.replaceFirst('Exception: ', ''),
       );
     }
   }

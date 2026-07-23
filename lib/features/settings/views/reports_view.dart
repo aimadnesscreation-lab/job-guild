@@ -43,8 +43,9 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   }
 
   void _showSubmitReportDialog() {
+    final s = ref.read(appStringsProvider);
     final detailsController = TextEditingController();
-    String selectedReason = 'Spam';
+    String                    selectedReason = 'Spam';
 
     showDialog(
       context: context,
@@ -59,19 +60,19 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                 DropdownButtonFormField<String>(
                   // ignore: deprecated_member_use
                   value: selectedReason,
-                  decoration: const InputDecoration(labelText: 'Reason'),
-                  items: const [
-                    DropdownMenuItem(value: 'Spam', child: Text('Spam')),
+                  decoration: InputDecoration(labelText: s.reportReasonLabel),
+                  items: [
+                    DropdownMenuItem(value: 'Spam', child: Text(s.reportReasonSpam)),
                     DropdownMenuItem(
                       value: 'Harassment',
-                      child: Text('Harassment'),
+                      child: Text(s.reportReasonHarassment),
                     ),
                     DropdownMenuItem(
                       value: 'Fake profile',
-                      child: Text('Fake profile'),
+                      child: Text(s.reportReasonFakeProfile),
                     ),
-                    DropdownMenuItem(value: 'Scam', child: Text('Scam')),
-                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                    DropdownMenuItem(value: 'Scam', child: Text(s.reportReasonScam)),
+                    DropdownMenuItem(value: 'Other', child: Text(s.reportReasonOther)),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -82,9 +83,9 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: detailsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Details',
-                    hintText: 'Describe the issue...',
+                  decoration: InputDecoration(
+                    labelText: s.reportDetailsLabel,
+                    hintText: s.reportDetailsHint,
                     alignLabelWithHint: true,
                   ),
                   maxLines: 3,
@@ -114,7 +115,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to submit report: $e'),
+                      content: Text('${s.reportSubmitFailed}$e'),
                       backgroundColor: AppTheme.errorColor,
                     ),
                   );

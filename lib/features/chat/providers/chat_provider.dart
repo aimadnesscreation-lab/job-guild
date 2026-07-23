@@ -465,8 +465,9 @@ class ChatNotifier extends Notifier<ChatState> {
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         state = state.copyWith(conversations: list);
       } catch (_) {
-        // Fetch failed — full reload as fallback.
-        _loadConversations();
+        // Fetch failed — schedule a deferred full reload so the user
+        // eventually sees this conversation without requiring a manual refresh.
+        Future.microtask(() => _loadConversations());
       }
     }
   }

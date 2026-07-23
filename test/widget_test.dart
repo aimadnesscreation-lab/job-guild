@@ -57,7 +57,7 @@ void main() {
       expect(find.text('اردو'), findsOneWidget);
     });
 
-    testWidgets('tapping a language card shows phone number input', (
+    testWidgets('tapping a language card shows continue to role selection', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(createTestApp(const LanguageSelectionView()));
@@ -66,8 +66,9 @@ void main() {
       await tester.tap(find.text('English'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Enter your phone number'), findsOneWidget);
-      expect(find.byType(TextField), findsOneWidget);
+      // After selecting a language, "Create your account" and "Continue"
+      // appear (the flow now goes to RoleSelectionView instead of phone input).
+      expect(find.text('Create your account'), findsOneWidget);
       expect(find.text('Continue'), findsOneWidget);
     });
 
@@ -89,24 +90,26 @@ void main() {
   });
 
   group('HomeView', () {
-    testWidgets('renders bottom navigation bar with all tabs', (
+    testWidgets('renders bottom navigation bar with worker-only tabs', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(createTestApp(const HomeView()));
       await tester.pumpAndSettle();
 
+      // Worker mode (test default) has 4 tabs: Home, Search, Messages, Dashboard.
       expect(find.text('Home'), findsOneWidget);
       expect(find.text('Search'), findsOneWidget);
-      expect(find.text('Post Job'), findsOneWidget);
       expect(find.text('Messages'), findsOneWidget);
       expect(find.text('Dashboard'), findsOneWidget);
+      // "Post Job" should NOT appear in worker mode
+      expect(find.text('Post Job'), findsNothing);
     });
 
     testWidgets(
-      'shows welcome card, live job feed header, and action buttons on home tab',
+      'shows worker welcome card and live job feed header on home tab',
       (WidgetTester tester) async {
         await tester.pumpWidget(createTestApp(const HomeView()));
-        // Don't pumpAndSettle — the Realtime stream will not settle without Supabase initialized
+        // Don't pumpAndSettle — the Realtime stream will not settle
         await tester.pump();
 
         // Welcome card should still render
@@ -114,11 +117,11 @@ void main() {
           find.text('Welcome to Local Services Marketplace'),
           findsOneWidget,
         );
-        // Live job feed header (uses AppStrings.nearbyJobs which is 'Nearby Jobs')
+        // Live job feed header
         expect(find.text('Nearby Jobs'), findsOneWidget);
-        // Action buttons
-        expect(find.text('Post a Job'), findsWidgets);
-        expect(find.text('Find Workers'), findsOneWidget);
+        // Worker mode: no employer action buttons
+        expect(find.text('Post a Job'), findsNothing);
+        expect(find.text('Find Workers'), findsNothing);
       },
     );
   });
@@ -201,8 +204,6 @@ void main() {
 
   group('WorkerPublicProfileView', () {
     // A real profile passed directly via the `profile` constructor param.
-    // (The widget no longer fabricates a default "Ahmed Khan" profile, so we
-    // supply an explicit one to verify the real-data rendering path.)
     final sampleWorker = WorkerProfile(
       userId: 'worker-1',
       fullName: 'Ali Raza',

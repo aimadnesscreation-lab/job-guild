@@ -52,7 +52,7 @@ class ChatListView extends ConsumerWidget {
       itemBuilder: (context, index) {
         final conv = state.conversations[index];
         final isUnread = conv.unreadCount > 0;
-        final timeStr = _formatTime(conv.updatedAt);
+        final timeStr = _formatTime(conv.updatedAt, ref);
 
         return ListTile(
           leading: CircleAvatar(
@@ -148,13 +148,14 @@ class ChatListView extends ConsumerWidget {
     );
   }
 
-  String _formatTime(DateTime dt) {
+  String _formatTime(DateTime dt, WidgetRef ref) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'Now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    if (diff.inDays < 7) return '${diff.inDays}d';
+    final s = ref.read(appStringsProvider);
+    if (diff.inMinutes < 1) return s.now;
+    if (diff.inMinutes < 60) return s.relativeTimeMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return s.relativeTimeHours(diff.inHours);
+    if (diff.inDays < 7) return s.relativeTimeDays(diff.inDays);
     return '${dt.day}/${dt.month}';
   }
 }

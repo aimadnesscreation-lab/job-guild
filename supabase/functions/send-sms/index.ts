@@ -15,16 +15,12 @@ serve(async (req) => {
     const payload: SendSmsPayload = await req.json();
     const provider = Deno.env.get("SMS_PROVIDER") || "log";
 
-    const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
-
-    // Bug #13 (User) Fix: Don't log the OTP in production even in "log" mode
-    // if it's considered sensitive. However, since "log" provider IS the 
-    // dev mode, we keep it but add a warning.
     console.log(`[SMS Hook] Provider: ${provider}`);
     console.log(`[SMS Hook] To: ${payload.phone.substring(0, 5)}***`); // Redact phone in logs
     console.log(`[SMS Hook] Type: ${payload.type}`);
 if (provider === "log") {
-  console.log(`[SMS Hook] [DEV] OTP delivery simulated.`);
+  const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
+  console.log(`[SMS Hook] [DEV] OTP: ${otp}`);
   return new Response(
         JSON.stringify({
           success: true,

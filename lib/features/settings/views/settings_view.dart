@@ -6,13 +6,14 @@ import 'package:local_services_marketplace/core/services/supabase_repository.dar
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/features/settings/providers/settings_provider.dart';
 import 'package:local_services_marketplace/features/settings/views/reports_view.dart';
+import 'package:local_services_marketplace/features/home/providers/role_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
 import 'package:local_services_marketplace/features/worker/views/id_verification_view.dart';
 import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
 
 /// Settings screen — language, notification preferences, service radius,
-/// account, verification, logout, report/block management, delete account.
+/// account mode toggle, verification, logout, report management, delete account.
 /// All settings are persisted to the `users` table in Supabase.
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});
@@ -22,6 +23,12 @@ class SettingsView extends ConsumerWidget {
     final state = ref.watch(settingsProvider);
     final settings = state.settings;
     final s = ref.watch(appStringsProvider);
+    final currentRole = ref.watch(currentRoleProvider);
+    final userRoles = ref.watch(userRolesProvider);
+    final isWorker = currentRole == AppRole.worker;
+    final hasBothRoles = userRoles.asData?.value != null &&
+        userRoles.asData!.value.isEmployer &&
+        userRoles.asData!.value.isWorker;
 
     return Scaffold(
       appBar: AppBar(title: Text(ref.watch(appStringsProvider).settings)),
@@ -30,6 +37,59 @@ class SettingsView extends ConsumerWidget {
           // ─── Account ──────────────────────────────────
           _SectionHeader(title: ref.watch(appStringsProvider).account),
           _AccountHeader(),
+          const Divider(height: 1),
+
+          // ─── Account Mode ─────────────────────────────
+          _SectionHeader(title: s.accountMode),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isWorker
+                    ? AppTheme.accentColor.withValues(alpha: 0.1)
+                    : AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isWorker ? Icons.engineering_rounded : Icons.business_center_rounded,
+                color: isWorker ? AppTheme.accentColor : AppTheme.primaryColor,
+              ),
+            ),
+            title: Text(isWorker ? s.workerMode : s.employerMode),
+            subtitle: Text(
+              isWorker
+                  ? s.browsingJobsSubtitle
+                  : s.postingJobsSubtitle,
+            ),
+            trailing: hasBothRoles
+                ? TextButton(
+                    onPressed: () {
+                      ref.read(currentRoleProvider.notifier).toggle();
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            s.switchedToModeLabel(isWorker ? s.employer : s.worker),
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Text(isWorker ? s.switchToEmployer : s.switchToWorker),
+                  )
+                : userRoles.asData?.value != null && !userRoles.asData!.value.isWorker
+                    ? TextButton(
+                        onPressed: () => _enableWorkerMode(context, ref),
+                        child: Text(s.enableWorkerMode),
+                      )
+                    : userRoles.asData?.value != null && !userRoles.asData!.value.isEmployer
+                        ? TextButton(
+                            onPressed: () => _enableEmployerMode(context, ref),
+                            child: Text(s.enableEmployerMode),
+                          )
+                        : null,
+          ),
           const Divider(height: 1),
 
           // ─── Verification ─────────────────────────────
@@ -182,10 +242,7 @@ class SettingsView extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                        'Could not open help center. Please visit '
-                        'localservices.app/help in your browser.',
-                      ),
+                      content: Text(s.helpCenterError),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -241,7 +298,7 @@ class SettingsView extends ConsumerWidget {
               s.deleteAccount,
               style: TextStyle(color: AppTheme.errorColor),
             ),
-            subtitle: const Text('This action cannot be undone'),
+            subtitle: Text(s.deleteUndoneWarning),
             onTap: () => _showConfirmDialog(
               context,
               ref,
@@ -264,7 +321,7 @@ class SettingsView extends ConsumerWidget {
                     Navigator.of(context).popUntil((route) => route.isFirst);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Account data cleared'),
+                        content: Text(s.accountDataCleared),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
@@ -273,7 +330,7 @@ class SettingsView extends ConsumerWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Failed to delete account: $e'),
+                        content: Text('${s.deleteAccountFailed}$e'),
                         backgroundColor: AppTheme.errorColor,
                       ),
                     );
@@ -329,6 +386,70 @@ class SettingsView extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _enableWorkerMode(BuildContext context, WidgetRef ref) async {
+    final s = ref.read(appStringsProvider);
+    try {
+      final userId = ref.read(currentUserProvider)?.id;
+      if (userId == null) return;
+
+      await ref
+          .read(supabaseRepositoryProvider)
+          .updateUserRole(userId, isWorker: true);
+
+      ref.invalidate(userRolesProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.workerModeEnabled),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${s.failedToEnable}$e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  void _enableEmployerMode(BuildContext context, WidgetRef ref) async {
+    final s = ref.read(appStringsProvider);
+    try {
+      final userId = ref.read(currentUserProvider)?.id;
+      if (userId == null) return;
+
+      await ref
+          .read(supabaseRepositoryProvider)
+          .updateUserRole(userId, isEmployer: true);
+
+      ref.invalidate(userRolesProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.employerModeEnabled),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${s.failedToEnable}$e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 }
 

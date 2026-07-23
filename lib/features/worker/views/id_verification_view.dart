@@ -34,9 +34,11 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
   bool _isSubmitting = false;
 
   Future<void> _pickImage(bool isIdFront) async {
+    final s = ref.read(appStringsProvider);
     try {
       final source = await showModalBottomSheet<ImageSource>(
         context: context,
+        isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -48,12 +50,12 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
               children: [
                 _SourceButton(
                   icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
+                  label: s.gallery,
                   onTap: () => Navigator.pop(ctx, ImageSource.gallery),
                 ),
                 _SourceButton(
                   icon: Icons.camera_alt_rounded,
-                  label: 'Camera',
+                  label: s.camera,
                   onTap: () => Navigator.pop(ctx, ImageSource.camera),
                 ),
               ],
@@ -84,7 +86,7 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to pick image: $e'),
+          content: Text('${s.verifyPickImageFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -92,9 +94,10 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
   }
 
   Future<void> _submitVerification() async {
+    final s = ref.read(appStringsProvider);
     if (_idFrontImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload your ID card photo first')),
+        SnackBar(content: Text(s.verifyUploadIdFirst)),
       );
       return;
     }
@@ -166,10 +169,8 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Verification submitted! Your documents are being reviewed.',
-          ),
+        SnackBar(
+          content: Text(s.verifySubmittedSuccess),
           backgroundColor: AppTheme.primaryColor,
         ),
       );
@@ -178,7 +179,7 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to submit: $e'),
+          content: Text('${s.verifySubmitFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -206,7 +207,7 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Verify Your Identity',
+              s.verifyTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -214,7 +215,7 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Upload a clear photo of your government-issued ID (CNIC) to earn the Verified badge. This helps build trust with employers.',
+              s.verifyInstruction,
               style: const TextStyle(
                 color: AppTheme.textSecondary,
                 height: 1.5,
@@ -225,21 +226,23 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
 
             // ─── ID Front Upload ───────────────────────────
             _UploadCard(
-              label: 'ID Card (Front)',
+              label: s.verifyIdCardLabel,
               icon: Icons.badge_rounded,
               image: _idFrontImage,
               onTap: () => _pickImage(true),
               onRemove: () => setState(() => _idFrontImage = null),
+              tapToUploadText: s.verifyTapToUpload,
             ),
             const SizedBox(height: 12),
 
             // ─── Selfie Upload (optional) ──────────────────
             _UploadCard(
-              label: 'Selfie (Optional)',
+              label: s.verifySelfieLabel,
               icon: Icons.camera_alt_rounded,
               image: _selfieImage,
               onTap: () => _pickImage(false),
               onRemove: () => setState(() => _selfieImage = null),
+              tapToUploadText: s.verifyTapToUpload,
             ),
             const SizedBox(height: 24),
 
@@ -257,13 +260,13 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
                     )
                   : const Icon(Icons.check_circle_rounded),
               label: Text(
-                _isSubmitting ? 'Submitting...' : 'Submit for Verification',
+                _isSubmitting ? s.verifySubmitting : s.verifySubmitButton,
               ),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Do this later'),
+              child: Text(s.verifyDoLater),
             ),
           ],
         ),
@@ -278,6 +281,7 @@ class _UploadCard extends StatelessWidget {
   final XFile? image;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  final String tapToUploadText;
 
   const _UploadCard({
     required this.label,
@@ -285,6 +289,7 @@ class _UploadCard extends StatelessWidget {
     required this.image,
     required this.onTap,
     required this.onRemove,
+    required this.tapToUploadText,
   });
 
   @override
@@ -367,8 +372,8 @@ class _UploadCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Tap to upload',
-                        style: TextStyle(color: AppTheme.textSecondary),
+                        tapToUploadText,
+                        style: const TextStyle(color: AppTheme.textSecondary),
                       ),
                     ],
                   ),

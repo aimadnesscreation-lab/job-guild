@@ -13,8 +13,11 @@ import 'package:local_services_marketplace/features/home/views/home_view.dart';
 /// Handles auto-submit, resend, and error states.
 class OtpVerificationView extends ConsumerStatefulWidget {
   final String phoneNumber;
+  /// The role selected during onboarding ('employer' or 'worker').
+  /// Passed through so OTP resend preserves the correct role metadata.
+  final String? initialRole;
 
-  const OtpVerificationView({super.key, required this.phoneNumber});
+  const OtpVerificationView({super.key, required this.phoneNumber, this.initialRole});
 
   @override
   ConsumerState<OtpVerificationView> createState() =>
@@ -144,7 +147,10 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     _otpFocusNodes[0].requestFocus();
 
     try {
-      await ref.read(authProvider.notifier).sendOtp(phone: widget.phoneNumber);
+      await ref.read(authProvider.notifier).sendOtp(
+        phone: widget.phoneNumber,
+        initialRole: widget.initialRole,
+      );
       _startResendCountdown();
     } catch (e) {
       setState(() => _error = ref.read(appStringsProvider).failedToResend);

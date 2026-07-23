@@ -524,13 +524,12 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final blockedKey = 'blocked_users';
+      const blockedKey = 'blocked_users';
       final blockedJson = prefs.getString(blockedKey);
       final blockedUsers = blockedJson != null
           ? List<String>.from(jsonDecode(blockedJson) as List)
           : <String>[];
-      final otherId = _otherUserId;
-      if (otherId.isEmpty || blockedUsers.contains(otherId)) return;
+      if (blockedUsers.contains(otherId)) return;
       blockedUsers.add(otherId);
       await prefs.setString(blockedKey, jsonEncode(blockedUsers));
       // Notify provider to filter this user out (Bug #8 Fix)

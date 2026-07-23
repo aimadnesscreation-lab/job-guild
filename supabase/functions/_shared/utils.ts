@@ -127,6 +127,7 @@ export function estimateBudget(category: string, text: string): number {
     Photographer: 5000, DJ: 8000, Cook: 3000,
     Cleaning: 1500, Moving: 5000, Healthcare: 2000,
     Beauty: 1500, "Pet Care": 1000,
+    "General Labor": 2000,
   };
   
   return budgets[category] || 2000;
