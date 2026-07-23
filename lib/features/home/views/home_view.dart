@@ -23,11 +23,9 @@ import 'package:local_services_marketplace/features/settings/views/settings_view
 import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
 import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';
 import 'package:local_services_marketplace/features/jobs/views/job_detail_worker_view.dart';
-import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
 
 import 'package:local_services_marketplace/core/widgets/shimmer_loading.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
-import 'package:local_services_marketplace/features/ratings/views/reviews_list_view.dart';
 
 /// Main home screen — entry point after authentication.
 /// Connects all real screens: feed, search, post job, messages, dashboard.
@@ -59,9 +57,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
     return tutorialAsync.when(
       data: (tutorialCompleted) {
+        final role = ref.watch(currentRoleProvider);
+        final isWorker = role == AppRole.worker;
+
         Widget scaffold = Scaffold(
-      // Only show AppBar for Home and Dashboard tabs — child screens have their own.
-      appBar: _currentTabIndex == 0 || _currentTabIndex == 4
+      appBar: _currentTabIndex == 0 || _currentTabIndex == 3
           ? AppBar(
               title: Text(
                 _currentTabIndex == 0
@@ -69,23 +69,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     : _tabTitle(_currentTabIndex),
               ),
               actions: [
-                if (_currentTabIndex == 0) ...[
-                  // Role toggle — seamless employer/worker switch
-                  IconButton(
-                    icon: Icon(
-                      ref.watch(currentRoleProvider) == AppRole.worker
-                          ? Icons.work_rounded
-                          : Icons.work_outline,
-                      color: ref.watch(currentRoleProvider) == AppRole.worker
-                          ? AppTheme.primaryColor
-                          : null,
-                    ),
-                    tooltip:
-                        'Switch to ${ref.watch(currentRoleProvider) == AppRole.employer ? 'Worker' : 'Employer'} mode',
-                    onPressed: () {
-                      ref.read(currentRoleProvider.notifier).toggle();
-                    },
-                  ),
+                if (_currentTabIndex == 0 && !isWorker) ...[
                   IconButton(
                     icon: const Icon(Icons.favorite_border_rounded),
                     onPressed: () => Navigator.push(
@@ -108,7 +92,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
                             builder: (_) => const NotificationsView(),
                           ),
                         );
-                        // Refresh the badge after returning from notifications
                         if (context.mounted) {
                           ref.invalidate(unreadNotificationCountProvider);
                         }
@@ -125,7 +108,39 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     ),
                   ),
                 ],
-                if (_currentTabIndex == 4) ...[
+                if (_currentTabIndex == 0 && isWorker) ...[
+                  Badge(
+                    isLabelVisible: unreadCount > 0,
+                    label: Text(
+                      '$unreadCount',
+                      style: const TextStyle(fontSize: 10, color: Colors.white),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.notifications_outlined),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsView(),
+                          ),
+                        );
+                        if (context.mounted) {
+                          ref.invalidate(unreadNotificationCountProvider);
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.person_outline),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EditWorkerProfileView(),
+                      ),
+                    ),
+                  ),
+                ],
+                if (_currentTabIndex == 3) ...[
                   IconButton(
                     icon: const Icon(Icons.settings_outlined),
                     onPressed: () => Navigator.push(
@@ -139,13 +154,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
           : null,
       body: IndexedStack(
         index: _currentTabIndex,
-        children: const [
-          _HomeFeedTab(),
-          SearchWorkersContent(),
-          _PostJobRoute(),
-          ChatListView(),
-          _DashboardContainer(),
-        ],
+        children: isWorker
+            ? const [
+                _HomeFeedTab(),        // Job feed (index 0)
+                SearchWorkersContent(), // Search jobs (index 1)
+                ChatListView(),        // Messages (index 2)
+                WorkerDashboard(),     // Dashboard (index 3)
+              ]
+            : const [
+                EmployerDashboard(),   // Dashboard (index 0)
+                SearchWorkersContent(), // Find Workers (index 1)
+                _PostJobRoute(),        // Post a Job (index 2)
+                ChatListView(),         // Messages (index 3)
+              ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         key: _navBarGlobalKey,
@@ -155,35 +176,53 @@ class _HomeViewState extends ConsumerState<HomeView> {
             _currentTabIndex = index;
           });
         },
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home_rounded),
-            label: ref.watch(appStringsProvider).tabHome,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.search_outlined),
-            activeIcon: const Icon(Icons.search_rounded),
-            label: ref.watch(appStringsProvider).tabSearch,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.add_circle_outline),
-            activeIcon: const Icon(Icons.add_circle_rounded),
-            label: ref.watch(appStringsProvider).tabPostJob,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_outlined),
-            activeIcon: const Icon(Icons.chat_rounded),
-            label: ref.watch(appStringsProvider).tabMessages,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.dashboard_outlined),
-            activeIcon: const Icon(Icons.dashboard_rounded),
-            label: ref.watch(appStringsProvider).tabDashboard,
-          ),
-        ],
+        items: isWorker
+            ? [
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.home_outlined),
+                  activeIcon: const Icon(Icons.home_rounded),
+                  label: ref.watch(appStringsProvider).tabHome,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.search_outlined),
+                  activeIcon: const Icon(Icons.search_rounded),
+                  label: ref.watch(appStringsProvider).tabSearch,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.chat_outlined),
+                  activeIcon: const Icon(Icons.chat_rounded),
+                  label: ref.watch(appStringsProvider).tabMessages,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.dashboard_outlined),
+                  activeIcon: const Icon(Icons.dashboard_rounded),
+                  label: ref.watch(appStringsProvider).tabDashboard,
+                ),
+              ]
+            : [
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.space_dashboard_outlined),
+                  activeIcon: const Icon(Icons.space_dashboard_rounded),
+                  label: ref.watch(appStringsProvider).tabDashboard,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.search_outlined),
+                  activeIcon: const Icon(Icons.search_rounded),
+                  label: ref.watch(appStringsProvider).tabSearch,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.add_circle_outline),
+                  activeIcon: const Icon(Icons.add_circle_rounded),
+                  label: ref.watch(appStringsProvider).tabPostJob,
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.chat_outlined),
+                  activeIcon: const Icon(Icons.chat_rounded),
+                  label: ref.watch(appStringsProvider).tabMessages,
+                ),
+              ],
       ),
-      floatingActionButton: _currentTabIndex == 0
+      floatingActionButton: _currentTabIndex == 0 && !isWorker
           ? FloatingActionButton(
               onPressed: () => Navigator.push(
                 context,
@@ -217,48 +256,52 @@ class _HomeViewState extends ConsumerState<HomeView> {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, st) => const Scaffold(
-        body: Center(child: Text('Failed to load tutorial state')),
+      error: (e, st) => Scaffold(
+        body: Center(child: Text(ref.read(appStringsProvider).tutorialLoadFailed)),
       ),
     );
   }
 
   String _tabTitle(int index) {
     final s = ref.watch(appStringsProvider);
+    if (ref.watch(currentRoleProvider) == AppRole.worker) {
+      switch (index) {
+        case 0:
+          return s.nearbyJobs;
+        case 1:
+          return s.tabSearch;
+        case 2:
+          return s.tabMessages;
+        case 3:
+          return s.tabDashboard;
+        default:
+          return '';
+      }
+    }
     switch (index) {
       case 0:
-        return ''; // Home - uses app name
+        return ''; // Dashboard - uses app name
       case 1:
         return s.findWorkersTitle;
       case 2:
         return s.postAJob;
       case 3:
         return s.tabMessages;
-      case 4:
-        return s.tabDashboard;
       default:
         return '';
     }
   }
 }
 
-/// Home feed tab — adapts content based on current role.
-/// In worker mode: shows nearby job listings.
-/// In employer mode: shows worker search and browse.
+/// Home feed tab — shows nearby job listings for workers.
+/// This widget is only used in the worker IndexedStack, so it always
+/// renders the worker-side content (job feed with welcome card).
 class _HomeFeedTab extends ConsumerWidget {
   const _HomeFeedTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final role = ref.watch(currentRoleProvider);
-
-    // Employer mode: show the employer dashboard with stats, active jobs,
-    // and quick actions (instead of duplicating the Search tab content).
-    if (role == AppRole.employer) {
-      return const EmployerDashboard();
-    }
-
-    // Worker mode: show live job feed
+    // Worker mode: show live job feed with a worker-specific welcome card.
     final jobsAsync = ref.watch(openJobsProvider);
     final strings = ref.watch(appStringsProvider);
     final width = MediaQuery.of(context).size.width;
@@ -303,7 +346,7 @@ class _HomeFeedTab extends ConsumerWidget {
       child: ListView(
         padding: Breakpoints.horizontalPadding(width),
         children: [
-          // Welcome card
+          // Worker welcome card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -321,36 +364,6 @@ class _HomeFeedTab extends ConsumerWidget {
                   Text(
                     strings.welcomeSubtitle,
                     style: const TextStyle(color: AppTheme.textSecondary),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const _PostJobRoute(),
-                            ),
-                          ),
-                          icon: const Icon(Icons.add_rounded),
-                          label: Text(strings.postAJob),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SearchWorkersView(),
-                            ),
-                          ),
-                          icon: const Icon(Icons.person_search_rounded),
-                          label: Text(strings.findWorkers),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -461,48 +474,6 @@ class _HomeFeedTab extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickLinkCard(
-                  icon: Icons.star_rounded,
-                  label: ref.watch(appStringsProvider).myReviews,
-                  color: AppTheme.accentColor,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ReviewsListView()),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _QuickLinkCard(
-                  icon: Icons.settings_rounded,
-                  label: ref.watch(appStringsProvider).settings,
-                  color: AppTheme.textSecondary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsView()),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _QuickLinkCard(
-                  icon: Icons.verified_rounded,
-                  label: ref.watch(appStringsProvider).publicProfile,
-                  color: AppTheme.verifiedBadge,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WorkerPublicProfileView(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -543,8 +514,8 @@ class _RealtimeJobCard extends ConsumerWidget {
                         color: AppTheme.accentColor,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        '⚡ URGENT',
+                      child: Text(
+                        s.urgentBadge,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -571,7 +542,7 @@ class _RealtimeJobCard extends ConsumerWidget {
                             );
                         return entry.key.isNotEmpty
                             ? entry.key
-                            : 'Cat #${job.categoryId}';
+                            : s.categoryFallback(job.categoryId);
                       })(),
                       style: const TextStyle(
                         fontSize: 11,
@@ -633,112 +604,6 @@ class _RealtimeJobCard extends ConsumerWidget {
   }
 }
 
-/// Dashboard tab toggles between employer and worker view, synced with the
-/// global [currentRoleProvider] so the role toggle in the app bar is reflected
-/// here too.
-class _DashboardContainer extends ConsumerStatefulWidget {
-  const _DashboardContainer();
-
-  @override
-  ConsumerState<_DashboardContainer> createState() =>
-      _DashboardContainerState();
-}
-
-class _DashboardContainerState extends ConsumerState<_DashboardContainer>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-  late final ProviderSubscription<AppRole> _roleSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    // Sync the dashboard tab controller with the global role provider.
-    _roleSub = ref.listenManual(currentRoleProvider, (_, next) {
-      final target = next == AppRole.worker ? 1 : 0;
-      if (_tabController.index != target) _tabController.index = target;
-    });
-  }
-
-  @override
-  void dispose() {
-    _roleSub.close();
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppTheme.primaryColor,
-            unselectedLabelColor: AppTheme.textSecondary,
-            indicatorColor: AppTheme.primaryColor,
-            tabs: [
-              Tab(text: ref.watch(appStringsProvider).employer),
-              Tab(text: ref.watch(appStringsProvider).worker),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: const [EmployerDashboard(), WorkerDashboard()],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickLinkCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickLinkCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Proper job detail screen routing based on ownership + current role.
 class _JobDetailScreen extends ConsumerWidget {
   final Job job;
@@ -747,19 +612,14 @@ class _JobDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final isMyJob = user?.id == job.employerId;
+    final role = ref.watch(currentRoleProvider);
 
-    // Navigate to the employer view if this user posted the job, otherwise
-    // show the worker view with the "I'm Interested" button.
-    Widget child;
-    if (isMyJob) {
-      child = JobDetailView(job: job);
-    } else {
-      child = JobDetailWorkerView(job: job);
+    // Workers see the worker view (with "I'm Interested" button).
+    // Employers see the employer view (applicants, hire, etc).
+    if (role == AppRole.worker) {
+      return JobDetailWorkerView(job: job);
     }
-
-    return child;
+    return JobDetailView(job: job);
   }
 }
 

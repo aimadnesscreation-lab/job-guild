@@ -70,8 +70,8 @@ class _JobDetailWorkerViewState extends ConsumerState<JobDetailWorkerView> {
                               color: AppTheme.accentColor,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              '⚡ URGENT',
+                            child: Text(
+                              ref.watch(appStringsProvider).urgentBadge,
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.white,
@@ -355,20 +355,7 @@ class _JobDetailWorkerViewState extends ConsumerState<JobDetailWorkerView> {
   }
 
   String _formatDate(DateTime dt) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    final months = ref.read(appStringsProvider).monthsShort;
     return '${dt.day} ${months[dt.month - 1]}';
   }
 }

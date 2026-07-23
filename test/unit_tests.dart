@@ -625,12 +625,75 @@ void main() {
       expect(AuthNotifier.normalizePhone('0300-1234567'), '+923001234567');
       expect(AuthNotifier.normalizePhone('+92 300 1234567'), '+923001234567');
       expect(AuthNotifier.normalizePhone('(92) 300-123-4567'), '+923001234567');
+    });      test('handles empty string', () {
+      // Empty string → no valid digits → throws FormatException
+      expect(
+        () => AuthNotifier.normalizePhone(''),
+        throwsA(isA<FormatException>()),
+      );
     });
+  });
 
-    test('handles empty string', () {
-      // Empty string → digits = '' → '+92'
-      expect(AuthNotifier.normalizePhone(''), '+92');
-    });
+  // ═════════════════════════════════════════════════════════════════════
+  //  AuthNotifier (email auth + OTP role metadata)
+  // ═════════════════════════════════════════════════════════════════════
+
+  group('AuthNotifier email + OTP methods', () {
+    test(
+      'signUpWithEmail throws when Supabase is not initialized',
+      () async {
+        final notifier = AuthNotifier();
+        // Without Supabase initialized, signUpWithEmail will throw
+        expectLater(
+          notifier.signUpWithEmail(
+            email: 'test@example.com',
+            password: 'password123',
+            fullName: 'Test User',
+            initialRole: 'employer',
+          ),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
+
+    test(
+      'signInWithEmail throws when Supabase is not initialized',
+      () async {
+        final notifier = AuthNotifier();
+        expectLater(
+          notifier.signInWithEmail(
+            email: 'test@example.com',
+            password: 'password123',
+          ),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
+
+    test(
+      'sendOtp throws when Supabase is not initialized',
+      () async {
+        final notifier = AuthNotifier();
+        expectLater(
+          notifier.sendOtp(
+            phone: '03001234567',
+            initialRole: 'worker',
+          ),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
+
+    test(
+      'sendOtp works without initialRole (optional param)',
+      () async {
+        final notifier = AuthNotifier();
+        expectLater(
+          notifier.sendOtp(phone: '03001234567'),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
   });
 
   // ═════════════════════════════════════════════════════════════════════

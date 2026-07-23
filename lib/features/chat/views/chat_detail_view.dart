@@ -50,6 +50,22 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(chatProvider.notifier).loadConversation(widget.conversationId);
     });
+    // Auto-scroll to bottom when new messages arrive via realtime.
+    ref.listenManual<ChatState>(chatProvider, (prev, next) {
+      if (prev != null &&
+          next.currentMessages.length > prev.currentMessages.length) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -81,6 +97,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   /// Pick and send an image from gallery or camera
   Future<void> _sendImageFromSource(ImageSource source) async {
+    final s = ref.read(appStringsProvider);
     try {
       final picked = await _picker.pickImage(
         source: source,
@@ -120,7 +137,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to send image: $e'),
+          content: Text('${s.chatImageSendFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -146,6 +163,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   /// Share current location as a message using actual GPS position
   Future<void> _shareCurrentLocation() async {
+    final s = ref.read(appStringsProvider);
     try {
       // Get actual current location with graceful fallback
       final (lat, lng) = await LocationUtils.getCurrentLatLng();
@@ -154,8 +172,8 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       await ref.read(chatProvider.notifier).sendMessage(locationText);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location shared'),
+        SnackBar(
+          content: Text(s.chatLocationShared),
           duration: Duration(seconds: 1),
         ),
       );
@@ -163,7 +181,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to share location: $e'),
+          content: Text('${s.chatLocationShareFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -172,6 +190,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(appStringsProvider);
     final state = ref.watch(chatProvider);
 
     return Scaffold(
@@ -220,8 +239,8 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
             icon: const Icon(Icons.phone_outlined, size: 20),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Voice calling — coming soon'),
+                SnackBar(
+                  content: Text(s.chatVoiceCallingSoon),
                   behavior: SnackBarBehavior.floating,
                   duration: Duration(seconds: 2),
                 ),
@@ -424,6 +443,17 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   /// Opens a dialog to submit a report against the other user.
   void _reportUser(BuildContext context) async {
+    final s = ref.read(appStringsProvider);
+    final otherId = _otherUserId;
+    if (otherId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(s.chatCannotBlockUnknown),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
     final reasonController = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -432,9 +462,9 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
         content: TextField(
           controller: reasonController,
           maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Describe the issue...',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: s.reportDetailsHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -444,7 +474,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, reasonController.text),
-            child: const Text('Submit'),
+            child: Text(s.submit),
           ),
         ],
       ),
@@ -463,8 +493,8 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report submitted. Thank you.'),
+        SnackBar(
+          content: Text(s.reportSubmittedThanks),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -472,7 +502,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to submit report: $e'),
+          content: Text('${s.reportSubmitFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -481,6 +511,17 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
   /// Block the other user — persists to a local block list.
   void _blockUser(BuildContext context) async {
+    final s = ref.read(appStringsProvider);
+    final otherId = _otherUserId;
+    if (otherId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(s.chatCannotBlockUnknown),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final blockedKey = 'blocked_users';
@@ -497,8 +538,8 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User blocked on this device.'),
+        SnackBar(
+          content: Text(s.chatUserBlocked),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -507,7 +548,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to block user: $e'),
+          content: Text('${s.chatBlockFailed}$e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -899,9 +940,9 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Recording...',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            Text(
+              ref.watch(appStringsProvider).voiceRecording,
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
             ),
           ] else ...[
             const Icon(
@@ -910,13 +951,13 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
               color: AppTheme.accentColor,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Tap and hold to record',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            Text(
+              ref.watch(appStringsProvider).voiceTapAndHold,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
-            const Text(
-              'Release to send',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            Text(
+              ref.watch(appStringsProvider).voiceReleaseToSend,
+              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
             ),
           ],
 
@@ -943,11 +984,9 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
           // fires stop before startRecording's async setup completes).
           GestureDetector(
             onLongPressStart: (_) async {
-              // Set the flag BEFORE awaiting so onLongPressEnd can observe
-              // even on quick releases.
-              _recordingStarted = true;
               try {
                 await _startRecording();
+                if (mounted) _recordingStarted = true;
               } catch (_) {
                 if (mounted) _recordingStarted = false;
               }
@@ -999,28 +1038,28 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
           // Cancel button
           TextButton(
             onPressed: _cancel,
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppTheme.textSecondary),
+            child: Text(
+              ref.watch(appStringsProvider).cancel,
+              style: const TextStyle(color: AppTheme.textSecondary),
             ),
           ),
 
           // Sending indicator
           if (voiceState.isSending)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 14,
                     height: 14,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
-                    'Sending voice message...',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                    ref.watch(appStringsProvider).voiceSendingMessage,
+                    style: const TextStyle(color: AppTheme.textSecondary),
                   ),
                 ],
               ),

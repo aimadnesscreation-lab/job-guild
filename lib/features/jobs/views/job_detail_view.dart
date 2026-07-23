@@ -196,8 +196,8 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
                                   color: AppTheme.accentColor,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
-                                  '⚡ URGENT',
+                                child: Text(
+                                  ref.watch(appStringsProvider).urgentBadge,
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.white,

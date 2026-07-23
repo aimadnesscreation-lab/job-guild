@@ -348,20 +348,7 @@ class _ReviewsListViewState extends ConsumerState<ReviewsListView>
   String _formatDate(String? iso) {
     final dt = DateTime.tryParse(iso ?? '');
     if (dt == null) return '';
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    final months = ref.read(appStringsProvider).monthsShort;
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 }
