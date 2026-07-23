@@ -67,6 +67,14 @@
 - `dart analyze`: **0 issues** ✅
 - `flutter test`: **117/117 pass** ✅
 
+**Edge Function Redeployments (Post-Fix):**
+| Function | Status | Smoke Test |
+|----------|--------|------------|
+| `bright-api` | ✅ No changes | ✅ Parsed job: returned category, urgency, budget, skills |
+| `rapid-worker` | ✅ Deployed (27 kB) | ✅ Generated bio + categories from description |
+| `send-sms` | ✅ No changes | ⚠️ Expected: `success: false` — no Twilio credentials |
+| `send-push-notification` | ✅ Deployed (27 kB) | ⚠️ Expected: `success: false` — test user has no FCM token |
+
 ---
 
 ### Session 31: End-to-End Audit Part 2 — 16 Bugs Fixed Across 13 Files
