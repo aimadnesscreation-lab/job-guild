@@ -25,6 +25,7 @@
 2. **FIX — Missing `buildscript` repositories** — Added `google()` and `mavenCentral()` to `buildscript` block in `android/build.gradle.kts`. The Google Services plugin couldn't resolve without them.
 3. **FIX — Kotlin Gradle Plugin** — Added `kotlin-gradle-plugin:2.3.20` to root buildscript classpath for AGP 8.x compatibility with plugins using Kotlin DSL extensions.
 4. **FIX — Remove unused `location` package** — Dropped from `pubspec.yaml`. The package (v10.0.0/10.0.1) is incompatible with AGP 8.x (Flutter 3.44.7) — its build.gradle uses deprecated `kotlinOptions`/`kotlin()` DSL. All location functionality already handled by `geolocator: ^14.0.3`.
+5. **FIX — Conditional Google Services plugin** — Made `com.google.gms.google-services` apply only when `google-services.json` exists. CI runners don't have this file (gitignored), so the plugin was failing the APK build with "File google-services.json is missing".
 
 **Changed Files:**
 | File | Changes |
@@ -32,12 +33,13 @@
 | `.github/workflows/ci.yml` | **NEW** — CI pipeline (analyze, test, APK, web) |
 | `android/build.gradle.kts` | Add buildscript repos + Kotlin Gradle Plugin |
 | `pubspec.yaml` | Remove incompatible `location` package |
+| `android/app/build.gradle.kts` | Conditional Google Services plugin (CI-compatible) |
 
 **Code Health:**
 - `dart analyze`: **0 errors, 0 warnings, 0 info** ✅
 - `flutter test`: **110/110 pass, 2 skip** ✅
 - `flutter build web`: ✅ Success
-- `flutter build apk`: ⏳ Pending CI verification (location package removed)
+- `flutter build apk`: ⏳ Pending CI verification (location removed, Firebase optional)
 - Deno tests: **15/15 pass** ✅
 
 ---
