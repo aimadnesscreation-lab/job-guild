@@ -82,7 +82,7 @@ class MyApp extends ConsumerWidget {
         // Nastaliq/Arabic-script rendering.
         return Directionality(
           textDirection: isUrdu ? TextDirection.rtl : TextDirection.ltr,
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
       home: authState.when(

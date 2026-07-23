@@ -1,42 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 /// Tracks the current authentication state (session, loading, error)
 final authStateChangesProvider = StreamProvider<AuthState>((ref) {
   return Supabase.instance.client.auth.onAuthStateChange;
 });
 
-/// Provides the current user directly.
-/// Returns null when `Supabase` has not been initialized yet (e.g. in widget
-/// tests) instead of throwing on `Supabase.instance.client`.
 final currentUserProvider = Provider<User?>((ref) {
-  try {
-    return Supabase.instance.client.auth.currentUser;
-  } catch (_) {
-    return null;
-  }
+  return ref.watch(authStateChangesProvider).value?.session?.user;
 });
 
-/// Provides access to the Supabase client.
-/// Returns null when `Supabase` has not been initialized yet (e.g. in widget
-/// tests) instead of throwing on `Supabase.instance.client`. Consumers must
-/// handle a null client (the app always initializes Supabase in `main()`
-/// before any UI is built, so this is only ever null in tests).
-final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
-  try {
-    return Supabase.instance.client;
-  } catch (_) {
-    return null;
-  }
-});
-
-/// Whether the user is authenticated
-final isAuthenticatedProvider = Provider<bool>((ref) {
-  final authState = ref.watch(authStateChangesProvider);
-  return authState.asData?.value.session != null;
-});
-
-/// Auth notifier for phone OTP flow
 class AuthNotifier extends Notifier<void> {
   @override
   void build() {}
@@ -88,11 +62,14 @@ class AuthNotifier extends Notifier<void> {
         token: otp,
         type: OtpType.sms,
       );
-      if (response.session == null) {
-        throw Exception('Invalid or expired code');
-      }
+      if (response.error != null) throw response.error!;
+      if (response.session == null) throw Exception('Invalid session');
+    } on AuthException catch (e) {
+      debugPrint('[Auth] OTP verification failed: ${e.message}');
+      throw Exception('Verification failed: ${e.message}');
     } catch (e) {
-      throw Exception('Failed to verify OTP: $e');
+      debugPrint('[Auth] OTP verification error: $e');
+      throw Exception('An unexpected error occurred during verification.');
     }
   }
 

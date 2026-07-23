@@ -21,7 +21,8 @@ import 'package:local_services_marketplace/features/jobs/views/search_workers_vi
 import 'package:local_services_marketplace/features/notifications/views/notifications_view.dart';
 import 'package:local_services_marketplace/features/settings/views/settings_view.dart';
 import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
-import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';import 'package:local_services_marketplace/features/jobs/views/job_detail_worker_view.dart';
+import 'package:local_services_marketplace/features/jobs/views/job_detail_view.dart';
+import 'package:local_services_marketplace/features/jobs/views/job_detail_worker_view.dart';
 import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
 
 import 'package:local_services_marketplace/core/widgets/shimmer_loading.dart';
