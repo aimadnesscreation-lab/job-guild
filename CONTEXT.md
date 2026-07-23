@@ -33,6 +33,11 @@
 | `pubspec.yaml` | Added `assets:` → `- assets/.env` under `flutter:` section |
 | `.gitignore` | Added `assets/.env` (explicit, though redundant with existing `.env` pattern) |
 | `assets/.env` | Created by copying root `.env` into new `assets/` directory |
+| `scripts/build_web.sh` | New build script: reads `.env`, passes as `--dart-define`, copies `.env` to `build/web/assets/` post-build |
+
+> ⚠️ **Flutter web hidden-file workaround:** `flutter build web` nests `assets/.env` under `build/web/assets/assets/.env` but the `AssetManifest.bin` maps it to `assets/.env` → `assets/.env` (wrong). The engine requests `/assets/.env` and gets 404. Two workarounds:
+> 1. Post-build copy: `cp .env build/web/assets/.env` (automated by `scripts/build_web.sh`)
+> 2. `--dart-define` fallback via `String.fromEnvironment()` (compiled into JS, always works)
 
 **Code Health:**
 - `flutter analyze`: **2 info-level issues** (pre-existing) ✅
