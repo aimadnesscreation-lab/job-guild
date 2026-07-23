@@ -559,7 +559,7 @@ class AppStrings {
       _t('Enter Verification Code', 'تصدیقی کوڈ درج کریں');
   String get enterCodeSentTo => _t(
     'Enter the 6-digit code sent to ',
-    '6 ہندسوں کا کوڈ درج کریں جو بھیجا گیا',
+    '6 ہندسوں کا کوڈ درج کریں جو بھیجا گیا ',
   );
   String get verify => _t('Verify', 'تصدیق کریں');
   String get didntReceiveCode =>

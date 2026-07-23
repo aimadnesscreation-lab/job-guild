@@ -142,14 +142,21 @@ class OpenRouterService {
     return jsonDecode(cleaned) as Map<String, dynamic>;
   }
 
-  /// Retry helper for API calls
+  /// Retry helper for API calls — retries on 429 and 5xx transient errors.
   Future<T> _callWithRetry<T>(Future<T> Function() call, int retries) async {
     try {
       return await call();
     } catch (e) {
-      if (retries > 0 && e is Exception && e.toString().contains('HTTP 429')) {
-        await Future.delayed(const Duration(seconds: 2));
-        return _callWithRetry(call, retries - 1);
+      if (retries > 0 && e is Exception) {
+        final msg = e.toString();
+        final isRetryable = msg.contains('HTTP 429') ||
+            msg.contains('HTTP 502') ||
+            msg.contains('HTTP 503') ||
+            msg.contains('HTTP 504');
+        if (isRetryable) {
+          await Future.delayed(const Duration(seconds: 2));
+          return _callWithRetry(call, retries - 1);
+        }
       }
       rethrow;
     }

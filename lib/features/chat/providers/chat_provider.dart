@@ -523,19 +523,9 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// Parse a content_type string into [MessageContentType].
+  /// Delegates to the canonical parser in [Message] to avoid duplication.
   static MessageContentType _parseContentType(String? type) {
-    switch (type) {
-      case 'image':
-        return MessageContentType.image;
-      case 'voice':
-        return MessageContentType.voice;
-      case 'location':
-        return MessageContentType.location;
-      case 'file':
-        return MessageContentType.file;
-      default:
-        return MessageContentType.text;
-    }
+    return Message.parseContentType(type);
   }
 
   /// Subscribe to live changes for the given job/conversation and apply them

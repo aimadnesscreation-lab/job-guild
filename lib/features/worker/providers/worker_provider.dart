@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
@@ -58,6 +59,7 @@ final nearbyWorkersProvider = FutureProvider<List<Map<String, dynamic>>>((
   } catch (e) {
     // If location permissions are denied or GPS is disabled, fall back to
     // an empty list so the UI shows the no-results state instead of crashing.
+    debugPrint('[nearbyWorkers] Failed to load: $e');
     return [];
   }
 });

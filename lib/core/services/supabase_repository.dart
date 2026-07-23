@@ -424,11 +424,16 @@ class SupabaseRepository {
       final isCurrentlyFavorited = existing != null;
       if (isCurrentlyFavorited) {
         // Already favorited — remove
-        await client
-            .from('favorites')
-            .delete()
-            .eq('user_id', userId)
-            .eq('favorited_user_id', favoritedUserId);
+        try {
+          await client
+              .from('favorites')
+              .delete()
+              .eq('user_id', userId)
+              .eq('favorited_user_id', favoritedUserId);
+        } on PostgrestException catch (e) {
+          debugPrint('[Favorites] delete error: $e');
+          return true; // assume still favorited if delete fails
+        }
         return false; // now not favorited
       } else {
         // Not favorited — insert. Handle TOCTOU race: if a concurrent

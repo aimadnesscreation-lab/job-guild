@@ -54,15 +54,9 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
     'Evening',
   ];
 
-  List<_WorkerResult> get _fromProvider {
-    final async = ref.watch(nearbyWorkersProvider);
-    final data = async.value ?? [];
-    return data.map(_WorkerResult.fromMap).toList();
-  }
-
-  List<_WorkerResult> get _filtered {
+  List<_WorkerResult> _filtered(List<_WorkerResult> workers) {
     final q = _searchController.text.toLowerCase();
-    return _fromProvider.where((w) {
+    return workers.where((w) {
       final matchesCategory =
           _selectedCategory == 'All' || w.categories.contains(_selectedCategory);
       final matchesRating = w.rating >= _minRating;
@@ -96,6 +90,8 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(nearbyWorkersProvider);
+    final workers = (async.value ?? []).map(_WorkerResult.fromMap).toList();
+    final filtered = _filtered(workers);
     return Column(
       children: [
           // ─── Search Bar ────────────────────────────────────
@@ -208,7 +204,7 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
                 : RefreshIndicator(
                     onRefresh: () async =>
                         ref.invalidate(nearbyWorkersProvider),
-                    child: _filtered.isEmpty
+                    child: filtered.isEmpty
                         ? ListView(
                             children: [
                               SizedBox(
@@ -227,7 +223,7 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
                           )
                         : ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: _filtered
+                            children: filtered
                                 .map(
                                   (worker) => _WorkerResultCard(worker: worker),
                                 )

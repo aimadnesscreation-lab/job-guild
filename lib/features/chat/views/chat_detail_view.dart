@@ -111,10 +111,12 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       final fileName = 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg';
       const bucket = 'chat_images';
 
-      // Ensure bucket exists (best-effort)
+      // Ensure bucket exists (best-effort); log failure for debugging.
       try {
         await Supabase.instance.client.storage.createBucket(bucket);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[Chat] createBucket $bucket failed: $e');
+      }
 
       if (kIsWeb) {
         final bytes = await picked.readAsBytes();

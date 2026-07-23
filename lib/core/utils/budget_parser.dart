@@ -117,9 +117,9 @@ String guessCategory(String text) {
   if (lower.contains('car wash')) return 'Car Wash';
   if (lower.contains('dj')) return 'DJ';
   if (lower.contains('beaut')) return 'Beauty';
-  if (lower.contains('health') || lower.contains('medi')) return 'Healthcare';
+  if (lower.contains('health') || lower.contains('medi') || lower.contains('nurse') || lower.contains('doctor')) return 'Healthcare';
   if (lower.contains('pet') || lower.contains('dog') || lower.contains('cat')) return 'Pet Care';
-  if (lower.contains('labor') || lower.contains('labour')) return 'General Labor';
+  if (lower.contains('labor') || lower.contains('labour') || lower.contains('general')) return 'General Labor';
   if (lower.contains('teacher') || lower.contains('language')) return 'Language Teacher';
   if (lower.contains('steel')) return 'Steel Fixing';
   return 'General Labor';

@@ -151,8 +151,10 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 Future<void> initializeFirebase() async {
   try {
     await Firebase.initializeApp();
-  } catch (e) {
+    debugPrint('Firebase initialized successfully');
+  } catch (e, st) {
     debugPrint('Firebase init error: $e');
+    debugPrint('Stack trace: $st');
     // Surface production failures to monitoring tools
     if (!kDebugMode) {
       // TODO: Log the error to a crash reporting tool (e.g., Sentry) here.

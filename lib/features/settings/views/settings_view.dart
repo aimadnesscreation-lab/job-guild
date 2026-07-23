@@ -8,7 +8,6 @@ import 'package:local_services_marketplace/features/settings/providers/settings_
 import 'package:local_services_marketplace/features/settings/views/reports_view.dart';
 import 'package:local_services_marketplace/features/home/providers/role_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:local_services_marketplace/features/worker/providers/worker_provider.dart';
 import 'package:local_services_marketplace/features/worker/views/id_verification_view.dart';
 import 'package:local_services_marketplace/features/worker/views/edit_worker_profile_view.dart';
 
@@ -129,17 +128,17 @@ class SettingsView extends ConsumerWidget {
             ),
             title: Text(s.appLanguage),
             trailing: DropdownButton<String>(
-              value: settings.preferredLanguage == 'ur' ? 'Urdu' : 'English',
+              value: settings.preferredLanguage,
               underline: const SizedBox(),
               items: [
-                DropdownMenuItem(value: 'English', child: Text(s.englishLabel)),
-                DropdownMenuItem(value: 'Urdu', child: Text(s.urduLabel)),
+                DropdownMenuItem(value: 'en', child: Text(s.englishLabel)),
+                DropdownMenuItem(value: 'ur', child: Text(s.urduLabel)),
               ],
               onChanged: (val) {
                 if (val != null) {
                   ref
                       .read(settingsProvider.notifier)
-                      .updateLanguage(val == 'Urdu' ? 'ur' : 'en');
+                      .updateLanguage(val);
                 }
               },
             ),
@@ -459,13 +458,8 @@ class _AccountHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final workerAsync = ref.watch(myWorkerProfileProvider);
 
-    final name = workerAsync.when(
-      data: (p) => p?.fullName ?? '',
-      loading: () => '',
-      error: (_, _) => '',
-    );
+    final name = user?.userMetadata?['full_name'] as String? ?? '';
     final phone = user?.phone ?? ref.watch(appStringsProvider).notSignedIn;
 
     return ListTile(

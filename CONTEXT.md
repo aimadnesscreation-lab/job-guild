@@ -10,7 +10,64 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-27 — Session 31: End-to-End Audit — 16 More Bugs Fixed)
+## Current State (Updated 2026-07-28 — Session 32: Full Codebase Audit — 15 Bugs Fixed + Migration Deployed)
+
+### Session 32: Full End-to-End Audit — 15 Bugs Fixed Across 13 Files + New Migration Deployed
+
+*Session 32 (comprehensive file-by-file audit of the entire codebase; found 18 bugs, 1 false positive, 15 fixed, 3 confirmed non-issues):*
+
+🔴 **Critical (1 — false positive):**
+1. **FALSE POSITIVE — `?trailing` syntax in `_SectionHeader`** (`edit_worker_profile_view.dart`) — `?trailing` is valid Dart 3.x null-aware collection element syntax (equivalent to `if (trailing != null) trailing`). Reverted; no change needed.
+
+🟠 **High (6):**
+2. **🔴 BUG-32-02 — `ref.watch` called in getters (Riverpod violation)** (`search_workers_view.dart`) — `_fromProvider` and `_filtered` getters called `ref.watch(nearbyWorkersProvider)`. Replaced with a `_filtered(List<_WorkerResult>)` method; list computed in `build()`.
+3. **🔴 BUG-32-03 — `_CategorySelector` had only 12 of 24 categories** (`post_job_view.dart`) — Added missing 12 categories: Bike Repair, Car Wash, Welding, Steel Fixing, Language Teacher, Laptop Repair, Mobile Repair, Web Developer, DJ, Beauty, Healthcare, Pet Care.
+4. **🔴 BUG-32-04 — `toggleFavorite` DELETE lacked error handling** (`supabase_repository.dart`) — DELETE now wrapped in try-catch for `PostgrestException`, returns `true` (still favorited) on failure.
+5. **🔴 BUG-32-05 — Unsafe `as Map<String, dynamic>` cast on Edge Function response** (`job_provider.dart`) — Added type check + JSON string parsing fallback; added `dart:convert` import.
+6. **🔴 BUG-32-06 — Retry logic only on HTTP 429** (`openrouter_service.dart`) — Extended to also retry on 502, 503, 504 transient errors.
+7. **🔴 BUG-32-07 — Language dropdown used display strings as values** (`settings_view.dart`) — Changed to locale codes (`'en'`, `'ur'`) instead of `'English'`, `'Urdu'` display labels.
+
+🟡 **Medium (5):**
+8. **🟡 BUG-32-09 — Duplicate `_parseContentType` in chat_provider and message_model** — Made `Message.parseContentType` public static; `ChatNotifier._parseContentType` delegates to it.
+9. **🟡 BUG-32-10 — Dart `budget_parser.dart` keyword detection diverged from TypeScript `utils.ts`** — Added `'general'`, `'nurse'`, `'doctor'` keywords to `guessCategory()` for parity.
+10. **🟡 BUG-32-12 — `get_nearby_workers` RPC returned only ONE category per worker** (`create_tables.sql`) — Created new migration `20260728000000_fix_nearby_workers_categories.sql` replacing function to return `TEXT[]` array via `ARRAY(SELECT ...)`. Deployed to Supabase. Client code (`_parseCategories`) already handles both formats.
+11. **🟡 BUG-32-13 — `nearbyWorkersProvider` silently swallowed all errors** (`worker_provider.dart`) — Added `debugPrint` in catch block; added `flutter/foundation.dart` import.
+12. **🟡 BUG-32-14 — `enterCodeSentTo` missing trailing space in Urdu** (`strings.dart`) — Added trailing space to Urdu translation for consistency with English.
+
+🟢 **Low (5):**
+13. **🟢 BUG-32-15 — Bucket creation errors silently swallowed** (`chat_detail_view.dart`) — Changed `catch (_) {}` to `catch (e) { debugPrint(...) }` for `chat_images` and `voice_messages` bucket creation.
+14. **🟢 BUG-32-17 — `_AccountHeader` watched `myWorkerProfileProvider` unnecessarily** (`settings_view.dart`) — Replaced with `user?.userMetadata?['full_name']`; removed unused `worker_provider.dart` import.
+15. **🟢 BUG-32-18 — Firebase init failure logged without stack trace** (`notification_service.dart`) — Added `st` (stack trace) parameter to catch block; added success log.
+
+**New Migration:**
+| File | Description |
+|------|-------------|
+| `supabase/migrations/20260728000000_fix_nearby_workers_categories.sql` | Replace `get_nearby_workers` to return `TEXT[]` of all categories |
+
+→ **Deployed to Supabase** (`izjfugswuwyinaeauhvz`) via Management API. Verified function uses `ARRAY()` subquery.
+
+**Changed Files (13):**
+| File | Bugs Fixed |
+|------|-----------|
+| `lib/features/jobs/views/search_workers_view.dart` | #2 (ref.watch in getters) |
+| `lib/features/jobs/views/post_job_view.dart` | #3 (24 categories) |
+| `lib/core/services/supabase_repository.dart` | #4 (DELETE error handling) |
+| `lib/features/jobs/providers/job_provider.dart` | #5 (safe cast) |
+| `lib/core/services/openrouter_service.dart` | #6 (extended retry) |
+| `lib/features/settings/views/settings_view.dart` | #7 (locale codes), #17 (remove import) |
+| `lib/features/chat/models/message_model.dart` | #9 (public parseContentType) |
+| `lib/features/chat/providers/chat_provider.dart` | #9 (delegate to Message) |
+| `lib/core/utils/budget_parser.dart` | #10 (keyword parity) |
+| `lib/features/worker/providers/worker_provider.dart` | #13 (error logging) |
+| `lib/core/localization/strings.dart` | #14 (trailing space) |
+| `lib/features/chat/views/chat_detail_view.dart` | #15 (bucket error logging) |
+| `lib/core/services/notification_service.dart` | #18 (stack trace logging) |
+
+**Code Health:**
+- `dart analyze`: **0 issues** ✅
+- `flutter test`: **117/117 pass** ✅
+
+---
 
 ### Session 31: End-to-End Audit Part 2 — 16 Bugs Fixed Across 13 Files
 

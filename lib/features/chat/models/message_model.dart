@@ -43,7 +43,7 @@ class Message {
       senderPhotoUrl:
           sender?['profile_photo_url'] as String? ??
           json['sender_photo_url'] as String?,
-      contentType: _parseContentType(json['content_type'] as String?),
+      contentType: parseContentType(json['content_type'] as String?),
       content: json['content'] as String? ?? '',
       metadata: json['metadata'] as Map<String, dynamic>?,
       sentAt: json['sent_at'] != null
@@ -66,7 +66,9 @@ class Message {
     if (readAt != null) 'read_at': readAt!.toIso8601String(),
   };
 
-  static MessageContentType _parseContentType(String? type) {
+  /// Parse a content_type string into [MessageContentType].
+  /// This is the canonical parser — used by both [Message] and [ChatNotifier].
+  static MessageContentType parseContentType(String? type) {
     switch (type) {
       case 'image':
         return MessageContentType.image;

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -90,8 +92,18 @@ class PostJobNotifier extends Notifier<PostJobState> {
       'bright-api',
       body: {'description': text},
     );
-    // The response data is already a Map<String, dynamic>
-    return response.data as Map<String, dynamic>;
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is String) {
+      // The response body might be a JSON string — try to parse it.
+      try {
+        final parsed = json.decode(data) as Map<String, dynamic>;
+        return parsed;
+      } catch (_) {
+        // Fall through to the error below.
+      }
+    }
+    throw Exception('Unexpected response format from bright-api');
   }
 
   Future<void> parseWithAi() async {
