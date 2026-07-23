@@ -15,6 +15,24 @@
 ### Branch `main` — 29 total audit bugs fixed across two major passes. `dart analyze` clean.
 
 ### Latest Developments (2026-07-24 — Session 20: Final Remediation Pass)
+*Session 21 (Final verification and Phase 1 remediation):
+
+🔴 **Critical:**
+1. **FIX — OTP Extraction Logic** — Refactored OTP extraction into `_shared/utils.ts` and unified across `send-sms` production and test files to ensure logic parity (Bug #7 fix).
+2. **FIX — RLS Idempotency** — Created migration `20260725000000_fix_rls_idempotency.sql` using `DROP POLICY IF EXISTS` to ensure reliable DB updates.
+
+🟠 **High:**
+3. **IMPROVEMENT — Firebase Error Reporting** — Updated `initializeFirebase()` in `notification_service.dart` to `rethrow` errors in production, allowing crash reporting services to capture initialization failures.
+
+**Changed Files:**
+| File | Changes |
+|------|---------|
+| `supabase/functions/_shared/utils.ts` | Added shared `extractOtpFromMessage` |
+| `supabase/functions/send-sms/index.ts` | Refactored to use shared `extractOtpFromMessage` |
+| `supabase/functions/send-sms/index_test.ts` | Refactored to use shared `extractOtpFromMessage` |
+| `lib/core/services/notification_service.dart` | Improved Firebase error visibility |
+| `supabase/migrations/20260725000000_fix_rls_idempotency.sql` | **NEW:** Idempotent policy fixes |
+
 
 *Session 20 (Final Remediation Pass):*
 
