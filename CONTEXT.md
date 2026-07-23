@@ -38,6 +38,14 @@
 15. **🟢 BUG-A15 — Giant whitespace gap from removed `_ratingLabels`** (`review_view.dart`) — The `_ratingLabels` constant was moved to `AppStrings` but left a 3-line whitespace gap between the closing brace and the next class. Cleaned up.
 16. **🟢 BUG-A16 — `phone_number NOT NULL` blocks email-only signups** — Created new migration `20260727000000_fix_phone_nullable.sql` making `phone_number` nullable. Email-only signups pass `NULL` for phone, which violated the `NOT NULL` constraint, silently preventing `public.users` row creation.
 
+**Edge Function Redeployments (Post-Fix):**
+| Function | Reason | Status |
+|----------|--------|--------|
+| `send-sms` | Deferred OTP extraction (BUG-A10) | ✅ Deployed 2026-07-27 |
+| `bright-api` | Updated `_shared/utils.ts` with "General Labor": 2000 budget (BUG-A7 parity) | ✅ Deployed 2026-07-27 |
+| `rapid-worker` | No functional change (doesn't use `estimateBudget`) | ⏭️ Skipped |
+| `send-push-notification` | No functional change (doesn't use `estimateBudget`) | ⏭️ Skipped |
+
 **New Migration:**
 | File | Description |
 |------|-------------|
@@ -743,7 +751,7 @@ test/
 **Deployed Edge Functions (4):**
 | Function | Model | Purpose |
 |----------|-------|---------|
-| `send-sms` | Twilio Verify API | SMS hook for phone OTP (production) |
+| `send-sms` | Twilio Verify API | SMS hook for phone OTP (production) — **redeployed 2026-07-27** with deferred OTP extraction fix |
 | `bright-api` | `google/gemma-4-26b-a4b-it:free` → `openrouter/free` | AI job parsing |
 | `rapid-worker` | `google/gemma-4-26b-a4b-it:free` → `openrouter/free` | AI profile/bio generation |
 | `send-push-notification` | FCM HTTP v1 (OAuth2) | Push notifications |
