@@ -10,42 +10,29 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-30 — Session 37: End-to-End Audit Pass 6)
+## Current State (Updated 2026-07-30 — Session 38: .env Bundling Fix + Web Server)
 
-### Session 37: End-to-End Audit Pass 6 — 1 Bug Fixed + Comprehensive File-by-File Review
+### Session 38: .env Asset Bundling Fix — Supabase Config Not Loading in Web Build
 
-*Session 37 (thorough file-by-file audit of all 51 Dart source files, 9 test files, 26 SQL migrations, 10 TS files; found 1 new bug, fixed same; all tests pass):*
+*Session 38 (fixed `flutter_dotenv` `.env` file not being bundled in web builds, causing "Supabase not configured" and cascading 404 errors):*
 
-**Audit Summary:** Codebase in excellent health. After 5 prior audit sessions (31-36) fixing 49+ bugs, only 1 remaining bug was found — a UI alignment issue in the tutorial coach marks.
+**Problem:** The web app showed "Supabase is not configured" because `flutter_dotenv` loads `.env` from `assets/.env`, but:
+- No `assets/` directory existed in the project
+- No assets were declared in `pubspec.yaml` under `flutter > assets`
+- `flutter build web` never bundled `.env` → `dotenv.load()` silently failed → `isSupabaseConfigured` returned `false`
 
-🔴 **Bug Found & Fixed (1):**
-1. **🔴 BUG-37-01 — `CoachMarkOverlay` default `tabCount=5` misaligned tutorial highlights** (`coach_mark_overlay.dart`) — Both worker and employer bottom navigation bars have **4 tabs** (not 5), but `CoachMarkOverlay` defaulted to `tabCount: 5`. This caused the highlight circle positions to be calculated with `tabWidth = navWidth / 5` instead of `navWidth / 4`, misaligning the coach mark spotlight by ~20% per tab. **Fix:** Changed default from `5` to `4`.
+🔴 **Bug Found & Fixed:**
+1. **🔴 BUG-38-01 — `.env` not bundled in web builds** — Missing `assets/` directory and `pubspec.yaml` asset declaration caused `dotenv.load()` to fail, making `AppConstants.isSupabaseConfigured` return `false`. This prevented the entire Supabase-backed app from loading.
 
-**File-by-File Audit Coverage:**
-| Area | Files Reviewed | Issues Found |
-|------|:-------------:|:------------:|
-| Core (services, utils, theme, constants, localization) | 12 | 0 |
-| Auth (provider + 4 views) | 5 | 0 |
-| Home (provider + 4 views) | 5 | 0 |
-| Jobs (models, providers, 5 views) | 8 | 0 |
-| Chat (models, providers, 2 views) | 5 | 0 |
-| Worker (models, repository, providers, 3 views) | 6 | 0 |
-| Ratings (2 views) | 2 | 0 |
-| Notifications (1 view) | 1 | 0 |
-| Settings (provider + 2 views) | 3 | 0 |
-| Widgets (shimmer, coach_mark) | 2 | 1 (tabCount) |
-| Providers (tutorial) | 1 | 0 |
-| Edge Functions (4) | 4 | 0 |
-| SQL Migrations (27) | 27 | 0 |
-| Tests (9 files) | 9 | 0 |
-
-**Changed Files:**
+**Changes Made:**
 | File | Changes |
 |------|---------|
-| `lib/core/widgets/coach_mark_overlay.dart` | `tabCount` default: 5 → 4 |
+| `pubspec.yaml` | Added `assets:` → `- assets/.env` under `flutter:` section |
+| `.gitignore` | Added `assets/.env` (explicit, though redundant with existing `.env` pattern) |
+| `assets/.env` | Created by copying root `.env` into new `assets/` directory |
 
 **Code Health:**
-- `dart analyze`: **2 info-level issues** (pre-existing, non-critical naming in test files) ✅
+- `flutter analyze`: **2 info-level issues** (pre-existing) ✅
 - `flutter test`: **140/140 pass** ✅
-- Deno smoke test: **17/17 pass** ✅
-- Edge Function tests: **15/15 pass** ✅
+- Web server running on **port 8080** (tmux session) ✅
+- `.env` bundled at `build/web/assets/assets/.env` and registered in `AssetManifest.bin.json` ✅

@@ -29,6 +29,7 @@ supabase/.temp/
 *.pem
 *.cert
 .env
+assets/.env
 !.env.example
 
 # Android
