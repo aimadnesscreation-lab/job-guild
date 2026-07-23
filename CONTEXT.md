@@ -10,11 +10,30 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 17)
+## Current State (Updated 2026-07-23 — Session 18)
 
-### Branch `main` — 13 audit bugs fixed. `flutter analyze` clean.
+### Branch `main` — 2 audit bugs fixed. `flutter analyze` clean. BUG-01 confirmed false positive.
 
-### Latest Developments (2026-07-23 — Session 17: 13 audit bugs fixed)
+### Latest Developments (2026-07-23 — Session 18: 2 remaining audit bugs fixed)
+
+*Session 18 (addressed the last 3 bugs from the v2 audit status report):*
+
+🟡 **Fixed (2):**
+1. **BUG-12 — Unsafe `as List` casts on raw Supabase responses in `searchWorkers()`** (`worker_repository.dart:152-174`) — Replaced `(catRows as List)` with `List<Map<String, dynamic>>.from(catRows)` in both the location+category branch and the category-only branch. This avoids runtime cast failures and is consistent with the existing `List.from()` pattern used elsewhere in the file.
+2. **BUG-15 — `FavoritesView` + `favoritesListProvider` lived in `home_view.dart`** — Extracted into new file `lib/features/home/views/favorites_view.dart`. Removed the class and provider from `home_view.dart`. Also cleaned up the now-unused `worker_profile_model.dart` import. The `unreadNotificationCountProvider` remains in `home_view.dart` since it's consumed directly by the `_HomeViewState` badge.
+
+🔄 **Confirmed false positive (1):**
+- **BUG-01 — `publishableKey` → `anonKey`** — Analyzer confirms `publishableKey` IS correct in supabase_flutter v2.16.0; `anonKey` is deprecated. The original code was right all along.
+
+**Changed Files (3):**
+| File | Bugs |
+|------|------|
+| `lib/features/worker/repositories/worker_repository.dart` | #BUG-12 (safe casts) |
+| `lib/features/home/views/home_view.dart` | #BUG-15 (remove extracted class, clean imports) |
+| `lib/features/home/views/favorites_view.dart` | #BUG-15 (new file — extracted class + provider) |
+
+**Code Health:**
+- `dart analyze`: **0 issues** on all changed files
 
 *Session 17 (second audit pass — 13 bugs fixed across all severity levels):*
 
@@ -185,7 +204,7 @@ lib/
 │   │   └── views/language_selection_view.dart, otp_verification_view.dart
 │   ├── home/
 │   │   ├── providers/role_provider.dart   # AppRole enum + currentRoleProvider
-│   │   └── views/home_view.dart, employer_dashboard.dart, worker_dashboard.dart
+│   │   └── views/home_view.dart, favorites_view.dart, employer_dashboard.dart, worker_dashboard.dart
 │   ├── jobs/
 │   │   ├── models/job_model.dart, providers/job_provider.dart, job_feed_provider.dart
 │   │   └── views/post_job_view.dart, job_detail_view.dart, job_detail_worker_view.dart,

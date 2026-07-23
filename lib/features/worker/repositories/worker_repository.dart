@@ -154,8 +154,9 @@ class WorkerRepository {
             .from('worker_categories')
             .select('worker_id')
             .eq('category_id', categoryId);
-        final matchingIds = (catRows as List)
-            .map((r) => (r as Map<String, dynamic>)['worker_id'] as String)
+        final catRowsData = List<Map<String, dynamic>>.from(catRows);
+        final matchingIds = catRowsData
+            .map((r) => r['worker_id'] as String)
             .toSet();
         results.removeWhere((w) => !matchingIds.contains(w['id']));
       }
@@ -175,8 +176,9 @@ class WorkerRepository {
           .from('worker_categories')
           .select('worker_id')
           .eq('category_id', categoryId);
-      final workerIds = (catRows as List)
-          .map((r) => (r as Map<String, dynamic>)['worker_id'] as String)
+      final catRowsData = List<Map<String, dynamic>>.from(catRows);
+      final workerIds = catRowsData
+          .map((r) => r['worker_id'] as String)
           .toList();
       if (workerIds.isNotEmpty) {
         query = query.filter('id', 'in', workerIds);
