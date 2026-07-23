@@ -30,6 +30,8 @@
 🟡 **Medium:**
 6. **POLISH — Linter Cleanups** — Removed unnecessary `// ignore_for_file: use_build_context_synchronously` in `language_selection_view.dart` because the code already includes proper `context.mounted` checks.
 7. **FIX — ChatProvider Memory Leak** — Optimized `_senderCache` by switching to `LinkedHashMap` and implementing proper LRU eviction, fixing unbounded growth.
+8. **FIX — CoachMarkOverlay Positioning** — Updated `CoachMarkOverlay` to accept dynamic `tabCount`, removing hardcoded assumptions about the bottom navigation layout.
+9. **FIX — BudgetParser Input Validation** — Improved budget extraction logic to identify and filter out potential phone numbers, reducing false-positive budget estimates.
 
 **Changed Files:**
 | File | Changes |
@@ -40,6 +42,8 @@
 | `lib/features/auth/views/language_selection_view.dart` | #6 (Linter ignore removal) |
 | `lib/features/jobs/models/job_model.dart` | #5 (Job location default) |
 | `lib/features/chat/providers/chat_provider.dart` | #7 (ChatProvider cache optimization) |
+| `lib/core/widgets/coach_mark_overlay.dart` | #8 (Dynamic tab count) |
+| `lib/core/utils/budget_parser.dart` | #9 (Phone number filtering) |
 
 
 *Session 20 (Final Remediation Pass):*

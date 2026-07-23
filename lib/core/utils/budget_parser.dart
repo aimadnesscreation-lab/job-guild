@@ -46,6 +46,11 @@ int estimateBudget(String input, String category) {
         // Skip values that are too small or too large to be budgets.
         if (scaled < 100) continue;
         if (scaled > 500000) continue;
+        
+        // Skip numbers that might be phone numbers (10-12 digits starting 03 or 92)
+        final rawStr = match.group(0)!;
+        if ((rawStr.startsWith('03') && rawStr.length >= 10) || 
+            (rawStr.startsWith('92') && rawStr.length >= 11)) continue;
 
         // Prefer K-suffix values, then larger values.
         if (bestValue == null ||

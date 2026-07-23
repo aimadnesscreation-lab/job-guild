@@ -27,11 +27,15 @@ class CoachMarkOverlay extends ConsumerStatefulWidget {
 
   /// The height of the bottom navigation bar.
   final double bottomNavHeight;
+  
+  /// Number of items in the bottom navigation bar.
+  final int tabCount;
 
   const CoachMarkOverlay({
     super.key,
     required this.bottomNavWidth,
     required this.bottomNavHeight,
+    this.tabCount = 5,
   });
 
   @override
@@ -117,8 +121,7 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
     final screenHeight = mediaQuery.size.height;
 
     // Calculate the highlight position for the target tab.
-    // Bottom nav has 5 items evenly spaced.
-    final tabWidth = widget.bottomNavWidth / 5;
+    final tabWidth = widget.bottomNavWidth / widget.tabCount;
     final highlightCenterX = (step.targetTabIndex * tabWidth) + (tabWidth / 2);
     final navY = screenHeight - widget.bottomNavHeight;
     final highlightRadius = tabWidth * 0.45;
