@@ -61,19 +61,18 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
       // stale provider state.
       ref.read(postJobProvider.notifier).resetForm();
     }
-    // Listen for draft job updates to sync controllers
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final state = ref.read(postJobProvider);
-      if (state.draftJob.title.isNotEmpty) {
-        _titleController.text = state.draftJob.title;
-      }
-      if (state.draftJob.description.isNotEmpty) {
-        _descriptionController.text = state.draftJob.description;
-      }
-      if (state.draftJob.budgetAmount != null) {
-        _budgetController.text = state.draftJob.budgetAmount.toString();
-      }
-    });
+    // Sync controllers from provider state synchronously in initState
+    // to avoid a race where addPostFrameCallback reads stale state.
+    final state = ref.read(postJobProvider);
+    if (state.draftJob.title.isNotEmpty) {
+      _titleController.text = state.draftJob.title;
+    }
+    if (state.draftJob.description.isNotEmpty) {
+      _descriptionController.text = state.draftJob.description;
+    }
+    if (state.draftJob.budgetAmount != null) {
+      _budgetController.text = state.draftJob.budgetAmount.toString();
+    }
   }
 
   @override

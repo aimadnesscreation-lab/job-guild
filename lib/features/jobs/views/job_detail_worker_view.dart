@@ -32,8 +32,7 @@ class _JobDetailWorkerViewState extends ConsumerState<JobDetailWorkerView> {
     if (userId == null) return;
     try {
       final repo = ref.read(supabaseRepositoryProvider);
-      final applications = await repo.getMyApplications(userId);
-      final alreadyApplied = applications.any((a) => a['job_id'] == widget.job.id);
+      final alreadyApplied = await repo.hasApplied(widget.job.id, userId);
       if (mounted) setState(() => _isInterested = alreadyApplied);
     } catch (_) {
       // Best-effort check — if it fails, the button defaults to not interested.

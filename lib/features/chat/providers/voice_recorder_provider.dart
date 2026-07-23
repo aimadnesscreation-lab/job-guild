@@ -67,6 +67,7 @@ class VoiceRecorderNotifier extends Notifier<VoiceRecorderState> {
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      _recorder.dispose();
     });
     return const VoiceRecorderState();
   }

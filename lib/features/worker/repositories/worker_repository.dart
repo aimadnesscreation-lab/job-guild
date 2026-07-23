@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import '../models/worker_profile_model.dart';
@@ -31,8 +32,11 @@ class WorkerRepository {
       if (rows.isNotEmpty) {
         await _supabase.from('worker_categories').insert(rows);
       }
-    } catch (_) {
-      // Categories are best-effort — don't abort the profile save.
+    } catch (e) {
+      // Categories are best-effort — log and surface the error so the UI can
+      // warn the user instead of silently losing all their category selections.
+      debugPrint('[WorkerRepo] _saveCategories failed: $e');
+      rethrow;
     }
   }
 
@@ -52,7 +56,8 @@ class WorkerRepository {
 
     // Try SECURITY DEFINER RPC first (available after migration
     // 20260720000002).  If the function doesn't exist yet, fall
-    // through to the insert-then-update pattern below.
+    // through to the upsert pattern below.
+    bool rpcSucceeded = false;
     try {
       await _supabase.rpc(
         'upsert_worker_profile',
@@ -69,21 +74,22 @@ class WorkerRepository {
           'p_is_featured': payload['is_featured'],
         },
       );
-      // RPC succeeded — skip to categories.
-      await _saveCategories(userId, profile.categories);
-      return;
+      rpcSucceeded = true;
     } catch (_) {
       // RPC not available (e.g. migration not run yet) — fall through.
     }
 
-    // Fallback: atomic upsert via PostgREST. This avoids the race between
-    // INSERT and UPDATE and correctly handles the id primary key.
-    await _supabase.from('worker_profiles').upsert(
-      payload,
-      onConflict: 'id',
-    );
+    if (!rpcSucceeded) {
+      // Fallback: atomic upsert via PostgREST. This avoids the race between
+      // INSERT and UPDATE and correctly handles the id primary key.
+      await _supabase.from('worker_profiles').upsert(
+        payload,
+        onConflict: 'id',
+      );
+    }
 
-    // Persist categories (best-effort, non-fatal).
+    // Persist categories (best-effort, but errors are surfaced so the caller
+    // can warn the user instead of silently losing all category selections).
     await _saveCategories(userId, profile.categories);
   }
 
@@ -141,9 +147,18 @@ class WorkerRepository {
         params: {'lat': lat, 'lng': lng, 'radius_km': radiusKm},
       );
       final results = List<Map<String, dynamic>>.from(response);
-      // Note: location + category filtering is not yet implemented —
-      // when both are supplied, the category filter is currently ignored.
-      // Full support requires joining worker_categories into the RPC response.
+      // When both location AND category are supplied, apply the category
+      // filter client-side after the spatial RPC returns.
+      if (categoryId != null) {
+        final catRows = await _supabase
+            .from('worker_categories')
+            .select('worker_id')
+            .eq('category_id', categoryId);
+        final matchingIds = (catRows as List)
+            .map((r) => (r as Map<String, dynamic>)['worker_id'] as String)
+            .toSet();
+        results.removeWhere((w) => !matchingIds.contains(w['id']));
+      }
       return results.map((json) => WorkerProfile.fromJson(json)).toList();
     }
 

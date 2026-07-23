@@ -127,8 +127,6 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
         _isVerifying = false;
         _error = ref.read(appStringsProvider).invalidCode;
       });
-    } finally {
-      if (context.mounted) setState(() => _isVerifying = false);
     }
   }
 

@@ -7,11 +7,6 @@ import 'package:local_services_marketplace/core/utils/budget_parser.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
 import 'package:local_services_marketplace/core/services/supabase_repository.dart';
 
-final nearbyJobsProvider = FutureProvider<List<Job>>((ref) async {
-  final repo = ref.watch(supabaseRepositoryProvider);
-  return repo.getNearbyJobs();
-});
-
 /// State for the job posting form
 class PostJobState {
   final String freeformText;

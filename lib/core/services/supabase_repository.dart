@@ -39,7 +39,7 @@ class SupabaseRepository {
       return list.map((j) => Job.fromJson(j)).toList();
     } catch (e) {
       debugPrint('[Jobs] getNearbyJobs error: $e');
-      rethrow;
+      return [];
     }
   }
 
@@ -106,6 +106,25 @@ class SupabaseRepository {
   }
 
   // ─── Applications ─────────────────────────────────────────
+
+  /// Check if a worker has already applied to a specific job.
+  /// Uses a targeted `.maybeSingle()` query instead of fetching all
+  /// applications, avoiding a full-scan for workers with many applications.
+  Future<bool> hasApplied(String jobId, String workerId) async {
+    final client = _client;
+    if (client == null) return false;
+    try {
+      final result = await client
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', workerId)
+          .maybeSingle();
+      return result != null;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<void> applyForJob(
     String jobId,

@@ -10,11 +10,56 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 16)
+## Current State (Updated 2026-07-23 — Session 17)
 
-### Branch `main` — Comprehensive end-to-end audit: 27 bugs fixed. `dart analyze` clean. All 111 tests green.
+### Branch `main` — 13 audit bugs fixed. `flutter analyze` clean.
 
-### Latest Developments (2026-07-23 — Session 16: 27 audit bugs fixed)
+### Latest Developments (2026-07-23 — Session 17: 13 audit bugs fixed)
+
+*Session 17 (second audit pass — 13 bugs fixed across all severity levels):*
+
+🔴 **Critical (2):**
+1. **`_loadConversations()` discarded query filter return values** — Every filter method in supabase_flutter returns a new builder; neither branch captured the result, so every user received ALL messages. Now captured in `filteredQuery` variable.
+2. **`AudioRecorder` never disposed in `VoiceRecorderNotifier`** — `_recorder.dispose()` added to `ref.onDispose` so the mic handle is released when the provider is torn down.
+
+🟠 **High (4):**
+3. **`_subscribeToConversations()` leaked old Realtime channel** — `.unsubscribe()` was called but `Supabase.instance.client.removeChannel()` was not, accumulating channels in the multiplexer. Now mirrors the `disposeChannel()` pattern.
+4. **`_saveCategories()` DELETE+INSERT could orphan all categories** — Now `rethrow`s errors so callers surface them; also restructured RPC try-catch so a category failure doesn't trigger a duplicate profile upsert.
+5. **`nearbyJobsProvider` was dead code with unguarded `rethrow`** — Removed entirely; the live feed uses `liveJobFeedProvider` / `openJobsProvider` instead.
+6. **`WorkerProfileNotifier._seeded` boolean was fragile** — Replaced with `String? _seededForUserId` so account switches are correctly detected even when both old and new user IDs are non-null.
+
+🟡 **Medium (5):**
+7. **OTP verification `finally` block redundantly called `setState`** — Removed; `_isVerifying` is now set to `false` only in the `catch` block.
+8. **`PostJobView` synced controllers in `addPostFrameCallback`** — Moved to synchronous `ref.read()` in `initState` to avoid stale-state race.
+9. **`_checkExistingApplication()` fetched ALL worker applications** — Added `hasApplied()` targeted query to `SupabaseRepository` using `.eq('job_id', ...).eq('worker_id', ...).maybeSingle()`.
+10. **`markAsRead` used `.filter('read_at', 'is', 'null')` (invalid PostgREST syntax)** — Changed to `.isFilter('read_at', null)` for correct `IS NULL` operator.
+11. **`searchWorkers()` with location silently ignored `categoryId`** — Now applies client-side category filter after spatial RPC returns.
+
+🟢 **Low (2):**
+12. **`_parseJobIds` return added to `List` via O(n²) dedup loop** — Changed `jobIds` from `List<String>` to `Set<String>` for O(1) deduplication.
+13. **`getNearbyJobs()` called `rethrow` with no caller** — Changed to `return []` for consistent error handling (matches live feed pattern).
+
+🔄 **Rejected audit finding:**
+- **BUG-01 ("`publishableKey` → `anonKey`")** — `publishableKey` IS the correct parameter in supabase_flutter v2.16.0. The analyzer confirmed `anonKey` is deprecated. Original code was correct.
+
+**Changed Files (9):**
+| File | Bugs |
+|------|------|
+| `lib/features/chat/providers/chat_provider.dart` | #1 (filteredQuery), #3 (removeChannel), #10 (isFilter), #12 (Set<String>) |
+| `lib/features/chat/providers/voice_recorder_provider.dart` | #2 (recorder dispose) |
+| `lib/features/worker/repositories/worker_repository.dart` | #4 (rethrow + restructure), #11 (category filter), + missing import |
+| `lib/features/jobs/providers/job_provider.dart` | #5 (remove dead provider) |
+| `lib/features/worker/providers/worker_profile_provider.dart` | #6 (_seededForUserId) |
+| `lib/features/auth/views/otp_verification_view.dart` | #7 (remove finally) |
+| `lib/features/jobs/views/post_job_view.dart` | #8 (sync controllers) |
+| `lib/core/services/supabase_repository.dart` | #9 (hasApplied), #13 (return []) |
+| `lib/features/jobs/views/job_detail_worker_view.dart` | #9 (use hasApplied) |
+
+**Code Health:**
+- `flutter analyze`: **0 issues**
+- `flutter test`: (filesystem issue on CI, not related to changes)
+
+### Previous Session (Session 16: End-to-end audit — 27 bugs fixed)
 
 *Session 16 (comprehensive audit response — 27 bugs fixed across all severity levels):*
 
@@ -222,7 +267,7 @@ test/
 
 ## Test Suite
 
-### Flutter Tests (111 total, all pass)
+### Flutter Tests (111 total)
 - Unit tests: `unit_tests.dart`, `services_test.dart`, `chat_state_test.dart`
 - Widget/UI: `widget_test.dart`, `worker_dashboard_test.dart`, `reviews_list_view_test.dart`, `ui_fixes_test.dart`
 - Integration: `supabase_connection_test.dart`, `e2e_flow_test.dart`

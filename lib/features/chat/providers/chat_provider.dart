@@ -142,7 +142,7 @@ class ChatNotifier extends Notifier<ChatState> {
           .from('jobs')
           .select('id')
           .eq('employer_id', userId);
-      final jobIds = _parseJobIds(employerJobIdsRaw);
+      final jobIds = <String>{..._parseJobIds(employerJobIdsRaw)};
 
       // 2. Jobs the user applied to as a worker (best-effort — the user may
       //    not have a worker_profile yet, or RLS may deny the query).
@@ -153,11 +153,7 @@ class ChatNotifier extends Notifier<ChatState> {
             .from('applications')
             .select('job_id')
             .eq('worker_id', userId);
-        for (final jid in _parseJobIds(appliedJobs)) {
-          if (!jobIds.contains(jid)) {
-            jobIds.add(jid);
-          }
-        }
+        jobIds.addAll(_parseJobIds(appliedJobs));
       } catch (_) {
         // applications table not available or user has no worker profile —
         // fall through with just the employer job IDs.
@@ -174,14 +170,10 @@ class ChatNotifier extends Notifier<ChatState> {
       // Only fetch messages for jobs the user is actually associated with.
       // This prevents phantom conversations from cancelled jobs or deleted
       // applications where the user sent a message but is no longer a party.
-      if (jobIds.isEmpty) {
-        // Fallback: user has no associated jobs (no employer jobs, no
-        // applications). Fetch only messages they sent themselves.
-        query.eq('sender_id', userId);
-      } else {
-        query.filter('job_id', 'in', jobIds.toList());
-      }
-      final response = await query.order('sent_at', ascending: false);
+      final filteredQuery = jobIds.isEmpty
+          ? query.eq('sender_id', userId)
+          : query.filter('job_id', 'in', jobIds.toList());
+      final response = await filteredQuery.order('sent_at', ascending: false);
 
       final data = _safeList(response);
 
@@ -347,8 +339,11 @@ class ChatNotifier extends Notifier<ChatState> {
   /// list updates live when a new message arrives — even if the user is not
   /// currently viewing that conversation.
   void _subscribeToConversations(String userId) {
-    // Unsubscribe previous channel before creating a new one
-    _conversationsChannel?.unsubscribe();
+    // Unsubscribe and remove previous channel before creating a new one.
+    if (_conversationsChannel != null) {
+      _conversationsChannel!.unsubscribe();
+      Supabase.instance.client.removeChannel(_conversationsChannel!);
+    }
 
     final client = Supabase.instance.client;
 
@@ -920,7 +915,7 @@ class ChatNotifier extends Notifier<ChatState> {
           .from('messages')
           .update({'read_at': now})
           .eq('job_id', conversationId)
-          .filter('read_at', 'is', 'null')
+          .isFilter('read_at', null)
           // Don't mark the user's own messages as read — the done_all
           // icon should only show when the OTHER user has read them.
           .filter('sender_id', 'neq', currentUserId);
