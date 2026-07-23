@@ -1,6 +1,13 @@
 // Shared utilities for Local Services Marketplace Edge Functions.
 
 /**
+ * Constants for business logic.
+ */
+export const BUDGET_MIN_PKR = 100;
+export const BUDGET_MAX_PKR = 100000;
+export const TOKEN_EXPIRY_BUFFER_MS = 300_000; // 5 minutes
+
+/**
  * Proper Base64URL encoding per RFC 4648.
  * Replaces + with -, / with _, and removes padding =.
  */
@@ -86,10 +93,10 @@ export function estimateBudget(category: string, text: string): number {
     if (
       extractedValue === null ||
       (currentHasK && !hasK) ||
-      (isNearKeyword && scaled >= 100 && scaled <= 100000)
+      (isNearKeyword && scaled >= BUDGET_MIN_PKR && scaled <= BUDGET_MAX_PKR)
     ) {
       // Clamping and validation
-      if (scaled >= 100 && scaled <= 100000) {
+      if (scaled >= BUDGET_MIN_PKR && scaled <= BUDGET_MAX_PKR) {
         extractedValue = scaled;
         hasK = currentHasK;
       }

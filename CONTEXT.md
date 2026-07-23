@@ -14,9 +14,9 @@
 
 ### Branch `main` — 29 total audit bugs fixed across two major passes. `dart analyze` clean.
 
-### Latest Developments (2026-07-24 — Session 20: 15-bug end-to-end audit fixed)
+### Latest Developments (2026-07-24 — Session 20: 15-bug end-to-end audit fixed + Polish)
 
-*Session 20 (comprehensive audit response — 15 bugs fixed across DB, Edge Functions, and Flutter):*
+*Session 20 (comprehensive audit response — 15 bugs fixed across DB, Edge Functions, and Flutter + Polish):*
 
 🔴 **Critical (3):**
 1. **BUG-01 — `worker_categories` missing SELECT policy** — RLS was blocking employers from seeing worker skills. Added `Anyone can view worker categories` policy.
@@ -29,39 +29,43 @@
 6. **BUG-06 — Earnings log included other workers' jobs** — `getWorkerCompletedJobs` now filters by application status (`hired` or `completed`) instead of just job status, ensuring workers only see their own income.
 7. **BUG-07 — `getApplicants` ordered by non-existent `created_at`** — Switched to `applied_at` (the correct column in the `applications` table). Applicant lists now load correctly.
 
-🟡 **Medium (4):**
+🟡 **Medium (6):**
 8. **BUG-08 — Block User was a functional no-op** — Integrated the local block list with `ChatProvider`. Conversations with blocked users are now dynamically filtered out in realtime.
 9. **BUG-09 — Budget regex captured house numbers** — (Edge Functions) Implemented keyword-anchored matching with a 30-char window around "budget/price/rs". Prevents address numbers from overriding actual budgets.
 10. **BUG-10 — `normalizePhone` weak validation** — Added strict length checks (11 digits for '0', 12 for '92', 10 for naked) and prefix enforcement. Invalid Pakistani formats now throw `FormatException`.
 11. **BUG-11 — Unsafe `int` cast in `JobAiMetadata.fromJson`** — Changed `as int` to `(as num?)?.toInt()` for budget and duration. Prevents crashes when AI models return floating-point numbers.
+12. **POLISH — Inconsistent Error Handling in `SupabaseRepository`** — Standardized `toggleFavorite` and `updateJobStatus` to return `bool` and handle all errors gracefully instead of rethrowing to the UI.
+13. **POLISH — Magic Numbers Refactor** — Extracted hardcoded values for budget limits and token buffers to named constants in `_shared/utils.ts`.
 
-🟢 **Low (4):**
-12. **BUG-12 — `Message` model ignored DB `metadata`** — Added `metadata` Map support to the `Message` model to handle voice durations, image dimensions, and attachment details.
-13. **BUG-13 — Dead FCM tokens never removed** — Added `removeDeadToken` logic to the `send-push-notification` Edge Function. Tokens that return `UNREGISTERED` from FCM are now automatically deleted from the DB.
-14. **BUG-14 — `delete_user_data` public profile leak** — Added explicit `DELETE FROM public.users` to the SECURITY DEFINER RPC to ensure no public profile info remains after account deletion.
-15. **BUG-15 — `tutorialStepCounter` non-interpolatable** — Converted `AppStrings.tutorialStepCounter` to a method that uses `.replaceAll` for `{current}` and `{total}` placeholders.
+🟢 **Low (5):**
+14. **BUG-12 — `Message` model ignored DB `metadata`** — Added `metadata` Map support to the `Message` model to handle voice durations, image dimensions, and attachment details.
+15. **BUG-13 — Dead FCM tokens never removed** — Added `removeDeadToken` logic to the `send-push-notification` Edge Function. Tokens that return `UNREGISTERED` from FCM are now automatically deleted from the DB.
+16. **BUG-14 — `delete_user_data` public profile leak** — Added explicit `DELETE FROM public.users` to the SECURITY DEFINER RPC to ensure no public profile info remains after account deletion.
+17. **BUG-15 — `tutorialStepCounter` non-interpolatable** — Converted `AppStrings.tutorialStepCounter` to a method that uses `.replaceAll` for `{current}` and `{total}` placeholders.
+18. **SECURITY — SMS Hook OTP Logging** — Added `ENABLE_OTP_LOGGING` environment variable check. OTPs are no longer logged by default even in "log" provider mode.
 
 **Changed Files (18):**
 | File | Changes |
 |------|---------|
 | `supabase/migrations/20260724000000_audit_fixes.sql` | DB Policies, Triggers, Constraints, RPC |
-| `supabase/functions/_shared/utils.ts` | **NEW:** Shared Base64URL, Budget, and Category logic |
+| `supabase/functions/_shared/utils.ts` | **NEW:** Shared constants, Base64URL, and extraction logic |
 | `supabase/functions/_shared/openrouter.ts` | Configurable model via `OPENROUTER_MODEL` env |
-| `supabase/functions/bright-api/index.ts` | Uses shared utils, fixed Bug #6 (skills), #9 (regex) |
+| `supabase/functions/bright-api/index.ts` | Uses shared utils/constants, fixed Bug #6, #9 |
 | `supabase/functions/rapid-worker/index.ts` | Uses shared utils, fixed Bug #5 (type safety) |
-| `supabase/functions/send-push-notification/index.ts` | Fixed Bug #1/#2 (Base64), #8 (expiry), #13 (dead tokens) |
-| `supabase/functions/send-sms/index.ts` | Fixed Bug #7 (OTP regex), #13 (logging/redaction) |
+| `supabase/functions/send-push-notification/index.ts` | Fixed Bug #1/#2, #8 (constants), #13 (dead tokens) |
+| `supabase/functions/send-sms/index.ts` | Fixed Bug #7 (OTP regex), Security (logging flag) |
 | `lib/core/services/notification_service.dart` | Fixed Bug #4 (multi-device) |
-| `lib/core/services/supabase_repository.dart` | Fixed Bug #6 (earnings), #7 (ordering) |
+| `lib/core/services/supabase_repository.dart` | Fixed Bug #6, #7, Standardized Error Handling |
 | `lib/features/chat/providers/chat_provider.dart` | Fixed Bug #8 (functional blocking) |
 | `lib/features/chat/views/chat_detail_view.dart` | Notify provider on block, pop detail view |
-| `lib/features/auth/providers/auth_provider.dart` | Fixed Bug #10 (strict phone normalization) |
+| `lib/features/auth/providers/auth_provider.dart` | Fixed Bug #10, added early length check |
 | `lib/features/jobs/models/job_model.dart` | Fixed Bug #11 (safe num casts) |
-| `lib/features/chat/models/message_model.dart` | Fixed Bug #12 (metadata column support) |
+| `lib/features/chat/models/message_model.dart` | Fixed Bug #12 (metadata support) |
 | `lib/core/localization/strings.dart` | Fixed Bug #15 (interpolatable tutorial string) |
 | `lib/core/widgets/coach_mark_overlay.dart` | Use new tutorialStepCounter method |
-| `supabase/functions/bright-api/index_test.ts` | Logic parity with production (shared utils) |
-| `supabase/functions/rapid-worker/index_test.ts` | Logic parity with production (shared utils) |
+| `supabase/functions/bright-api/index_test.ts` | Logic parity with production |
+| `supabase/functions/rapid-worker/index_test.ts` | Logic parity with production |
+
 
 **Code Health:**
 - `dart analyze`: **0 issues** project-wide

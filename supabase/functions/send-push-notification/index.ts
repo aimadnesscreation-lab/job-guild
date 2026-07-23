@@ -2,7 +2,7 @@
 // Triggered by database changes to send FCM push notifications to users.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { encodeBase64Url } from "../_shared/utils.ts";
+import { encodeBase64Url, TOKEN_EXPIRY_BUFFER_MS } from "../_shared/utils.ts";
 
 interface PushPayload {
   user_id: string;
@@ -32,9 +32,9 @@ let _cachedToken: { token: string; expiresAt: number } | null = null;
 async function getAccessToken(): Promise<string> {
   const nowMs = Date.now();
   
-  // Return cached token if still valid (with 5 min buffer)
+  // Return cached token if still valid (with buffer)
   // Fix Bug #8: Also check if token is already expired or near expiry.
-  if (_cachedToken && _cachedToken.expiresAt > nowMs + 300_000) {
+  if (_cachedToken && _cachedToken.expiresAt > nowMs + TOKEN_EXPIRY_BUFFER_MS) {
     return _cachedToken.token;
   }
 

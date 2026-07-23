@@ -44,6 +44,9 @@ class AuthNotifier extends Notifier<void> {
   /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx).
   /// Throws [FormatException] if the number is not a valid Pakistani mobile.
   static String normalizePhone(String phone) {
+    if (phone.length > 30) {
+      throw const FormatException('Phone number is too long.');
+    }
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     // Pakistani mobile numbers are +92 followed by exactly 10 digits,
     // so the full digit string must be 12 characters long.

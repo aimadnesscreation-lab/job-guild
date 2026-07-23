@@ -71,37 +71,25 @@ class SupabaseRepository {
     await client.from('jobs').insert(json);
   }
 
-  Future<void> updateJobStatus(String jobId, JobStatus status) async {
+  /// Update the status of a job. If status is 'completed', uses the
+  /// complete_job RPC to ensure atomic updates to both the job and application.
+  /// Returns true on success, false on failure.
+  Future<bool> updateJobStatus(String jobId, JobStatus status) async {
     final client = _client;
-    if (client == null) return;
+    if (client == null) return false;
 
-    // Use the atomic complete_job RPC when marking a job completed so both the
-    // job and the hired application are updated in a single transaction.
-    if (status == JobStatus.completed) {
-      try {
+    try {
+      if (status == JobStatus.completed) {
         await client.rpc('complete_job', params: {'p_job_id': jobId});
-        return;
-      } on PostgrestException catch (e) {
-        // If the RPC doesn't exist yet (migration not run), log a warning
-        // and fall through. The job will NOT be marked complete via the
-        // legacy path — this is intentional to avoid bypassing the RPC's
-        // security check that only hired jobs can be completed.
-        if (e.code != 'PGRST202' && e.code != '42883') rethrow;
-        debugPrint('[Job] complete_job RPC not found — ensure migration '
-            '20260722000010_harden_complete_job.sql is deployed.');
+      } else {
+        await client
+            .from('jobs')
+            .update({'status': status.name}).eq('id', jobId);
       }
-    }
-
-    // Non-completed status updates are safe to apply directly.
-    if (status != JobStatus.completed) {
-      await client.from('jobs').update({'status': status.name}).eq('id', jobId);
-    } else {
-      // If we reached here for a completed status, the RPC failed but we
-      // caught the error. Throw so callers can show a user-facing error.
-      throw Exception(
-        'Cannot complete job: the required database function is not available. '
-        'Please contact support.',
-      );
+      return true;
+    } catch (e) {
+      debugPrint('[Job] updateJobStatus error: $e');
+      return false;
     }
   }
 
@@ -451,13 +439,14 @@ class SupabaseRepository {
             // request. Treat as success (favorited state).
             return true;
           }
-          rethrow;
+          debugPrint('[Favorites] toggle error: $e');
+          return isCurrentlyFavorited; // return previous state on error
         }
         return true; // now favorited
       }
     } catch (e) {
       debugPrint('[Favorites] toggle error: $e');
-      rethrow;
+      return false; // Safely return false if everything else fails
     }
   }
 
