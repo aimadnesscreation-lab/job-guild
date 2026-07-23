@@ -35,6 +35,11 @@
 - `dart analyze`: **0 issues** ✅
 - `flutter test`: **117/117 pass** ✅
 
+**Migration Deployed to Supabase:**
+| Migration | Status |
+|-----------|--------|
+| `20260729000000_fix_is_featured_preserve.sql` | ✅ Deployed via `supabase db push` |
+
 ---
 
 ### Session 33: End-to-End Audit Part 4 — 15 Bugs Fixed Across 14 Files + 2 Edge Functions Redeployed
