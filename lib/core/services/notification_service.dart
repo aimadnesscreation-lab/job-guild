@@ -151,7 +151,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 Future<void> initializeFirebase() async {
   try {
     await Firebase.initializeApp();
-  } catch (e, st) {
+  } catch (e) {
     debugPrint('Firebase init error: $e');
     // Surface production failures to monitoring tools
     if (!kDebugMode) {

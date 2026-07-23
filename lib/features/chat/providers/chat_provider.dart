@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
-
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,8 +62,6 @@ class ChatNotifier extends Notifier<ChatState> {
   /// and updates the conversation previews in realtime.
   RealtimeChannel? _conversationsChannel;
 
-import 'dart:collection';
-...
   /// Cache of sender profiles keyed by user id, so realtime inserts can be
   /// enriched without refetching the whole thread (realtime payloads don't
   /// include joined relation data). Capped at 100 entries to bound memory.
@@ -610,7 +608,7 @@ import 'dart:collection';
         if (_senderCache.length >= _maxSenderCacheSize) {
           _senderCache.remove(_senderCache.keys.first);
         }
-        _senderCache[senderId] = sender!;
+        _senderCache[senderId] = sender;
       } catch (_) {
         sender = null;
       }

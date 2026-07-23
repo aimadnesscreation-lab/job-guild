@@ -734,6 +734,16 @@ class SupabaseRepository {
   ];
 }
 
+/// Provides the raw SupabaseClient (nullable — returns null when Supabase
+/// hasn't been initialized, e.g. in widget tests).
+final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
+  try {
+    return Supabase.instance.client;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Riverpod provider for Supabase repository
 final supabaseRepositoryProvider = Provider<SupabaseRepository>((ref) {
   try {

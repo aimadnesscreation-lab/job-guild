@@ -10,9 +10,34 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-24 — Session 20)
+## Current State (Updated 2026-07-24 — Session 23)
 
-### Branch `main` — 29 total audit bugs fixed across two major passes. `dart analyze` clean.
+### Branch `main` — 6 compilation bugs fixed in session 23. `dart analyze` clean (0 errors, 0 warnings).
+
+### Latest Developments (2026-07-24 — Session 23: Audit Bug Fixes)
+
+*Session 23 (Fix 5 compilation errors + 1 warning from end-to-end audit):*
+
+🔴 **Critical (5):**
+1. **FIX — Corrupted import inside class body** — Removed literal `import 'dart:collection'; ...` from inside `ChatNotifier` class body and moved to proper import block at top of file.
+2. **FIX — `LinkedHashMap` undefined** — Resolved by #1 (import was misplaced inside the class).
+3. **FIX — `supabaseClientProvider` undefined** — Added `supabaseClientProvider` (Provider<SupabaseClient?>) to `supabase_repository.dart` with null-safe initialization. `worker_provider.dart` already imported the file.
+4. **FIX — `debugPrint` undefined in `OpenRouterService`** — Changed import from `dart:developer` (which doesn't export `debugPrint`) to `package:flutter/foundation.dart`.
+
+🟡 **Warning (1):**
+5. **FIX — Unnecessary `!` null assertion** — Removed `!` from `_senderCache[senderId] = sender!;` — Dart flow analysis already proves sender is non-null at that point.
+
+**Changed Files:**
+| File | Changes |
+|------|---------|
+| `lib/features/chat/providers/chat_provider.dart` | #1, #2, #5 (remove corrupted code + import, remove `!`) |
+| `lib/core/services/openrouter_service.dart` | #4 (fix debugPrint import) |
+| `lib/core/services/notification_service.dart` | WARN-01 (remove unused `st`) |
+| `lib/core/services/supabase_repository.dart` | #3 (add `supabaseClientProvider`) |
+
+**Code Health:**
+- `dart analyze`: **0 errors, 0 warnings** (3 info-level only)
+- `flutter test`: **110/110 pass, 2 skip** (credential gated)
 
 ### Latest Developments (2026-07-24 — Session 22: Final Verification & Remediation)
 
