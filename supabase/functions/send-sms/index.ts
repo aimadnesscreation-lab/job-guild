@@ -2,26 +2,11 @@
 // Handles phone OTP delivery.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { extractOtpFromMessage } from "../_shared/utils.ts";
 
 interface SendSmsPayload {
   phone: string;
-  message: string;
-  type: "sms" | "phone_verify";
-  otp?: string;
-}
-
-/**
- * Extract the OTP code from the SMS message template.
- * Bug #7 Fix: Use a more restrictive regex to ensure we only pick 6 digits
- * that are likely the OTP, avoiding phone numbers or zips.
- */
-function extractOtpFromMessage(message: string): string | null {
-  // Look for "code is 123456" or "123456" at the end/start of string
-  const match = message.match(/(?:code|otp|is)\s*:?\s*\b(\d{6})\b/i) || 
-                message.match(/\b(\d{6})\b/);
-  return match ? match[1] : null;
-}
-
+...
 serve(async (req) => {
   try {
     const payload: SendSmsPayload = await req.json();

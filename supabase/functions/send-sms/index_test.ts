@@ -3,19 +3,8 @@
 // Run: deno test supabase/functions/send-sms/index_test.ts
 // Requires: Deno 1.x+
 
-import { assertEquals, assertExists } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-
-// ─── Pure function under test (mirrors production code) ───────────────
-
-/**
- * Extract the OTP code from the SMS message template.
- * Supabase replaces {{ .Code }} with the actual OTP, so the message
- * will contain the 6-digit code directly.
- */
-function extractOtpFromMessage(message: string): string | null {
-  const match = message.match(/\b(\d{6})\b/);
-  return match ? match[1] : null;
-}
+import { assertEquals } from "https://deno.land/std@0.177.0/testing/asserts.ts";
+import { extractOtpFromMessage } from "../_shared/utils.ts";
 
 // ─── Tests ────────────────────────────────────────────────────────────
 

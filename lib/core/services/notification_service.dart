@@ -137,15 +137,13 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 Future<void> initializeFirebase() async {
   try {
     await Firebase.initializeApp();
-  } catch (e) {
-    // In debug, log the full error. In production, this is expected when
-    // google-services.json is missing on a development device — but a
-    // production build with missing config should still surface visibly.
-    if (kDebugMode) {
-      debugPrint('Firebase init error (dev): $e');
-    } else {
-      // Re-throw in release builds so monitoring tools can surface it.
-      debugPrint('Firebase init failed in production: $e');
+  } catch (e, st) {
+    debugPrint('Firebase init error: $e');
+    // Surface production failures to monitoring tools
+    if (!kDebugMode) {
+      // Re-throw or use a crash reporting tool (e.g., Sentry) here.
+      // Example: Sentry.captureException(e, stackTrace: st);
+      rethrow; 
     }
   }
 }

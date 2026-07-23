@@ -8,6 +8,18 @@ export const BUDGET_MAX_PKR = 100000;
 export const TOKEN_EXPIRY_BUFFER_MS = 300_000; // 5 minutes
 
 /**
+ * Extract the OTP code from the SMS message template.
+ * Bug #7 Fix: Use a more restrictive regex to ensure we only pick 6 digits
+ * that are likely the OTP, avoiding phone numbers or zips.
+ */
+export function extractOtpFromMessage(message: string): string | null {
+  // Look for "code is 123456" or "123456" at the end/start of string
+  const match = message.match(/(?:code|otp|is)\s*:?\s*\b(\d{6})\b/i) || 
+                message.match(/\b(\d{6})\b/);
+  return match ? match[1] : null;
+}
+
+/**
  * Proper Base64URL encoding per RFC 4648.
  * Replaces + with -, / with _, and removes padding =.
  */
