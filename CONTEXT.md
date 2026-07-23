@@ -32,6 +32,7 @@
 7. **FIX — ChatProvider Memory Leak** — Optimized `_senderCache` by switching to `LinkedHashMap` and implementing proper LRU eviction, fixing unbounded growth.
 8. **FIX — CoachMarkOverlay Positioning** — Updated `CoachMarkOverlay` to accept dynamic `tabCount`, removing hardcoded assumptions about the bottom navigation layout.
 9. **FIX — BudgetParser Input Validation** — Improved budget extraction logic to identify and filter out potential phone numbers, reducing false-positive budget estimates.
+10. **FIX — Edge Function Type Safety** — Implemented strict type validation for AI JSON responses in `bright-api` Edge Function, ensuring malformed responses don't cause 500 errors.
 
 **Changed Files:**
 | File | Changes |
@@ -44,6 +45,7 @@
 | `lib/features/chat/providers/chat_provider.dart` | #7 (ChatProvider cache optimization) |
 | `lib/core/widgets/coach_mark_overlay.dart` | #8 (Dynamic tab count) |
 | `lib/core/utils/budget_parser.dart` | #9 (Phone number filtering) |
+| `supabase/functions/bright-api/index.ts` | #10 (Edge function type safety) |
 
 
 *Session 20 (Final Remediation Pass):*

@@ -53,13 +53,17 @@ function extractJson(raw: string): ParseResponse {
     return fallbackParse(raw);
   }
 
-  const category = findBestCategoryMatch((parsed.category as string) || "");
-  const urgency = VALID_URGENCIES.includes(parsed.urgency as string)
-    ? (parsed.urgency as string)
+  // Validate and type-check fields
+  const category = findBestCategoryMatch(
+    typeof parsed.category === 'string' ? parsed.category : ""
+  );
+  
+  const urgencyRaw = typeof parsed.urgency === 'string' ? parsed.urgency : "";
+  const urgency = VALID_URGENCIES.includes(urgencyRaw as any)
+    ? (urgencyRaw as typeof VALID_URGENCIES[number])
     : "today";
 
-  // Fix: Default to [category] ONLY if required_skills is completely missing or not an array.
-  // If the LLM returned [], we respect it (Bug #6).
+  // Validate skills
   let skills: string[];
   if (Array.isArray(parsed.required_skills)) {
     skills = (parsed.required_skills as unknown[]).map((s) => String(s));
@@ -67,17 +71,20 @@ function extractJson(raw: string): ParseResponse {
     skills = [category];
   }
 
+  // Validate numeric fields
+  const budget = typeof parsed.suggested_budget_pkr === "number"
+        ? Math.max(0, parsed.suggested_budget_pkr)
+        : estimateBudget(category, "");
+  
+  const duration = typeof parsed.estimated_duration_hours === "number"
+        ? Math.max(1, Math.min(40, parsed.estimated_duration_hours))
+        : 2;
+
   return {
     category,
     urgency,
-    suggested_budget_pkr:
-      typeof parsed.suggested_budget_pkr === "number"
-        ? Math.max(0, parsed.suggested_budget_pkr)
-        : estimateBudget(category, ""),
-    estimated_duration_hours:
-      typeof parsed.estimated_duration_hours === "number"
-        ? Math.max(1, Math.min(40, parsed.estimated_duration_hours))
-        : 2,
+    suggested_budget_pkr: budget,
+    estimated_duration_hours: duration,
     required_skills: skills,
   };
 }
