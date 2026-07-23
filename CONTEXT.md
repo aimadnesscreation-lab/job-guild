@@ -10,9 +10,37 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-24 — Session 24)
+## Current State (Updated 2026-07-24 — Session 25)
 
-### Branch `main` — 6 compilation bugs + 3 info lints fixed. `dart analyze` completely clean (0 errors, 0 warnings, 0 info). Deno tests: 15/15 pass.
+### Branch `main` — All bugs fixed, CI/CD pipeline active, APK build verified on GitHub Actions.
+
+### Latest Developments (2026-07-24 — Session 25: CI/CD + APK Build Fixes)
+
+*Session 25 (GitHub Actions CI/CD pipeline, APK build fixes, package cleanup):*
+
+🔧 **CI/CD Setup:**
+1. **NEW — GitHub Actions Workflow** — `.github/workflows/ci.yml`: runs `dart analyze`, `flutter test`, `flutter build apk --debug`, `flutter build web` on every push to `main`. APK and web build uploaded as artifacts.
+
+🔴 **Android Build Fixes:**
+2. **FIX — Missing `buildscript` repositories** — Added `google()` and `mavenCentral()` to `buildscript` block in `android/build.gradle.kts`. The Google Services plugin couldn't resolve without them.
+3. **FIX — Kotlin Gradle Plugin** — Added `kotlin-gradle-plugin:2.3.20` to root buildscript classpath for AGP 8.x compatibility with plugins using Kotlin DSL extensions.
+4. **FIX — Remove unused `location` package** — Dropped from `pubspec.yaml`. The package (v10.0.0/10.0.1) is incompatible with AGP 8.x (Flutter 3.44.7) — its build.gradle uses deprecated `kotlinOptions`/`kotlin()` DSL. All location functionality already handled by `geolocator: ^14.0.3`.
+
+**Changed Files:**
+| File | Changes |
+|------|---------|
+| `.github/workflows/ci.yml` | **NEW** — CI pipeline (analyze, test, APK, web) |
+| `android/build.gradle.kts` | Add buildscript repos + Kotlin Gradle Plugin |
+| `pubspec.yaml` | Remove incompatible `location` package |
+
+**Code Health:**
+- `dart analyze`: **0 errors, 0 warnings, 0 info** ✅
+- `flutter test`: **110/110 pass, 2 skip** ✅
+- `flutter build web`: ✅ Success
+- `flutter build apk`: ✅ Verified on GitHub Actions runner
+- Deno tests: **15/15 pass** ✅
+
+---
 
 ### Latest Developments (2026-07-24 — Session 24: Lint Fixes + Deno Tests)
 
