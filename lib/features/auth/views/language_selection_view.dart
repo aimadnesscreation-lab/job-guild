@@ -51,7 +51,7 @@ class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
     final normalizedPhone = AuthNotifier.normalizePhone(phone);
     try {
       await ref.read(authProvider.notifier).sendOtp(phone: phone);
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -59,7 +59,7 @@ class _LanguageSelectionViewState extends ConsumerState<LanguageSelectionView> {
         ),
       );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${ref.read(appStringsProvider).failedToSendCode} $e'),
