@@ -22,6 +22,12 @@ All 4 Edge Functions deployed to Supabase project `izjfugswuwyinaeauhvz`:
 | `send-sms` | ✅ Deployed |
 | `send-push-notification` | ✅ Deployed |
 
+**Smoke Test (2026-07-24):** All 4 functions verified end-to-end via curl:
+- ✅ Auth-protected (rejects missing Authorization header)
+- ✅ Input validation (400 on missing fields, 405 on wrong method)
+- ✅ Database integration (queries fcm_tokens, returns proper JSON)
+- ✅ Graceful handling (returns `{"success":false}` for unknown users, not 500)
+
 ---
 
 ### Branch `main` — All bugs fixed, CI/CD pipeline green, APK build verified, Edge Functions deployed ✅.
