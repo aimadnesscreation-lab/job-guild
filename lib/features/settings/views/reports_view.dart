@@ -45,7 +45,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   void _showSubmitReportDialog() {
     final s = ref.read(appStringsProvider);
     final detailsController = TextEditingController();
-    String                    selectedReason = 'Spam';
+    String                    selectedReason = 'Spam'; // Internal value matching dropdown item values
 
     showDialog(
       context: context,

@@ -460,7 +460,7 @@ class _AccountHeader extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
 
     final name = user?.userMetadata?['full_name'] as String? ?? '';
-    final phone = user?.phone ?? ref.watch(appStringsProvider).notSignedIn;
+    final phone = user?.phone ?? user?.email ?? ref.watch(appStringsProvider).notSignedIn;
 
     return ListTile(
       leading: CircleAvatar(

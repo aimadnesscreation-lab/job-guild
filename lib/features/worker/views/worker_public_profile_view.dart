@@ -149,7 +149,7 @@ class WorkerPublicProfileView extends ConsumerWidget {
                       child: _InfoTile(
                         icon: Icons.monetization_on_outlined,
                         title: ref.watch(appStringsProvider).hourlyRate,
-                        value: 'Rs. ${p.hourlyRatePkr}/hr',
+                        value: 'PKR ${p.hourlyRatePkr}/hr',
                         valueColor: AppTheme.accentDark,
                       ),
                     ),

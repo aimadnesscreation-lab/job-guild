@@ -96,6 +96,7 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
         (route) => false,
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = e.toString().replaceFirst('Exception: ', '');
@@ -356,9 +357,9 @@ class _PhoneOtpEntryViewState extends ConsumerState<_PhoneOtpEntryView> {
       _error = null;
     });
 
-    // Normalize phone for consistent display in OTP view
-    final normalizedPhone = AuthNotifier.normalizePhone(phone);
     try {
+      // Normalize phone for consistent display in OTP view
+      final normalizedPhone = AuthNotifier.normalizePhone(phone);
       await ref.read(authProvider.notifier).sendOtp(
         phone: phone,
         initialRole: widget.initialRole,

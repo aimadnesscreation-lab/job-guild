@@ -330,7 +330,7 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
                       controller: _budgetController,
                       decoration: InputDecoration(
                         labelText: ref.watch(appStringsProvider).amount,
-                        prefixText: 'Rs. ',
+                        prefixText: 'PKR ',
                       ),
                       keyboardType: TextInputType.number,
                       onChanged: (val) {

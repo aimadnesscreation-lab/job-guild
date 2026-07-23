@@ -472,7 +472,8 @@ class WorkerDashboard extends ConsumerWidget {
     if (diff.inMinutes < 1) return s.now;
     if (diff.inHours < 24) return s.relativeHoursAgo(diff.inHours);
     if (diff.inDays < 7) return s.relativeDaysAgo(diff.inDays);
-    return '${dt.day}/${dt.month}';
+    final months = s.monthsShort;
+    return '${dt.day} ${months[dt.month - 1]}';
   }
 }
 

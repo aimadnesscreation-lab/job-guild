@@ -135,6 +135,7 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
   }
 
   Future<void> _resendOtp() async {
+    if (!mounted) return;
     setState(() {
       _isResending = true;
       _error = null;
@@ -151,11 +152,15 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
         phone: widget.phoneNumber,
         initialRole: widget.initialRole,
       );
+      if (!mounted) return;
       _startResendCountdown();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = ref.read(appStringsProvider).failedToResend);
     } finally {
-      setState(() => _isResending = false);
+      if (mounted) {
+        setState(() => _isResending = false);
+      }
     }
   }
 

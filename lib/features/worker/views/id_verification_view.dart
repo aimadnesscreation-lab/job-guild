@@ -109,6 +109,11 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
       final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('Not authenticated');
 
+      // Ensure the verification_docs bucket exists before upload.
+      try {
+        await client.storage.createBucket('verification_docs');
+      } catch (_) {}
+
       // Web uses XFile bytes instead of File for storage uploads
       Future<void> uploadFile(String fileName, XFile file) async {
         if (kIsWeb) {

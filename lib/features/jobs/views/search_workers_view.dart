@@ -31,17 +31,7 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
 
   final _categories = [
     'All',
-    'Plumbing',
-    'Electrical',
-    'Painting',
-    'Carpentry',
-    'Cleaning',
-    'Tutor',
-    'Mechanic',
-    'Moving',
-    'Cook',
-    'Photographer',
-    'General Labor',
+    ...allWorkerCategories,
   ];
 
   final _availabilityOptions = [

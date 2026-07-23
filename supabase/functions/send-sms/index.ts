@@ -18,7 +18,8 @@ serve(async (req) => {
     console.log(`[SMS Hook] Provider: ${provider}`);
     console.log(`[SMS Hook] To: ${payload.phone.substring(0, 5)}***`); // Redact phone in logs
     console.log(`[SMS Hook] Type: ${payload.type}`);
-if (provider === "log") {
+
+    if (provider === "log") {
   const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
   console.log(`[SMS Hook] [DEV] OTP: ${otp}`);
   return new Response(

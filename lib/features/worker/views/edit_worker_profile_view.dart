@@ -495,7 +495,7 @@ class _EditWorkerProfileViewState extends ConsumerState<EditWorkerProfileView> {
                     child: TextField(
                       decoration: InputDecoration(
                         labelText: s.hourlyRate,
-                        prefixText: 'Rs. ',
+                        prefixText: 'PKR ',
                       ),
                       keyboardType: TextInputType.number,
                       controller: _hourlyRateController,

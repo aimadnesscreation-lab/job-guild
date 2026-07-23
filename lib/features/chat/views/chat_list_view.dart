@@ -156,6 +156,7 @@ class ChatListView extends ConsumerWidget {
     if (diff.inMinutes < 60) return s.relativeTimeMinutes(diff.inMinutes);
     if (diff.inHours < 24) return s.relativeTimeHours(diff.inHours);
     if (diff.inDays < 7) return s.relativeTimeDays(diff.inDays);
-    return '${dt.day}/${dt.month}';
+    final months = s.monthsShort;
+    return '${dt.day} ${months[dt.month - 1]}';
   }
 }

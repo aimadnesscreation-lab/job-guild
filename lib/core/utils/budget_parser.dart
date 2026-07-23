@@ -142,7 +142,14 @@ String guessUrgency(String text) {
 /// and ignores scheduling words like "next week" / "tomorrow."
 int estimateDuration(String input) {
   final lower = input.toLowerCase();
-  // Explicit duration: "2 hours", "3hrs", "for an hour"
+  // Explicit duration with a number: "3 hours", "2hrs", "5 hour"
+  final numericMatch = RegExp(r'(\d+)\s*(?:hour|hr)', caseSensitive: false)
+      .firstMatch(lower);
+  if (numericMatch != null) {
+    final hours = int.tryParse(numericMatch.group(1)!) ?? 1;
+    return hours.clamp(1, 40);
+  }
+  // Explicit duration without number: "for an hour", "a few hours"
   if (lower.contains('hour') || lower.contains('hr')) return 1;
   // Explicit duration: "all day", "full day", "one day"
   if (lower.contains('day')) return 8;

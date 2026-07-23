@@ -269,13 +269,14 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
       if (diff.inMinutes < 1) return s.now;
       if (diff.inMinutes < 60) {
         final n = diff.inMinutes;
-        return '$n${s.minAbbrev}';
+        return '$n ${s.minAbbrev}';
       }
       if (diff.inHours < 24) {
         final n = diff.inHours;
-        return '$n${s.hoursAbbrev}';
+        return '$n ${s.hoursAbbrev}';
       }
-      return '${dt.day}/${dt.month}/${dt.year}';
+      final months = s.monthsShort;
+      return '${dt.day} ${months[dt.month - 1]}, ${dt.year}';
     } catch (_) {
       return '';
     }

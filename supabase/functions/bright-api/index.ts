@@ -71,9 +71,10 @@ function extractJson(raw: string): ParseResponse {
     skills = [category];
   }
 
-  // Validate numeric fields
-  const budget = typeof parsed.suggested_budget_pkr === "number"
-        ? Math.max(0, parsed.suggested_budget_pkr)
+  // Validate numeric fields — fall back to estimateBudget when budget is zero
+  // or negative, since PKR 0 looks broken in the UI.
+  const budget = typeof parsed.suggested_budget_pkr === "number" && parsed.suggested_budget_pkr > 0
+        ? Math.max(1, parsed.suggested_budget_pkr)
         : estimateBudget(category, "");
   
   const duration = typeof parsed.estimated_duration_hours === "number"
