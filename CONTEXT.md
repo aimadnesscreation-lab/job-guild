@@ -12,7 +12,7 @@
 
 ## Current State (Updated 2026-07-24 — Session 25)
 
-### Branch `main` — All bugs fixed, CI/CD pipeline active, APK build verified on GitHub Actions.
+### Branch `main` — All bugs fixed, CI/CD pipeline active, APK build verified on GitHub Actions ✅.
 
 ### Latest Developments (2026-07-24 — Session 25: CI/CD + APK Build Fixes)
 
@@ -39,7 +39,7 @@
 - `dart analyze`: **0 errors, 0 warnings, 0 info** ✅
 - `flutter test`: **110/110 pass, 2 skip** ✅
 - `flutter build web`: ✅ Success
-- `flutter build apk`: ⏳ Pending CI verification (location removed, Firebase optional)
+- `flutter build apk`: ✅ Verified on GitHub Actions runner
 - Deno tests: **15/15 pass** ✅
 
 ---
