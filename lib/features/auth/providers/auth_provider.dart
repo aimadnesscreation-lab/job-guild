@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 /// Tracks the current authentication state (session, loading, error)
@@ -62,8 +63,10 @@ class AuthNotifier extends Notifier<void> {
         token: otp,
         type: OtpType.sms,
       );
-      if (response.error != null) throw response.error!;
       if (response.session == null) throw Exception('Invalid session');
+    } on SocketException catch (e) {
+      debugPrint('[Auth] Network error: $e');
+      throw Exception('Network error: Please check your connection.');
     } on AuthException catch (e) {
       debugPrint('[Auth] OTP verification failed: ${e.message}');
       throw Exception('Verification failed: ${e.message}');

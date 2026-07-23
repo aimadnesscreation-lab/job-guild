@@ -19,22 +19,22 @@
 *Session 22 (Final verification and remediation):*
 
 🔴 **Critical:**
-1. **FIX — Compilation Error in `toggleFavorite`** — Corrected missing `isCurrentlyFavorited` variable definition in `SupabaseRepository`.
-2. **FIX — `hireWorker` Exception Handling** — Wrapped database operations in `try-catch` to ensure atomic state updates and consistent `bool` returns for UI stability.
-3. **FIX — `main.dart` null safety** — Fixed potential null assertion failure by adding `child ?? const SizedBox.shrink()`.
-4. **FIX — `home_view.dart` syntax error** — Split duplicate import line to fix syntax error.
+1. **FIX — Firebase Init Crash** — Logged production errors instead of re-throwing, ensuring graceful degradation.
+2. **FIX — SMS Edge Function Repair** — Restored truncated code and fixed `SendSmsPayload` interface.
 
 🟠 **High:**
-5. **IMPROVEMENT — `auth_provider.dart` Error Handling** — Replaced generic `catch` blocks in `verifyOtp` with specific `AuthException` handling for better UI feedback.
+3. **FIX — Auth Provider Error Handling** — Refactored `verifyOtp` for modern Supabase patterns (`AuthException` handling) and added network error handling (`SocketException`).
+
+🟡 **Medium:**
+4. **POLISH — Linter Cleanups** — Removed unnecessary `// ignore_for_file: use_build_context_synchronously` in `language_selection_view.dart` because the code already includes proper `context.mounted` checks.
 
 **Changed Files:**
 | File | Changes |
 |------|---------|
-| `supabase/functions/_shared/utils.ts` | Added shared `extractOtpFromMessage` |
-| `supabase/functions/send-sms/index.ts` | Refactored to use shared `extractOtpFromMessage` |
-| `supabase/functions/send-sms/index_test.ts` | Refactored to use shared `extractOtpFromMessage` |
-| `lib/core/services/notification_service.dart` | Improved Firebase error visibility |
-| `supabase/migrations/20260725000000_fix_rls_idempotency.sql` | **NEW:** Idempotent policy fixes |
+| `lib/core/services/notification_service.dart` | #1 (Firebase init crash) |
+| `supabase/functions/send-sms/index.ts` | #2 (Truncated function repair) |
+| `lib/features/auth/providers/auth_provider.dart` | #3 (Auth API patterns, network handling) |
+| `lib/features/auth/views/language_selection_view.dart` | #4 (Linter ignore removal) |
 
 
 *Session 20 (Final Remediation Pass):*

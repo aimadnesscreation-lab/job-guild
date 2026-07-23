@@ -141,9 +141,9 @@ Future<void> initializeFirebase() async {
     debugPrint('Firebase init error: $e');
     // Surface production failures to monitoring tools
     if (!kDebugMode) {
-      // Re-throw or use a crash reporting tool (e.g., Sentry) here.
-      // Example: Sentry.captureException(e, stackTrace: st);
-      rethrow; 
+      // TODO: Log the error to a crash reporting tool (e.g., Sentry) here.
+      // Sentry.captureException(e, stackTrace: st);
+      debugPrint('Firebase init failed in production, continuing without notifications: $e');
     }
   }
 }

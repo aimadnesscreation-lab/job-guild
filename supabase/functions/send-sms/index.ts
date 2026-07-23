@@ -6,7 +6,10 @@ import { extractOtpFromMessage } from "../_shared/utils.ts";
 
 interface SendSmsPayload {
   phone: string;
-...
+  message?: string;
+  otp?: string;
+  type: string;
+}
 serve(async (req) => {
   try {
     const payload: SendSmsPayload = await req.json();
@@ -28,7 +31,6 @@ if (provider === "log") {
     console.log(`[SMS Hook] [DEV] OTP logging suppressed. Set ENABLE_OTP_LOGGING=true to see codes.`);
   }
   return new Response(
-...
         JSON.stringify({
           success: true,
           message: "[DEV MODE] OTP logged to Edge Function logs",
