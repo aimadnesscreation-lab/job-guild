@@ -35,7 +35,7 @@ class CoachMarkOverlay extends ConsumerStatefulWidget {
     super.key,
     required this.bottomNavWidth,
     required this.bottomNavHeight,
-    this.tabCount = 5,
+    this.tabCount = 4,
   });
 
   @override
