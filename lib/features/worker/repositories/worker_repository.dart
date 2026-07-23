@@ -33,12 +33,18 @@ class WorkerRepository {
       }
 
       // Prune stale category assignments that are no longer selected.
+      // PostgREST's .not() expects the filter value as a string formatted
+      // as a Postgres array literal (IN clause). The supabase_flutter
+      // client converts Dart Lists to Postgres arrays, but .not() uses
+      // the PostgREST filter syntax: not(category_id.in.(1,2,3)).
       if (newCategoryIds.isNotEmpty) {
+        // Format as PostgREST filter string: (1,2,3)
+        final idsStr = '(${newCategoryIds.join(',')})';
         await _supabase
             .from('worker_categories')
             .delete()
             .eq('worker_id', userId)
-            .not('category_id', 'in', newCategoryIds);
+            .not('category_id', 'in', idsStr);
       } else {
         // All categories removed — delete everything.
         await _supabase
@@ -73,6 +79,9 @@ class WorkerRepository {
     // through to the upsert pattern below.
     bool rpcSucceeded = false;
     try {
+      // NOTE: `p_is_featured` is intentionally excluded — it is an
+      // admin-managed flag that should never be overwritten by client-side
+      // profile saves (see WorkerProfile.toJson which also excludes it).
       await _supabase.rpc(
         'upsert_worker_profile',
         params: {
@@ -85,7 +94,6 @@ class WorkerRepository {
           'p_availability_status': payload['availability_status'],
           'p_service_radius_km': payload['service_radius_km'],
           'p_portfolio_media': payload['portfolio_media'],
-          'p_is_featured': payload['is_featured'],
         },
       );
       rpcSucceeded = true;
