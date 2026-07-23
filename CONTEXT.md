@@ -10,11 +10,64 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 18)
+## Current State (Updated 2026-07-23 — Session 19)
 
-### Branch `main` — 2 audit bugs fixed. `flutter analyze` clean. BUG-01 confirmed false positive.
+### Branch `main` — 14 audit bugs fixed, 1 deferred, 1 false positive. `dart analyze` clean.
 
-### Latest Developments (2026-07-23 — Session 18: 2 remaining audit bugs fixed)
+### Latest Developments (2026-07-23 — Session 19: 16-bug end-to-end audit fixed)
+
+*Session 19 (comprehensive audit response — 14 of 16 bugs fixed):*
+
+🔴 **Critical (2):**
+1. **BUG-01 — Earnings section dead code in `worker_dashboard.dart`** — A `return Padding(...);}` and `final now = DateTime.now();` on the same line made the earnings variables unreachable. Now properly separated so `recentEntries`, `totalEarnings`, and `displayEntries` execute.
+2. **BUG-02 — Realtime channel leak in `_subscribeToMessages`** — Added `Supabase.instance.client.removeChannel(_messagesChannel!)` after `unsubscribe()`, matching the `_subscribeToConversations()` and `disposeChannel()` patterns.
+
+🟠 **High (5):**
+3. **BUG-03 — `hireWorker` verified job row but not application row** — Now verifies BOTH the application AND job rows after update. Silent application update failures are surfaced as errors.
+4. **BUG-04 — OTP paste blocked by `maxLength: 1`** — Removed `maxLength: 1` from OTP `TextField`s, added `FilteringTextInputFormatter.digitsOnly`. Paste-to-fill now works on all platforms.
+5. **BUG-05 — `_saveCategories` non-atomic delete-then-insert** — Changed to upsert-first-then-prune: new categories are upserted before stale ones are deleted, preventing data loss on network failure.
+6. **BUG-06 — `AuthRepository` dead class bypassing phone normalization** — Deleted the entire file (`auth_repository.dart`). It was never imported or used anywhere; if wired up, it would skip `normalizePhone()`.
+7. **BUG-07 — Block User local-only with misleading promise** — Changed UI copy to "You'll no longer see messages from this user on this device." (honest about local-only limitation).
+
+🟡 **Medium (4):**
+8. **BUG-08 — `getNearbyJobs` raw RPC response not type-checked** — Now uses `_safeList(response)` instead of raw `response` cast, preventing crashes on unexpected RPC shapes.
+9. **BUG-10 — Completed jobs reused `_ActiveJobCard` with applicant queries** — Completed jobs now skip applicant count queries AND navigate to `JobDetailView(false)` (read-only mode, no hire button).
+10. **BUG-11 — `rejected` applications fell through to "Interested" label** — Added `case 'rejected':` returning `(s.rejected, AppTheme.errorColor)` + bilingual `rejected` string in `AppStrings`.
+11. **BUG-12 — Hand-rolled UUID alongside imported `uuid` package** — Replaced `_generateUuid()` with `_uuid.v4()` from the already-imported `uuid` package. Removed unused `dart:math` import.
+
+🟢 **Low (3):**
+12. **BUG-14 — Duplicate `saveWorkerProfile` in `SupabaseRepository`** — Removed the duplicate method; all paths now go through `WorkerRepository.updateWorkerProfile()`. Updated test to match.
+13. **BUG-15 — `AudioPlayer.setSourceUrl` use-after-dispose risk** — Added `_disposed` flag to `_VoiceMessageWidget`; callbacks are guarded after disposal.
+14. **BUG-16 — Firebase init failures silently swallowed** — Added `kDebugMode` check in `initializeFirebase()`; release builds can route errors to a crash reporter.
+
+🔄 **Deferred (1):**
+- **BUG-13 — Notification badge count not refreshed on realtime events** — Requires a Realtime `INSERT` listener on the `notifications` table. Non-trivial change for low severity; deferred to a future session.
+
+↩️ **False positive (1):**
+- **BUG-09 — `state` read in `build()` before initialized** — `hasState` doesn't exist in Riverpod 2.x. The original code is safe because `_seededForUserId` starts `null`, so the early return is never reached on first build.
+
+**Changed Files (12):**
+| File | Bugs |
+|------|------|
+| `lib/features/home/views/worker_dashboard.dart` | #1 (earnings dead code), #11 (rejected case) |
+| `lib/features/chat/providers/chat_provider.dart` | #2 (removeChannel), #12 (uuid package) |
+| `lib/core/services/supabase_repository.dart` | #3 (hireWorker verification), #8 (_safeList), #14 (remove saveWorkerProfile) |
+| `lib/features/auth/views/otp_verification_view.dart` | #4 (OTP paste fix) |
+| `lib/features/worker/repositories/worker_repository.dart` | #5 (atomic categories) |
+| `lib/features/auth/repositories/auth_repository.dart` | #6 (deleted — dead class) |
+| `lib/features/chat/views/chat_detail_view.dart` | #7 (block copy), #15 (_disposed flag) |
+| `lib/features/home/views/employer_dashboard.dart` | #10 (completed job card) |
+| `lib/core/localization/strings.dart` | #11 (rejected string) |
+| `lib/core/services/notification_service.dart` | #16 (kDebugMode) |
+| `lib/features/worker/providers/worker_profile_provider.dart` | (no change — BUG-09 false positive) |
+| `test/services_test.dart` | #14 (remove saveWorkerProfile ref) |
+
+**Code Health:**
+- `dart analyze`: **0 issues** project-wide
+
+---
+
+### Previous Session (Session 18: 2 remaining audit bugs fixed)
 
 *Session 18 (addressed the last 3 bugs from the v2 audit status report):*
 

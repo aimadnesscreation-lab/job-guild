@@ -250,7 +250,9 @@ class WorkerDashboard extends ConsumerWidget {
                     ),
                   ),
                 );
-              }                  final now = DateTime.now();
+              }
+
+              final now = DateTime.now();
                   final sevenDaysAgo = now.subtract(const Duration(days: 7));
 
                   // Compute the full earnings total over the last 7 days
@@ -436,6 +438,8 @@ class WorkerDashboard extends ConsumerWidget {
         return (s.shortlisted, AppTheme.accentColor);
       case 'completed':
         return (s.completed, AppTheme.verifiedBadge);
+      case 'rejected':
+        return (s.rejected, AppTheme.errorColor);
       case 'pending':
       case 'applied':
       default:

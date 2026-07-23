@@ -81,6 +81,9 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
     // Once we have a real profile (or the fallback), keep that state so
     // unsaved form changes are not silently discarded. Also detects account
     // switches: if the logged-in user changed, re-seed from the new profile.
+    // On first build _seededForUserId is null so this early return is skipped.
+    // On subsequent rebuilds the previous state is preserved until the user
+    // switches accounts (detected by a changed currentUserId).
     if (_seededForUserId != null && _seededForUserId == currentUserId) {
       return state;
     }

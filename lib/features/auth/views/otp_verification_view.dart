@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
@@ -218,7 +219,7 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
                         focusNode: _otpFocusNodes[index],
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        maxLength: 1,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,

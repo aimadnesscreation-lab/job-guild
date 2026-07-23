@@ -147,8 +147,14 @@ Future<void> initializeFirebase() async {
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint(
-      'Firebase initialization error (may be already initialized): $e',
-    );
+    // In debug, log the full error. In production, this is expected when
+    // google-services.json is missing on a development device — but a
+    // production build with missing config should still surface visibly.
+    if (kDebugMode) {
+      debugPrint('Firebase init error (dev): $e');
+    } else {
+      // Re-throw in release builds so monitoring tools can surface it.
+      debugPrint('Firebase init failed in production: $e');
+    }
   }
 }

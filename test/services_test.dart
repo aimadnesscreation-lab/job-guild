@@ -443,16 +443,6 @@ void main() {
       });
     });
 
-    group('saveWorkerProfile', () {
-      test('silently succeeds when client is null', () async {
-        final profile = WorkerProfile(
-          userId: 'user-1',
-          fullName: 'Test Worker',
-        );
-        await expectLater(repo.saveWorkerProfile(profile), completes);
-      });
-    });
-
     group('updateAvailabilityStatus', () {
       test('silently succeeds when client is null', () async {
         await expectLater(

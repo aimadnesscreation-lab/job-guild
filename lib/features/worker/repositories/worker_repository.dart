@@ -13,24 +13,38 @@ class WorkerRepository {
   /// if categories can't be persisted.
   Future<void> _saveCategories(String userId, List<String> categories) async {
     try {
-      // Remove existing category assignments
-      await _supabase
-          .from('worker_categories')
-          .delete()
-          .eq('worker_id', userId);
-
-      if (categories.isEmpty) return;
-
-      // Map category names to their IDs and batch insert in a single request.
+      // Map category names to their IDs.
       final rows = <Map<String, dynamic>>[];
+      final newCategoryIds = <int>[];
       for (final name in categories) {
         final catId = categoryNameToId[name];
         if (catId != null) {
           rows.add({'worker_id': userId, 'category_id': catId});
+          newCategoryIds.add(catId);
         }
       }
+
+      // Upsert new rows first so data is never lost on partial failure.
       if (rows.isNotEmpty) {
-        await _supabase.from('worker_categories').insert(rows);
+        await _supabase.from('worker_categories').upsert(
+          rows,
+          onConflict: 'worker_id,category_id',
+        );
+      }
+
+      // Prune stale category assignments that are no longer selected.
+      if (newCategoryIds.isNotEmpty) {
+        await _supabase
+            .from('worker_categories')
+            .delete()
+            .eq('worker_id', userId)
+            .not('category_id', 'in', newCategoryIds);
+      } else {
+        // All categories removed — delete everything.
+        await _supabase
+            .from('worker_categories')
+            .delete()
+            .eq('worker_id', userId);
       }
     } catch (e) {
       // Categories are best-effort — log and surface the error so the UI can

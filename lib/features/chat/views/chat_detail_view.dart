@@ -495,7 +495,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('User blocked. You will no longer receive messages from them.'),
+          content: Text('User blocked on this device.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1047,6 +1047,7 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
   StreamSubscription? _durationSub;
   StreamSubscription? _stateSub;
   Timer? _waveformTick;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -1055,17 +1056,17 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
 
     // Listen to position updates (~200ms on most platforms)
     _positionSub = _player.onPositionChanged.listen((pos) {
-      if (context.mounted) setState(() => _position = pos);
+      if (!_disposed && context.mounted) setState(() => _position = pos);
     });
 
     // Listen to duration
     _durationSub = _player.onDurationChanged.listen((dur) {
-      if (context.mounted) setState(() => _duration = dur);
+      if (!_disposed && context.mounted) setState(() => _duration = dur);
     });
 
     // Listen to state changes
     _stateSub = _player.onPlayerStateChanged.listen((state) {
-      if (!context.mounted) return;
+      if (_disposed || !context.mounted) return;
       setState(() => _playerState = state);
       if (state == PlayerState.playing) {
         _startWaveformTick();
@@ -1075,14 +1076,14 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
     });
 
     // Set source with error handling for expired/invalid URLs.
-    // Can't await in initState, so we handle errors via the state listener.
     _player.setSourceUrl(widget.url).catchError((_) {
-      if (mounted) setState(() => _playerState = PlayerState.stopped);
+      if (!_disposed && mounted) setState(() => _playerState = PlayerState.stopped);
     });
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _stopWaveformTick();
     _positionSub?.cancel();
     _durationSub?.cancel();

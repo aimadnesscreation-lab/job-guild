@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/features/chat/models/message_model.dart';
 
@@ -108,17 +109,10 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// Generate a v4 UUID without adding a dependency.
-  String _generateUuid() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
-  }
+  static const _uuid = Uuid();
+
+  /// Generate a v4 UUID using the uuid package.
+  String _generateUuid() => _uuid.v4();
 
   /// Fetch the current user's conversations from Supabase
   Future<void> _loadConversations() async {
@@ -514,8 +508,12 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Subscribe to live changes for the given job/conversation and apply them
   /// as deltas (insert/update/delete) instead of refetching the whole thread.
   void _subscribeToMessages(String conversationId) {
-    // Unsubscribe from previous channel
-    _messagesChannel?.unsubscribe();
+    // Unsubscribe and remove previous channel before creating a new one.
+    if (_messagesChannel != null) {
+      _messagesChannel!.unsubscribe();
+      Supabase.instance.client.removeChannel(_messagesChannel!);
+      _messagesChannel = null;
+    }
 
     final client = Supabase.instance.client;
 

@@ -35,7 +35,7 @@ class SupabaseRepository {
         'get_nearby_jobs',
         params: {'lat': lat, 'lng': lng, 'radius_km': radiusKm},
       );
-      final list = response;
+      final list = _safeList(response);
       return list.map((j) => Job.fromJson(j)).toList();
     } catch (e) {
       debugPrint('[Jobs] getNearbyJobs error: $e');
@@ -160,6 +160,19 @@ class SupabaseRepository {
     await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
 
     // Step 3: Verify both updates actually took effect.
+    final appCheck = await client
+        .from('applications')
+        .select('status')
+        .eq('job_id', jobId)
+        .eq('worker_id', workerId)
+        .maybeSingle();
+    if (appCheck == null || appCheck['status'] != 'hired') {
+      debugPrint('[Hire] Application status verification failed — status is '
+          '${appCheck?['status']}');
+      return false;
+    }
+
+    // Step 4: Verify the job row.
     final jobCheck = await client
         .from('jobs')
         .select('status')
@@ -283,22 +296,6 @@ class SupabaseRepository {
     } catch (e) {
       return null;
     }
-  }
-
-  Future<void> saveWorkerProfile(WorkerProfile profile) async {
-    final client = _client;
-    if (client == null) return;
-
-    await client.from('worker_profiles').upsert({
-      'id': profile.userId,
-      'headline': profile.headline,
-      'bio': profile.bio,
-      'years_experience': profile.yearsExperience,
-      'hourly_rate_pkr': profile.hourlyRatePkr,
-      'availability_status': profile.availabilityStatus.name,
-      'service_radius_km': profile.serviceRadiusKm,
-      'portfolio_media': profile.portfolioMediaUrls,
-    }, onConflict: 'id');
   }
 
   /// Lightweight PATCH — update only the availability status without

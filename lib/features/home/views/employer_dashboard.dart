@@ -128,7 +128,7 @@ class EmployerDashboard extends ConsumerWidget {
                   ),
                 )
               else
-                ...completed.map((job) => _ActiveJobCard(job: job)),
+                ...completed.map((job) => _ActiveJobCard(job: job, showApplicantCount: false, interactive: false)),
               const SizedBox(height: 20),
             ],
           ),
@@ -211,12 +211,16 @@ class _StatCard extends StatelessWidget {
 
 class _ActiveJobCard extends ConsumerWidget {
   final Job job;
+  final bool showApplicantCount;
+  final bool interactive;
 
-  const _ActiveJobCard({required this.job});
+  const _ActiveJobCard({required this.job, this.showApplicantCount = true, this.interactive = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final applicantCount = ref.watch(_applicantCountProvider(job.id));
+    final applicantCount = showApplicantCount
+        ? ref.watch(_applicantCountProvider(job.id))
+        : const AsyncValue.data(0);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
@@ -254,17 +258,21 @@ class _ActiveJobCard extends ConsumerWidget {
             ),
           ],
         ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          size: 18,
-          color: AppTheme.textDisabled,
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => JobDetailView(job: job)),
-          );
-        },
+        trailing: interactive
+            ? const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppTheme.textDisabled,
+              )
+            : null,
+        onTap: interactive
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => JobDetailView(job: job)),
+                );
+              }
+            : null,
       ),
     );
   }

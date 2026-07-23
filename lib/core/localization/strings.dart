@@ -445,6 +445,7 @@ class AppStrings {
 
   // ─── Bottom Action Bar ────────────────────────────────────
   String get interested => _t('Interested', 'دلچسپی ہے');
+  String get rejected => _t('Rejected', 'مسترد');
   String get shortlisted => _t('Shortlisted', 'شارٹ لسٹ');
   String get hired => _t('Hired', 'بھرتی ہو گیا');
 
