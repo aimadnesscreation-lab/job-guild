@@ -37,7 +37,7 @@
 - `dart analyze`: **0 errors, 0 warnings, 0 info** ✅
 - `flutter test`: **110/110 pass, 2 skip** ✅
 - `flutter build web`: ✅ Success
-- `flutter build apk`: ✅ Verified on GitHub Actions runner
+- `flutter build apk`: ⏳ Pending CI verification (location package removed)
 - Deno tests: **15/15 pass** ✅
 
 ---
