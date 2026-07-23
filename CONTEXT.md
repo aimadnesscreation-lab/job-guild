@@ -21,20 +21,23 @@
 🔴 **Critical:**
 1. **FIX — Firebase Init Crash** — Logged production errors instead of re-throwing, ensuring graceful degradation.
 2. **FIX — SMS Edge Function Repair** — Restored truncated code and fixed `SendSmsPayload` interface.
+3. **FIX — FCM Token Cleanup** — Added automatic FCM token deletion from Supabase on logout to prevent cross-user notification leakage.
 
 🟠 **High:**
-3. **FIX — Auth Provider Error Handling** — Refactored `verifyOtp` for modern Supabase patterns (`AuthException` handling) and added network error handling (`SocketException`).
+4. **FIX — Auth Provider Error Handling** — Refactored `verifyOtp` for modern Supabase patterns (`AuthException` handling) and added network error handling (`SocketException`).
+5. **FIX — Job Location Default** — Added check in `Job.fromJson` to use default Lahore coordinates (31.5204, 74.3587) if location is missing (previously defaulted to 0,0).
 
 🟡 **Medium:**
-4. **POLISH — Linter Cleanups** — Removed unnecessary `// ignore_for_file: use_build_context_synchronously` in `language_selection_view.dart` because the code already includes proper `context.mounted` checks.
+6. **POLISH — Linter Cleanups** — Removed unnecessary `// ignore_for_file: use_build_context_synchronously` in `language_selection_view.dart` because the code already includes proper `context.mounted` checks.
 
 **Changed Files:**
 | File | Changes |
 |------|---------|
-| `lib/core/services/notification_service.dart` | #1 (Firebase init crash) |
+| `lib/core/services/notification_service.dart` | #1 (Firebase init crash), #3 (FCM cleanup) |
 | `supabase/functions/send-sms/index.ts` | #2 (Truncated function repair) |
-| `lib/features/auth/providers/auth_provider.dart` | #3 (Auth API patterns, network handling) |
-| `lib/features/auth/views/language_selection_view.dart` | #4 (Linter ignore removal) |
+| `lib/features/auth/providers/auth_provider.dart` | #4 (Auth API patterns, network handling) |
+| `lib/features/auth/views/language_selection_view.dart` | #6 (Linter ignore removal) |
+| `lib/features/jobs/models/job_model.dart` | #5 (Job location default) |
 
 
 *Session 20 (Final Remediation Pass):*

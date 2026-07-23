@@ -72,6 +72,11 @@ class Job {
 
   factory Job.fromJson(Map<String, dynamic> json) {
     final (parsedLat, parsedLng) = _parseCoordinates(json);
+    
+    // Check if coordinates are valid (not 0,0), otherwise use Lahore defaults
+    final lat = (parsedLat == 0.0 && parsedLng == 0.0) ? 31.5204 : parsedLat;
+    final lng = (parsedLat == 0.0 && parsedLng == 0.0) ? 74.3587 : parsedLng;
+
     return Job(
       id: json['id'] as String? ?? '',
       employerId: json['employer_id'] as String? ?? '',
@@ -88,8 +93,8 @@ class Job {
           : (json['budget_amount'] as num?)?.toInt(),
       budgetType: Job.parseBudgetType(json['budget_type'] as String?),
       locationText: json['location_text'] as String?,
-      lat: parsedLat,
-      lng: parsedLng,
+      lat: lat,
+      lng: lng,
       status: Job.parseJobStatus(json['status'] as String?),
       urgency: Job.parseUrgency(json['urgency'] as String?),
       scheduledFor: json['scheduled_for'] != null

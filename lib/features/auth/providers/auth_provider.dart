@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:local_services_marketplace/core/services/notification_service.dart';
 
 /// Tracks the current authentication state (session, loading, error)
 final authStateChangesProvider = StreamProvider<AuthState>((ref) {
@@ -78,6 +79,7 @@ class AuthNotifier extends Notifier<void> {
 
   /// Sign out
   Future<void> signOut() async {
+    await ref.read(notificationServiceProvider).signOut();
     await Supabase.instance.client.auth.signOut();
   }
 }

@@ -24,16 +24,11 @@ serve(async (req) => {
     console.log(`[SMS Hook] To: ${payload.phone.substring(0, 5)}***`); // Redact phone in logs
     console.log(`[SMS Hook] Type: ${payload.type}`);
 if (provider === "log") {
-  const enableLogging = Deno.env.get("ENABLE_OTP_LOGGING") === "true";
-  if (enableLogging) {
-    console.log(`[SMS Hook] [DEV] OTP for ${payload.phone}: ${otp}`);
-  } else {
-    console.log(`[SMS Hook] [DEV] OTP logging suppressed. Set ENABLE_OTP_LOGGING=true to see codes.`);
-  }
+  console.log(`[SMS Hook] [DEV] OTP delivery simulated.`);
   return new Response(
         JSON.stringify({
           success: true,
-          message: "[DEV MODE] OTP logged to Edge Function logs",
+          message: "[DEV MODE] OTP delivery simulated",
         }),
         { headers: { "Content-Type": "application/json" } },
       );

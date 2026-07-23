@@ -79,6 +79,20 @@ class NotificationService {
     }
   }
 
+  /// Clean up FCM token on logout
+  Future<void> signOut() async {
+    if (_token == null) return;
+    try {
+      final client = Supabase.instance.client;
+      await client.from('fcm_tokens').delete().eq('token', _token!);
+      debugPrint('[FCM] Token deleted from Supabase on logout');
+      _token = null;
+      _currentUserId = null;
+    } catch (e) {
+      debugPrint('[FCM] Failed to delete token on logout: $e');
+    }
+  }
+
   /// Save (or update) the FCM token in the fcm_tokens table.
   /// Removes any previously-stored tokens for this user on the same
   /// platform so stale tokens do not accumulate over time.
