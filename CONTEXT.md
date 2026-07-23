@@ -10,9 +10,21 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-24 — Session 25)
+## Current State (Updated 2026-07-24 — Session 25/26)
 
-### Branch `main` — All bugs fixed, CI/CD pipeline active, APK build verified on GitHub Actions ✅.
+### Edge Functions: Deployed ✅ (2026-07-24)
+
+All 4 Edge Functions deployed to Supabase project `izjfugswuwyinaeauhvz`:
+| Function | Status |
+|----------|--------|
+| `bright-api` | ✅ Deployed |
+| `rapid-worker` | ✅ Deployed |
+| `send-sms` | ✅ Deployed |
+| `send-push-notification` | ✅ Deployed |
+
+---
+
+### Branch `main` — All bugs fixed, CI/CD pipeline green, APK build verified, Edge Functions deployed ✅.
 
 ### Latest Developments (2026-07-24 — Session 25: CI/CD + APK Build Fixes)
 
@@ -54,7 +66,7 @@
 
 ✅ **Deno Tests:** Installed Deno 2.9.3, ran all 4 Edge Function test suites — **15/15 pass** (bright-api: 3, rapid-worker: 5, send-sms: 2, send-push-notification: 5).
 
-⚠️ **Supabase Deploy:** Blocked — requires `npx supabase login` for authentication.
+✅ **Supabase Deploy:** All 4 functions deployed to `izjfugswuwyinaeauhvz` (2026-07-24).
 
 **Changed Files:**
 | File | Changes |
