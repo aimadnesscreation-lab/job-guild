@@ -530,8 +530,12 @@ class AppStrings {
     'Chat with workers and employers about your jobs. Send images, voice messages, and share your location.',
     'نوکریوں کے بارے میں کارکنوں اور آجروں سے بات کریں۔ تصاویر، صوتی پیغامات بھیجیں اور اپنا مقام شیئر کریں۔',
   );
-  String get tutorialStepCounter =>
-      _t('Step {current} of {total}', 'مرحلہ {current} از {total}');
+  String tutorialStepCounter(int current, int total) {
+    final template = _t('Step {current} of {total}', 'مرحلہ {current} از {total}');
+    return template
+        .replaceAll('{current}', current.toString())
+        .replaceAll('{total}', total.toString());
+  }
 
   // ─── Favorites ────────────────────────────────────────────
   String get savedWorkers => _t('Saved Workers', 'محفوظ کارکن');

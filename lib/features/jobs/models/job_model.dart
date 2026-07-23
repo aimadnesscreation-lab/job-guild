@@ -244,8 +244,9 @@ class JobAiMetadata {
     return JobAiMetadata(
       category: json['category'] as String? ?? '',
       urgency: json['urgency'] as String? ?? 'today',
-      suggestedBudgetPkr: json['suggested_budget_pkr'] as int? ?? 0,
-      estimatedDurationHours: json['estimated_duration_hours'] as int? ?? 2,
+      suggestedBudgetPkr: (json['suggested_budget_pkr'] as num?)?.toInt() ?? 0,
+      estimatedDurationHours:
+          (json['estimated_duration_hours'] as num?)?.toInt() ?? 2,
       requiredSkills:
           (json['required_skills'] as List<dynamic>?)
               ?.map((e) => e.toString())

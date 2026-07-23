@@ -231,11 +231,11 @@ class SupabaseRepository {
           .eq('worker_id', workerId)
           .order('applied_at', ascending: false);
       final allApps = _safeList(response);
-      // Client-side filter: include hired apps OR apps for completed jobs.
+      // Client-side filter: only include applications where THIS worker was 
+      // hired or successfully completed the job (Bug #6 Fix).
       return allApps.where((a) {
-        if (a['status'] == 'hired') return true;
-        final job = a['jobs'] as Map<String, dynamic>?;
-        return job?['status'] == 'completed';
+        final status = a['status'] as String?;
+        return status == 'hired' || status == 'completed';
       }).toList();
     } catch (e) {
       return [];
@@ -272,7 +272,7 @@ class SupabaseRepository {
             '*, worker_profiles!inner(id, headline, average_rating, total_jobs_completed, users!inner(full_name, profile_photo_url, is_verified))',
           )
           .eq('job_id', jobId)
-          .order('created_at');
+          .order('applied_at'); // Bug #7 Fix: use applied_at
       return _safeList(response);
     } catch (e) {
       return [];

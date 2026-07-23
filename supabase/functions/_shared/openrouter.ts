@@ -44,7 +44,7 @@ export async function callOpenRouter(
   const {
     temperature = 0.1,
     maxTokens = 400,
-    model = "google/gemma-4-26b-a4b-it:free",
+    model = Deno.env.get("OPENROUTER_MODEL") || "google/gemma-4-26b-a4b-it:free",
   } = options;
 
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {

@@ -1,23 +1,9 @@
 // Supabase Edge Function: rapid-worker
 // Generates professional worker bios and suggests categories from freeform text.
-//
-// Environment variables:
-// - OPENROUTER_API_KEY: Your OpenRouter API key (shared with bright-api)
-// - OPENROUTER_BASE_URL: Optional, defaults to https://openrouter.ai/api/v1
-//
-// Called from: Flutter client via supabase.functions.invoke('rapid-worker', body)
-//
-// Endpoint: POST /rapid-worker
-// Body: {
-//   "raw_description": "I worked in construction for 8 years, mostly plumbing and tiling."
-// }
-// Response: {
-//   "bio": "Professional plumber and tiler with 8 years of construction experience...",
-//   "categories": ["Plumbing", "Masonry", "General Labor"]
-// }
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
+import { VALID_CATEGORIES, findBestCategoryMatch } from "../_shared/utils.ts";
 
 interface ProfileRequestBody {
   raw_description: string;
@@ -28,16 +14,7 @@ interface ProfileResponse {
   categories: string[];
 }
 
-const VALID_CATEGORIES = [
-  "Plumbing", "Electrical", "Painting", "Carpentry", "Masonry",
-  "Mechanic", "Bike Repair", "Car Wash",
-  "Labor", "Welding", "Steel Fixing",
-  "Tutor", "Language Teacher",
-  "Laptop Repair", "Mobile Repair", "Web Developer",
-  "Photographer", "DJ", "Cook",
-  "Cleaning", "Moving", "Healthcare", "Beauty", "Pet Care",
-  "General Labor",
-];
+const CATEGORY_LIMIT = 3;
 
 /**
  * Extract JSON from LLM response, stripping markdown fences.
@@ -59,11 +36,19 @@ function extractJson(raw: string): ProfileResponse {
     return fallbackParse(raw);
   }
 
+  // Bug #5 fix: Ensure categories is an array before filtering
+  const suggestedCategories = Array.isArray(parsed.categories)
+    ? (parsed.categories as unknown[]).map(c => String(c))
+    : [];
+
   return {
     bio: (parsed.bio as string) || "",
-    categories: (parsed.categories as string[])?.filter((c) =>
-      VALID_CATEGORIES.includes(c)
-    ) || [],
+    categories: suggestedCategories
+      .map(c => findBestCategoryMatch(c))
+      .filter((c, index, self) => 
+        (VALID_CATEGORIES as unknown as string[]).includes(c) && self.indexOf(c) === index
+      )
+      .slice(0, CATEGORY_LIMIT),
   };
 }
 
@@ -102,7 +87,7 @@ function fallbackParse(text: string): ProfileResponse {
 
   for (const [keyword, category] of Object.entries(keywordMap)) {
     if (lower.includes(keyword) && !matched.includes(category)) {
-      if (matched.length < 3) matched.push(category);
+      if (matched.length < CATEGORY_LIMIT) matched.push(category);
     }
   }
 

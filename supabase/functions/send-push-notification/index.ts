@@ -1,21 +1,8 @@
 // Supabase Edge Function: send-push-notification
 // Triggered by database changes to send FCM push notifications to users.
-//
-// Environment variables:
-// - FCM_SERVICE_ACCOUNT: Full JSON service account key from Firebase
-//   (Project Settings → Service Accounts → Generate New Private Key)
-//
-// Called via: supabase.functions.invoke('send-push-notification', body)
-// Or via DB webhook: on INSERT to notifications, messages, jobs
-//
-// Body: {
-//   "user_id": "uuid",
-//   "title": "Notification title",
-//   "body": "Notification body",
-//   "data": { "type": "new_message|job_match|status_update|application", "id": "..." }
-// }
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { encodeBase64Url } from "../_shared/utils.ts";
 
 interface PushPayload {
   user_id: string;
@@ -41,12 +28,13 @@ let _cachedToken: { token: string; expiresAt: number } | null = null;
 
 /**
  * Get an OAuth2 access token from the Firebase service account.
- * Uses Google's OAuth2 server-to-server flow (JWT assertion → access token).
- * Tokens are cached and auto-refreshed.
  */
 async function getAccessToken(): Promise<string> {
+  const nowMs = Date.now();
+  
   // Return cached token if still valid (with 5 min buffer)
-  if (_cachedToken && _cachedToken.expiresAt > Date.now() + 300_000) {
+  // Fix Bug #8: Also check if token is already expired or near expiry.
+  if (_cachedToken && _cachedToken.expiresAt > nowMs + 300_000) {
     return _cachedToken.token;
   }
 
@@ -54,7 +42,7 @@ async function getAccessToken(): Promise<string> {
   if (!raw) throw new Error("FCM_SERVICE_ACCOUNT not configured");
 
   const sa: ServiceAccount = JSON.parse(raw);
-  const now = Math.floor(Date.now() / 1000);
+  const nowSec = Math.floor(nowMs / 1000);
 
   // Build JWT assertion
   const header = { alg: "RS256", typ: "JWT" };
@@ -62,22 +50,16 @@ async function getAccessToken(): Promise<string> {
     iss: sa.client_email,
     scope: "https://www.googleapis.com/auth/firebase.messaging",
     aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
+    exp: nowSec + 3600,
+    iat: nowSec,
   };
 
-  // Base64url encode helper
-  const b64 = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, "").replace(/\+/g, "-").replace(
-      /\//g,
-      "_",
-    );
-
-  const headerB64 = b64(header);
-  const payloadB64 = b64(payload);
+  // Fix Bug #1: Use proper Base64URL encoding from shared utils
+  const headerB64 = encodeBase64Url(JSON.stringify(header));
+  const payloadB64 = encodeBase64Url(JSON.stringify(payload));
   const toSign = `${headerB64}.${payloadB64}`;
 
-  // Convert PEM private key to ArrayBuffer (PKCS#8 DER format)
+  // Convert PEM private key to ArrayBuffer
   const pemToBinary = (pem: string): ArrayBuffer => {
     const b64Content = pem
       .replace(/-----BEGIN PRIVATE KEY-----/, "")
@@ -91,7 +73,6 @@ async function getAccessToken(): Promise<string> {
     return bytes.buffer;
   };
 
-  // Import the private key and sign
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
     pemToBinary(sa.private_key),
@@ -106,15 +87,11 @@ async function getAccessToken(): Promise<string> {
     new TextEncoder().encode(toSign),
   );
 
-  // Encode signature as base64url
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+  // Fix Bug #2: Use proper Base64URL encoding for signature (safe from stack overflow)
+  const sigB64 = encodeBase64Url(new Uint8Array(signature));
 
   const jwt = `${toSign}.${sigB64}`;
 
-  // Exchange JWT for access token
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -131,14 +108,38 @@ async function getAccessToken(): Promise<string> {
     );
   }
 
-  // Cache the token (expires_in is typically 3600s). Store expiry in ms so
-  // the comparison with Date.now() works correctly.
   _cachedToken = {
     token: tokenData.access_token,
-    expiresAt: (now + (tokenData.expires_in || 3600)) * 1000,
+    expiresAt: (nowSec + (tokenData.expires_in || 3600)) * 1000,
   };
 
   return tokenData.access_token;
+}
+
+/**
+ * Remove a dead FCM token from the database.
+ */
+async function removeDeadToken(token: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/fcm_tokens?token=eq.${token}`,
+      {
+        method: "DELETE",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+      },
+    );
+    if (response.ok) {
+      console.log(`[send-push] Successfully removed dead token from database`);
+    }
+  } catch (e) {
+    console.error(`[send-push] Failed to remove dead token: ${e}`);
+  }
 }
 
 /**
@@ -148,6 +149,7 @@ async function getUserFcmToken(userId: string): Promise<string | null> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
+  // User-12: The RPC is the preferred way. If it returns null, we fallback once.
   const response = await fetch(
     `${supabaseUrl}/rest/v1/rpc/get_user_fcm_token`,
     {
@@ -162,9 +164,8 @@ async function getUserFcmToken(userId: string): Promise<string | null> {
   );
 
   if (!response.ok) {
-    // Fallback: query the fcm_tokens table directly
     const fallback = await fetch(
-      `${supabaseUrl}/rest/v1/fcm_tokens?user_id=eq.${userId}&select=token&order=created_at.desc&limit=1`,
+      `${supabaseUrl}/rest/v1/fcm_tokens?user_id=eq.${userId}&select=token&order=updated_at.desc&limit=1`,
       {
         headers: {
           "apikey": supabaseKey,
@@ -179,9 +180,9 @@ async function getUserFcmToken(userId: string): Promise<string | null> {
   }
 
   const data = await response.json();
-  return Array.isArray(data)
-    ? data[0]?.token || null
-    : data?.token || null;
+  // RPC returns the token directly or a single-row list
+  if (typeof data === "string") return data;
+  return Array.isArray(data) ? data[0]?.token || null : data?.token || null;
 }
 
 /**
@@ -199,10 +200,7 @@ async function sendFcmNotification(
   const v1Message = {
     message: {
       token,
-      notification: {
-        title,
-        body,
-      },
+      notification: { title, body },
       data: data || undefined,
       android: {
         priority: "high" as const,
@@ -242,16 +240,16 @@ async function sendFcmNotification(
     return { success: true, message_id: result.name };
   }
 
-  // Handle specific error cases
   const errorBody = await response.text();
   let errorMsg = `HTTP ${response.status}`;
   try {
     const err = JSON.parse(errorBody);
     errorMsg = err.error?.message || err.error?.status || errorMsg;
 
-    // Token not registered — clean up
+    // Bug #13 Fix: Remove token from DB if it's dead
     if (errorMsg.includes("UNREGISTERED") || errorMsg.includes("NOT_FOUND")) {
-      console.warn(`[FCM] Token not registered, should remove: ${token}`);
+      console.warn(`[FCM] Token dead: ${token}. Removing from DB.`);
+      await removeDeadToken(token);
     }
   } catch {
     errorMsg = errorBody || errorMsg;
@@ -261,7 +259,6 @@ async function sendFcmNotification(
 }
 
 serve(async (req) => {
-  // Only accept POST requests
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -279,34 +276,18 @@ serve(async (req) => {
       );
     }
 
-    console.log(
-      `[send-push] Sending to user ${payload.user_id}: ${payload.title}`,
-    );
-
-    // Get the user's FCM token
     const token = await getUserFcmToken(payload.user_id);
     if (!token) {
-      console.log(`[send-push] No FCM token found for user ${payload.user_id}`);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: "No FCM token found for user",
-        }),
+        JSON.stringify({ success: false, error: "No FCM token found" }),
         { headers: { "Content-Type": "application/json" } },
       );
     }
 
-    // Get project ID from the service account
     const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
-    if (!raw) {
-      return new Response(
-        JSON.stringify({ success: false, error: "FCM_SERVICE_ACCOUNT not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
-      );
-    }
+    if (!raw) throw new Error("FCM_SERVICE_ACCOUNT not configured");
     const sa: ServiceAccount = JSON.parse(raw);
 
-    // Send the notification via FCM v1
     const result = await sendFcmNotification(
       sa.project_id,
       token,
@@ -314,12 +295,6 @@ serve(async (req) => {
       payload.body,
       payload.data,
     );
-
-    if (result.success) {
-      console.log(`[send-push] Sent successfully: ${result.message_id}`);
-    } else {
-      console.error(`[send-push] Failed: ${result.error}`);
-    }
 
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },

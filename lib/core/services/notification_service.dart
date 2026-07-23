@@ -95,15 +95,6 @@ class NotificationService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'token');
 
-      // Clean up other tokens for this user+platform so only the latest one
-      // remains and stale tokens are not targeted by future pushes.
-      await client
-          .from('fcm_tokens')
-          .delete()
-          .eq('user_id', userId)
-          .eq('platform', platform)
-          .neq('token', token);
-
       debugPrint('[FCM] Token saved to Supabase for user $userId');
     } catch (e) {
       debugPrint('[FCM] Failed to save token to Supabase: $e');

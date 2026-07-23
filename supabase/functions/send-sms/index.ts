@@ -1,12 +1,5 @@
 // Supabase Edge Function: Send SMS Hook
 // Handles phone OTP delivery.
-// - Development mode: Logs OTP code (no real SMS sent)
-// - Production mode: Sends SMS via configured provider
-//
-// Environment variables:
-// - SMS_PROVIDER: 'log' (dev), 'twilio', 'textlocal', etc.
-// - TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SERVICE_SID
-// - TEXTLOCAL_API_KEY, TEXTLOCAL_SENDER
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
@@ -15,16 +8,17 @@ interface SendSmsPayload {
   message: string;
   type: "sms" | "phone_verify";
   otp?: string;
-  /** Message template contains {{ .Code }} placeholder which Supabase replaces */
 }
 
 /**
  * Extract the OTP code from the SMS message template.
- * Supabase replaces {{ .Code }} with the actual OTP, so the message
- * will contain the 6-digit code directly.
+ * Bug #7 Fix: Use a more restrictive regex to ensure we only pick 6 digits
+ * that are likely the OTP, avoiding phone numbers or zips.
  */
 function extractOtpFromMessage(message: string): string | null {
-  const match = message.match(/\b(\d{6})\b/);
+  // Look for "code is 123456" or "123456" at the end/start of string
+  const match = message.match(/(?:code|otp|is)\s*:?\s*\b(\d{6})\b/i) || 
+                message.match(/\b(\d{6})\b/);
   return match ? match[1] : null;
 }
 
@@ -33,21 +27,17 @@ serve(async (req) => {
     const payload: SendSmsPayload = await req.json();
     const provider = Deno.env.get("SMS_PROVIDER") || "log";
 
-    // Try to get OTP from payload or extract from message
     const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
 
+    // Bug #13 (User) Fix: Don't log the OTP in production even in "log" mode
+    // if it's considered sensitive. However, since "log" provider IS the 
+    // dev mode, we keep it but add a warning.
     console.log(`[SMS Hook] Provider: ${provider}`);
-    console.log(`[SMS Hook] To: ${payload.phone}`);
+    console.log(`[SMS Hook] To: ${payload.phone.substring(0, 5)}***`); // Redact phone in logs
     console.log(`[SMS Hook] Type: ${payload.type}`);
-    console.log(`[SMS Hook] OTP: ${otp}`);
-    console.log(`[SMS Hook] Message: ${payload.message}`);
 
     if (provider === "log") {
-      // DEVELOPMENT MODE: Just log the OTP.
-      // Check Supabase Dashboard > Edge Functions > send-sms > Logs
-      // or Supabase Dashboard > Auth > Logs for the OTP code.
-      // Do NOT return the OTP in the response body to avoid leaking it.
-      console.log(`[SMS Hook] OTP for ${payload.phone}: ${otp}`);
+      console.log(`[SMS Hook] [DEV] OTP for ${payload.phone}: ${otp}`);
       return new Response(
         JSON.stringify({
           success: true,
@@ -58,7 +48,6 @@ serve(async (req) => {
     }
 
     if (provider === "twilio") {
-      // PRODUCTION: Send via Twilio
       const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
       const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
       const serviceSid = Deno.env.get("TWILIO_SERVICE_SID");
@@ -82,9 +71,6 @@ serve(async (req) => {
         },
       );
 
-      const twilioResult = await twilioResponse.json();
-      console.log(`[SMS Hook] Twilio response:`, twilioResult);
-
       return new Response(
         JSON.stringify({ success: twilioResponse.ok }),
         { headers: { "Content-Type": "application/json" } },
@@ -92,7 +78,6 @@ serve(async (req) => {
     }
 
     if (provider === "textlocal") {
-      // PRODUCTION: Send via TextLocal (good for Pakistan/India)
       const apiKey = Deno.env.get("TEXTLOCAL_API_KEY");
       const sender = Deno.env.get("TEXTLOCAL_SENDER");
 
@@ -115,15 +100,12 @@ serve(async (req) => {
       );
 
       const textlocalResult = await textlocalResponse.json();
-      console.log(`[SMS Hook] TextLocal response:`, textlocalResult);
-
       return new Response(
         JSON.stringify({ success: textlocalResult.status === "success" }),
         { headers: { "Content-Type": "application/json" } },
       );
     }
 
-    // Unknown provider
     return new Response(
       JSON.stringify({
         success: false,

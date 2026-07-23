@@ -1,47 +1,26 @@
 // Supabase Edge Function: bright-api
 // Proxies job description parsing requests to OpenRouter's free AI models.
-//
-// Environment variables:
-// - OPENROUTER_API_KEY: Your OpenRouter API key (set via `supabase secrets set`)
-// - OPENROUTER_BASE_URL: Optional, defaults to https://openrouter.ai/api/v1
-//
-// Called from: Flutter client via supabase.functions.invoke('bright-api', body)
-//
-// Endpoint: POST /bright-api
-// Body: { "description": "Freeform job description text" }
-// Response: {
-//   "category": "Plumbing",
-//   "urgency": "instant" | "today" | "scheduled",
-//   "suggested_budget_pkr": 2500,
-//   "estimated_duration_hours": 2,
-//   "required_skills": ["Plumbing"]
-// }
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
+import { 
+  findBestCategoryMatch, 
+  estimateBudget, 
+  VALID_CATEGORIES, 
+  Category 
+} from "../_shared/utils.ts";
 
 interface ParseRequestBody {
   description: string;
 }
 
 interface ParseResponse {
-  category: string;
+  category: Category;
   urgency: string;
   suggested_budget_pkr: number;
   estimated_duration_hours: number;
   required_skills: string[];
 }
-
-const VALID_CATEGORIES = [
-  "Plumbing", "Electrical", "Painting", "Carpentry", "Masonry",
-  "Mechanic", "Bike Repair", "Car Wash",
-  "Labor", "Welding", "Steel Fixing",
-  "Tutor", "Language Teacher",
-  "Laptop Repair", "Mobile Repair", "Web Developer",
-  "Photographer", "DJ", "Cook",
-  "Cleaning", "Moving", "Healthcare", "Beauty", "Pet Care",
-  "General Labor",
-] as const;
 
 const VALID_URGENCIES = ["instant", "today", "scheduled"] as const;
 
@@ -66,24 +45,25 @@ function extractJson(raw: string): ParseResponse {
   try {
     parsed = JSON.parse(cleaned) as Record<string, unknown>;
   } catch {
-    // If JSON parsing fails, do basic keyword extraction
     console.warn(
       "[bright-api] Failed to parse LLM response as JSON, using keyword fallback",
     );
     return fallbackParse(raw);
   }
 
-  const category = findBestMatch(
-    (parsed.category as string) || "",
-    VALID_CATEGORIES as unknown as string[],
-  );
+  const category = findBestCategoryMatch((parsed.category as string) || "");
   const urgency = VALID_URGENCIES.includes(parsed.urgency as string)
     ? (parsed.urgency as string)
     : "today";
 
-  const skills = Array.isArray(parsed.required_skills)
-    ? (parsed.required_skills as string[]).map((s) => String(s))
-    : [category];
+  // Fix: Default to [category] ONLY if required_skills is completely missing or not an array.
+  // If the LLM returned [], we respect it (Bug #6).
+  let skills: string[];
+  if (Array.isArray(parsed.required_skills)) {
+    skills = (parsed.required_skills as unknown[]).map((s) => String(s));
+  } else {
+    skills = [category];
+  }
 
   return {
     category,
@@ -101,56 +81,13 @@ function extractJson(raw: string): ParseResponse {
 }
 
 /**
- * Find the best matching valid category from the LLM output.
- * Handles case differences and partial matches.
- */
-function findBestMatch(input: string, validOptions: string[]): string {
-  const lower = input.toLowerCase().trim();
-
-  // Exact match (case-insensitive)
-  const exact = validOptions.find(
-    (o) => o.toLowerCase() === lower,
-  );
-  if (exact) return exact;
-
-  // Partial match
-  const partial = validOptions.find(
-    (o) => o.toLowerCase().includes(lower) || lower.includes(o.toLowerCase()),
-  );
-  if (partial) return partial;
-
-  return "General Labor";
-}
-
-/**
  * Fallback keyword-based parsing when AI is unavailable.
  */
 function fallbackParse(text: string): ParseResponse {
   const lower = text.toLowerCase();
-  let category = "General Labor";
-
-  if (lower.includes("plumb")) category = "Plumbing";
-  else if (lower.includes("electr")) category = "Electrical";
-  else if (lower.includes("paint")) category = "Painting";
-  else if (lower.includes("carpent")) category = "Carpentry";
-  else if (lower.includes("mason") || lower.includes("brick")) category = "Masonry";
-  else if (lower.includes("car wash")) category = "Car Wash";
-  else if (lower.includes("mechanic") || lower.includes("car")) category = "Mechanic";
-  else if (lower.includes("bike") || lower.includes("motor")) category = "Bike Repair";
-  else if (lower.includes("welding") || lower.includes("weld")) category = "Welding";
-  else if (lower.includes("steel")) category = "Steel Fixing";
-  else if (lower.includes("tutor") || lower.includes("teach")) category = "Tutor";
-  else if (lower.includes("laptop") || lower.includes("computer")) category = "Laptop Repair";
-  else if (lower.includes("mobile") || lower.includes("phone")) category = "Mobile Repair";
-  else if (lower.includes("web") || lower.includes("website")) category = "Web Developer";
-  else if (lower.includes("photo")) category = "Photographer";
-  else if (lower.includes("dj") || lower.includes("music")) category = "DJ";
-  else if (lower.includes("cook") || lower.includes("food") || lower.includes("chef")) category = "Cook";
-  else if (lower.includes("clean")) category = "Cleaning";
-  else if (lower.includes("move") || lower.includes("shift") || lower.includes("relocat")) category = "Moving";
-  else if (lower.includes("health") || lower.includes("nurse") || lower.includes("doctor")) category = "Healthcare";
-  else if (lower.includes("beauty") || lower.includes("salon") || lower.includes("hair")) category = "Beauty";
-  else if (lower.includes("pet") || lower.includes("dog") || lower.includes("cat")) category = "Pet Care";
+  
+  // Use findBestCategoryMatch for keyword detection (it handles partials)
+  const category = findBestCategoryMatch(text);
 
   const urgency = lower.includes("urgent") || lower.includes("emergency") || lower.includes("asap")
     ? "instant"
@@ -161,7 +98,7 @@ function fallbackParse(text: string): ParseResponse {
   return {
     category,
     urgency,
-    suggested_budget_pkr: estimateBudget(category, lower),
+    suggested_budget_pkr: estimateBudget(category, text),
     estimated_duration_hours: lower.includes("hour") || lower.includes("hr")
       ? 1
       : lower.includes("day")
@@ -171,50 +108,7 @@ function fallbackParse(text: string): ParseResponse {
   };
 }
 
-/**
- * Estimate a reasonable budget based on category and any budget hints in text.
- */
-function estimateBudget(category: string, text: string): number {
-  // Try to extract a budget hint from the text e.g. "5000", "5k", "3rs".
-  // We look at every number and prefer k-suffixed values, then the largest
-  // reasonable number, so house numbers like "42" don't override a "3k" budget.
-  const matches = text.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)\s*(k|rs|pkr)?/gi);
-  let best: number | null = null;
-  let bestHasK = false;
-  for (const match of matches) {
-    const raw = match[1].replace(/,/g, "");
-    const num = parseInt(raw, 10);
-    const hasK = match[2]?.toLowerCase() === "k";
-    const scaled = hasK ? num * 1000 : num;
-    if (
-      best === null ||
-      (hasK && !bestHasK) ||
-      (hasK === bestHasK && scaled > best)
-    ) {
-      best = scaled;
-      bestHasK = hasK;
-    }
-  }
-  if (best !== null && best >= 100 && best <= 100000) {
-    return best;
-  }
-
-  const budgets: Record<string, number> = {
-    Plumbing: 3000, Electrical: 3500, Painting: 4000,
-    Carpentry: 3500, Masonry: 5000,
-    Mechanic: 3000, "Bike Repair": 1500, "Car Wash": 1000,
-    Labor: 2000, Welding: 4000, "Steel Fixing": 5000,
-    Tutor: 500, "Language Teacher": 800,
-    "Laptop Repair": 2500, "Mobile Repair": 1500, "Web Developer": 5000,
-    Photographer: 5000, DJ: 8000, Cook: 3000,
-    Cleaning: 1500, Moving: 5000, Healthcare: 2000,
-    Beauty: 1500, "Pet Care": 1000,
-  };
-  return budgets[category] || 2000;
-}
-
 serve(async (req) => {
-  // Only accept POST requests
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -255,12 +149,10 @@ serve(async (req) => {
     let result: ParseResponse;
 
     try {
-      // Try AI parsing first
       const rawResponse = await callOpenRouter(systemPrompt, userPrompt);
       console.log(`[bright-api] LLM response: ${rawResponse.substring(0, 200)}...`);
       result = extractJson(rawResponse);
     } catch (aiError) {
-      // Fall back to keyword-based parsing if AI is unavailable
       console.warn(
         `[bright-api] AI unavailable, using keyword fallback: ${aiError}`,
       );

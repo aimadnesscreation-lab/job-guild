@@ -492,6 +492,9 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       if (otherId.isEmpty || blockedUsers.contains(otherId)) return;
       blockedUsers.add(otherId);
       await prefs.setString(blockedKey, jsonEncode(blockedUsers));
+      // Notify provider to filter this user out (Bug #8 Fix)
+      ref.read(chatProvider.notifier).refreshBlockedUsers();
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -499,6 +502,7 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+      Navigator.pop(context); // Close detail view of blocked user
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

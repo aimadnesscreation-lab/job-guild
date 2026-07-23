@@ -174,7 +174,10 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${_currentStep + 1}/${steps.length}',
+                                s.tutorialStepCounter(
+                                  _currentStep + 1,
+                                  steps.length,
+                                ),
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,

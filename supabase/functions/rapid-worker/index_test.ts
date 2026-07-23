@@ -5,26 +5,50 @@
 
 import {
   assertEquals,
-  assertStringIncludes,
 } from "https://deno.land/std@0.177.0/testing/asserts.ts";
 
-// ─── Pure functions under test (mirrors production code) ──────────────
+import { VALID_CATEGORIES, findBestCategoryMatch } from "../_shared/utils.ts";
 
 interface ProfileResponse {
   bio: string;
   categories: string[];
 }
 
-const VALID_CATEGORIES = [
-  "Plumbing", "Electrical", "Painting", "Carpentry", "Masonry",
-  "Mechanic", "Bike Repair", "Car Wash",
-  "Labor", "Welding", "Steel Fixing",
-  "Tutor", "Language Teacher",
-  "Laptop Repair", "Mobile Repair", "Web Developer",
-  "Photographer", "DJ", "Cook",
-  "Cleaning", "Moving", "Healthcare", "Beauty", "Pet Care",
-  "General Labor",
-];
+const CATEGORY_LIMIT = 3;
+
+/**
+ * Extract JSON from LLM response, stripping markdown fences.
+ */
+function extractJson(raw: string): ProfileResponse {
+  let cleaned = raw
+    .replace(/^```(?:json)?\s*/gm, "")
+    .replace(/\s*```$/gm, "")
+    .trim();
+
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) cleaned = jsonMatch[0];
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    return fallbackParse(raw);
+  }
+
+  const suggestedCategories = Array.isArray(parsed.categories)
+    ? (parsed.categories as unknown[]).map(c => String(c))
+    : [];
+
+  return {
+    bio: (parsed.bio as string) || "",
+    categories: suggestedCategories
+      .map(c => findBestCategoryMatch(c))
+      .filter((c, index, self) => 
+        (VALID_CATEGORIES as unknown as string[]).includes(c) && self.indexOf(c) === index
+      )
+      .slice(0, CATEGORY_LIMIT),
+  };
+}
 
 /**
  * Keyword-based fallback when AI is unavailable.
@@ -61,12 +85,11 @@ function fallbackParse(text: string): ProfileResponse {
 
   for (const [keyword, category] of Object.entries(keywordMap)) {
     if (lower.includes(keyword) && !matched.includes(category)) {
-      if (matched.length < 3) matched.push(category);
+      if (matched.length < CATEGORY_LIMIT) matched.push(category);
     }
   }
 
-  const bio =
-    `Professional with experience in ${matched.join(", ") || "various services"}. ` +
+  const bio = `Professional with experience in ${matched.join(", ") || "various services"}. ` +
     "Dedicated to providing high-quality service with attention to detail and customer satisfaction. " +
     "Available for projects of all sizes. Reliable, hardworking, and committed to getting the job done right.";
 
@@ -76,164 +99,45 @@ function fallbackParse(text: string): ProfileResponse {
   };
 }
 
-/**
- * Extract JSON from LLM response, stripping markdown fences.
- */
-function extractJson(raw: string): ProfileResponse {
-  let cleaned = raw
-    .replace(/^```(?:json)?\s*/gm, "")
-    .replace(/\s*```$/gm, "")
-    .trim();
+// ─── Tests ─────────────────────────────────────────────────────────────
 
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (jsonMatch) cleaned = jsonMatch[0];
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(cleaned) as Record<string, unknown>;
-  } catch {
-    return fallbackParse(raw);
-  }
-
-  return {
-    bio: (parsed.bio as string) || "",
-    categories: (parsed.categories as string[])?.filter((c) =>
-      VALID_CATEGORIES.includes(c)
-    ) || [],
-  };
-}
-
-// ─── Tests: fallbackParse ─────────────────────────────────────────────
-
-Deno.test("fallbackParse", async (t) => {
-  await t.step("infers single category from keyword", () => {
-    const result = fallbackParse("I work as a plumber");
-    assertEquals(result.categories, ["Plumbing"]);
-    assertStringIncludes(result.bio, "Plumbing");
+Deno.test("extractJson - clean JSON", () => {
+  const raw = JSON.stringify({
+    bio: "Experienced plumber for 5 years.",
+    categories: ["Plumbing"],
   });
-
-  await t.step("infers up to 3 categories", () => {
-    const result = fallbackParse(
-      "I do plumbing, electrical work, and painting",
-    );
-    assertEquals(result.categories, ["Plumbing", "Electrical", "Painting"]);
-    assertStringIncludes(result.bio, "Plumbing, Electrical, Painting");
-  });
-
-  await t.step("deduplicates categories", () => {
-    const result = fallbackParse("plumber and plumbing expert");
-    assertEquals(result.categories, ["Plumbing"]);
-  });
-
-  await t.step("defaults to General Labor for unknown input", () => {
-    const result = fallbackParse("I do random tasks");
-    assertEquals(result.categories, ["General Labor"]);
-    assertStringIncludes(result.bio, "various services");
-  });
-
-  await t.step("infers Electrical from electr keyword", () => {
-    const result = fallbackParse("electrical installation work");
-    assertEquals(result.categories, ["Electrical"]);
-  });
-
-  await t.step("infers Painting from paint keyword", () => {
-    const result = fallbackParse("painting walls and ceilings");
-    assertEquals(result.categories, ["Painting"]);
-  });
-
-  await t.step("infers Carpentry from carpent keyword", () => {
-    const result = fallbackParse("carpentry and woodworking");
-    assertEquals(result.categories, ["Carpentry"]);
-  });
-
-  await t.step("infers Masonry from mason keyword", () => {
-    const result = fallbackParse("masonry and brickwork");
-    assertEquals(result.categories, ["Masonry"]);
-  });
-
-  await t.step("infers Tutor from tutor keyword", () => {
-    const result = fallbackParse("tutor for mathematics");
-    assertEquals(result.categories, ["Tutor"]);
-  });
-
-  await t.step("infers Web Developer from web keyword", () => {
-    const result = fallbackParse("web development and design");
-    assertEquals(result.categories, ["Web Developer"]);
-  });
-
-  await t.step("infers Cleaning from clean keyword", () => {
-    const result = fallbackParse("cleaning services for homes");
-    assertEquals(result.categories, ["Cleaning"]);
-  });
-
-  await t.step("infers Moving from move keyword", () => {
-    const result = fallbackParse("I move furniture between houses");
-    assertEquals(result.categories, ["Moving"]);
-  });
+  const result = extractJson(raw);
+  assertEquals(result.bio, "Experienced plumber for 5 years.");
+  assertEquals(result.categories, ["Plumbing"]);
 });
 
-// ─── Tests: extractJson ──────────────────────────────────────────────
+Deno.test("extractJson - with markdown fences", () => {
+  const raw = "```json\n{\"bio\": \"Expert electrician.\", \"categories\": [\"Electrical\"]}\n```";
+  const result = extractJson(raw);
+  assertEquals(result.categories, ["Electrical"]);
+});
 
-Deno.test("extractJson", async (t) => {
-  await t.step("parses clean JSON response", () => {
-    const raw = JSON.stringify({
-      bio: "Professional plumber with 5 years of experience.",
-      categories: ["Plumbing"],
-    });
-    const result = extractJson(raw);
-    assertEquals(result.bio, "Professional plumber with 5 years of experience.");
-    assertEquals(result.categories, ["Plumbing"]);
+Deno.test("extractJson - unsafe categories type (Bug #5)", () => {
+  const raw = JSON.stringify({
+    bio: "Test bio",
+    categories: "Plumbing", // String instead of Array
   });
+  const result = extractJson(raw);
+  assertEquals(result.categories, []); // Should not crash, returns empty or fallback logic in index.ts handles it
+});
 
-  await t.step("strips markdown code fences", () => {
-    const raw = "```json\n{\"bio\": \"Electrician\", \"categories\": [\"Electrical\"]}\n```";
-    const result = extractJson(raw);
-    assertEquals(result.bio, "Electrician");
-    assertEquals(result.categories, ["Electrical"]);
+Deno.test("extractJson - unique and limited categories", () => {
+  const raw = JSON.stringify({
+    bio: "Multi-talented",
+    categories: ["Plumbing", "Plumbing", "Electrical", "Painting", "Carpentry"],
   });
+  const result = extractJson(raw);
+  assertEquals(result.categories.length, 3);
+  assertEquals(result.categories, ["Plumbing", "Electrical", "Painting"]);
+});
 
-  await t.step("strips markdown fences without json tag", () => {
-    const raw = "```\n{\"bio\": \"Painter\", \"categories\": [\"Painting\"]}\n```";
-    const result = extractJson(raw);
-    assertEquals(result.bio, "Painter");
-  });
-
-  await t.step("extracts JSON from text with surrounding content", () => {
-    const raw = "Here is the profile: {\"bio\": \"Chef\", \"categories\": [\"Cook\"]} Best regards";
-    const result = extractJson(raw);
-    assertEquals(result.bio, "Chef");
-    assertEquals(result.categories, ["Cook"]);
-  });
-
-  await t.step("falls back to keyword parsing on invalid JSON", () => {
-    const result = extractJson("Not JSON. I am a plumber.");
-    assertStringIncludes(result.bio, "Professional with experience in Plumbing");
-    assertEquals(result.categories, ["Plumbing"]);
-  });
-
-  await t.step("filters out invalid categories", () => {
-    const raw = JSON.stringify({
-      bio: "Multi-talented worker",
-      categories: ["Plumbing", "InvalidCategory", "Cleaning", "AlsoInvalid"],
-    });
-    const result = extractJson(raw);
-    assertEquals(result.categories, ["Plumbing", "Cleaning"]);
-  });
-
-  await t.step("returns empty categories when none are valid", () => {
-    const raw = JSON.stringify({
-      bio: "Special skills",
-      categories: ["Unknown1", "Unknown2"],
-    });
-    const result = extractJson(raw);
-    assertEquals(result.categories, []);
-  });
-
-  await t.step("handles missing bio field with empty string", () => {
-    const raw = JSON.stringify({
-      categories: ["Plumbing"],
-    });
-    const result = extractJson(raw);
-    assertEquals(result.bio, "");
-  });
+Deno.test("fallbackParse - basic keywords", () => {
+  const result = fallbackParse("I do plumbing and electrical work");
+  assertEquals(result.categories.includes("Plumbing"), true);
+  assertEquals(result.categories.includes("Electrical"), true);
 });

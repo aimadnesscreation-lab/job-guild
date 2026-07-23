@@ -76,17 +76,18 @@ class ChatNotifier extends Notifier<ChatState> {
   /// messages without re-querying.
   final Set<String> _userJobIds = {};
 
+  /// Local list of user IDs blocked by this user (persisted in SharedPreferences).
+  /// Messages from these users will be filtered out.
+  final Set<String> _blockedUserIds = {};
+
   @override
   ChatState build() {
-    // Start loading conversations on init
-    _loadConversations();
+    // Start loading conversations and blocked list on init
+    _initializeChat();
 
-    // Auto-retry queued offline messages on startup (deferred to avoid
-    // coupling the provider to Flutter's widget layer)
+    // Auto-retry queued offline messages on startup
     Future.microtask(() => retryOfflineQueue());
 
-    // Clean up the global conversation channel when this provider is
-    // disposed by Riverpod (e.g. user leaves the chat tab entirely).
     ref.onDispose(() {
       _conversationsChannel?.unsubscribe();
       if (_conversationsChannel != null) {
@@ -95,6 +96,32 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     return const ChatState(isLoading: true);
+  }
+
+  Future<void> _initializeChat() async {
+    await _loadBlockedUsers();
+    await _loadConversations();
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const blockedKey = 'blocked_users';
+      final blockedJson = prefs.getString(blockedKey);
+      if (blockedJson != null) {
+        final List list = jsonDecode(blockedJson);
+        _blockedUserIds.clear();
+        _blockedUserIds.addAll(list.cast<String>());
+      }
+    } catch (e) {
+      debugPrint('[Chat] Failed to load blocked users: $e');
+    }
+  }
+
+  /// Reload the blocked user list (called when a user is blocked in the UI).
+  Future<void> refreshBlockedUsers() async {
+    await _loadBlockedUsers();
+    await _loadConversations();
   }
 
   /// Call this when leaving the chat detail view to clean up the
@@ -298,7 +325,12 @@ class ChatNotifier extends Notifier<ChatState> {
         );
       }).toList();
 
-      state = ChatState(conversations: conversations, isLoading: false);
+      // Filter out blocked users (Bug #8 Fix)
+      final activeConversations = conversations
+          .where((c) => !_blockedUserIds.contains(c.otherUserId))
+          .toList();
+
+      state = ChatState(conversations: activeConversations, isLoading: false);
 
       // Subscribe to realtime updates for the conversation list now that
       // we have the job IDs cached.

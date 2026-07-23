@@ -10,11 +10,66 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-23 — Session 19)
+## Current State (Updated 2026-07-24 — Session 20)
 
-### Branch `main` — 14 audit bugs fixed, 1 deferred, 1 false positive. `dart analyze` clean.
+### Branch `main` — 29 total audit bugs fixed across two major passes. `dart analyze` clean.
 
-### Latest Developments (2026-07-23 — Session 19: 16-bug end-to-end audit fixed)
+### Latest Developments (2026-07-24 — Session 20: 15-bug end-to-end audit fixed)
+
+*Session 20 (comprehensive audit response — 15 bugs fixed across DB, Edge Functions, and Flutter):*
+
+🔴 **Critical (3):**
+1. **BUG-01 — `worker_categories` missing SELECT policy** — RLS was blocking employers from seeing worker skills. Added `Anyone can view worker categories` policy.
+2. **BUG-02 — `applications` table missing UPDATE policy** — Employers could not hire workers because status updates were rejected. Added policy allowing employers to update applications for their own jobs.
+3. **BUG-03 — `notify_on_job_insert` trigger column mismatch** — Fixed `wp.user_id` -> `wp.id` reference in the PostgreSQL trigger. Push notifications for new jobs now trigger correctly.
+
+🟠 **High (4):**
+4. **BUG-04 — Multi-device push notifications blocked** — Removed aggressive `delete().eq('platform', platform)` in `NotificationService`. Users can now receive notifications on multiple Android/iOS devices simultaneously.
+5. **BUG-05 — `fcm_tokens` platform constraint missing 'macos'** — Updated DB CHECK constraint to allow `macos`. Prevents insertion failures on Apple desktop platforms.
+6. **BUG-06 — Earnings log included other workers' jobs** — `getWorkerCompletedJobs` now filters by application status (`hired` or `completed`) instead of just job status, ensuring workers only see their own income.
+7. **BUG-07 — `getApplicants` ordered by non-existent `created_at`** — Switched to `applied_at` (the correct column in the `applications` table). Applicant lists now load correctly.
+
+🟡 **Medium (4):**
+8. **BUG-08 — Block User was a functional no-op** — Integrated the local block list with `ChatProvider`. Conversations with blocked users are now dynamically filtered out in realtime.
+9. **BUG-09 — Budget regex captured house numbers** — (Edge Functions) Implemented keyword-anchored matching with a 30-char window around "budget/price/rs". Prevents address numbers from overriding actual budgets.
+10. **BUG-10 — `normalizePhone` weak validation** — Added strict length checks (11 digits for '0', 12 for '92', 10 for naked) and prefix enforcement. Invalid Pakistani formats now throw `FormatException`.
+11. **BUG-11 — Unsafe `int` cast in `JobAiMetadata.fromJson`** — Changed `as int` to `(as num?)?.toInt()` for budget and duration. Prevents crashes when AI models return floating-point numbers.
+
+🟢 **Low (4):**
+12. **BUG-12 — `Message` model ignored DB `metadata`** — Added `metadata` Map support to the `Message` model to handle voice durations, image dimensions, and attachment details.
+13. **BUG-13 — Dead FCM tokens never removed** — Added `removeDeadToken` logic to the `send-push-notification` Edge Function. Tokens that return `UNREGISTERED` from FCM are now automatically deleted from the DB.
+14. **BUG-14 — `delete_user_data` public profile leak** — Added explicit `DELETE FROM public.users` to the SECURITY DEFINER RPC to ensure no public profile info remains after account deletion.
+15. **BUG-15 — `tutorialStepCounter` non-interpolatable** — Converted `AppStrings.tutorialStepCounter` to a method that uses `.replaceAll` for `{current}` and `{total}` placeholders.
+
+**Changed Files (18):**
+| File | Changes |
+|------|---------|
+| `supabase/migrations/20260724000000_audit_fixes.sql` | DB Policies, Triggers, Constraints, RPC |
+| `supabase/functions/_shared/utils.ts` | **NEW:** Shared Base64URL, Budget, and Category logic |
+| `supabase/functions/_shared/openrouter.ts` | Configurable model via `OPENROUTER_MODEL` env |
+| `supabase/functions/bright-api/index.ts` | Uses shared utils, fixed Bug #6 (skills), #9 (regex) |
+| `supabase/functions/rapid-worker/index.ts` | Uses shared utils, fixed Bug #5 (type safety) |
+| `supabase/functions/send-push-notification/index.ts` | Fixed Bug #1/#2 (Base64), #8 (expiry), #13 (dead tokens) |
+| `supabase/functions/send-sms/index.ts` | Fixed Bug #7 (OTP regex), #13 (logging/redaction) |
+| `lib/core/services/notification_service.dart` | Fixed Bug #4 (multi-device) |
+| `lib/core/services/supabase_repository.dart` | Fixed Bug #6 (earnings), #7 (ordering) |
+| `lib/features/chat/providers/chat_provider.dart` | Fixed Bug #8 (functional blocking) |
+| `lib/features/chat/views/chat_detail_view.dart` | Notify provider on block, pop detail view |
+| `lib/features/auth/providers/auth_provider.dart` | Fixed Bug #10 (strict phone normalization) |
+| `lib/features/jobs/models/job_model.dart` | Fixed Bug #11 (safe num casts) |
+| `lib/features/chat/models/message_model.dart` | Fixed Bug #12 (metadata column support) |
+| `lib/core/localization/strings.dart` | Fixed Bug #15 (interpolatable tutorial string) |
+| `lib/core/widgets/coach_mark_overlay.dart` | Use new tutorialStepCounter method |
+| `supabase/functions/bright-api/index_test.ts` | Logic parity with production (shared utils) |
+| `supabase/functions/rapid-worker/index_test.ts` | Logic parity with production (shared utils) |
+
+**Code Health:**
+- `dart analyze`: **0 issues** project-wide
+- Edge Function Tests: **All 16 tests pass** (Deno)
+
+---
+
+### Previous Session (Session 19)
 
 *Session 19 (comprehensive audit response — 14 of 16 bugs fixed):*
 
@@ -325,10 +380,10 @@ test/
 7. ✅ Worker Profile (edit) — AI bio generation, portfolio, availability
 8. ✅ Worker Profile (public view) — read-only with reviews, favorite, hire
 9. ✅ ID Verification — upload CNIC + selfie to Supabase Storage
-10. ✅ Chat — realtime, image/voice/location, typing indicator, read receipts, offline queue
-11. ✅ Search/Browse Workers — filters, skeleton loaders
+10. ✅ Chat — realtime, image/voice/location, typing indicator, read receipts, offline queue, functional block list
+11. ✅ Search/Browse Workers — filters, skeleton loaders, location-aware
 12. ✅ Ratings & Review — two-way star rating with animation
-13. ✅ Notifications screen — live list, filter by type
+13. ✅ Notifications screen — live list, filter by type, multi-device support
 14. ✅ Employer Dashboard — live jobs + applicant counts
 15. ✅ Worker Dashboard — live stats, applications, earnings, availability toggle
 16. ✅ Settings — language, notifications, radius, verification, logout, delete account
@@ -344,18 +399,19 @@ test/
 - Widget/UI: `widget_test.dart`, `worker_dashboard_test.dart`, `reviews_list_view_test.dart`, `ui_fixes_test.dart`
 - Integration: `supabase_connection_test.dart`, `e2e_flow_test.dart`
 
-### Edge Function Tests (13 Deno tests, all pass)
+### Edge Function Tests (16 Deno tests, all pass)
 - `send-sms/index_test.ts`, `bright-api/index_test.ts`, `rapid-worker/index_test.ts`, `send-push-notification/index_test.ts`
+- Added shared utility tests for Base64URL and budget logic.
 
 ## Future Goals / Phase 2 Roadmap
 
 ### Short-term (Next Sprint)
 - [ ] Map/list toggle on Worker Feed
 - [ ] Push notifications end-to-end verification on physical Android device
+- [ ] Unread notification badge — Badge count on the bell icon in AppBar (Deferred Bug #13)
 
 ### Medium-term
 - [x] Push notification webhooks — ✅ Deployed
-- [ ] Unread notification badge — Badge count on the bell icon in AppBar
 - [ ] Voice/video calling (real WebRTC)
 
 ### Phase 3 (Future)

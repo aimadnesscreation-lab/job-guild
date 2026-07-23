@@ -7,6 +7,7 @@ class Message {
   final String? senderPhotoUrl;
   final MessageContentType contentType;
   final String content;
+  final Map<String, dynamic>? metadata;
   final DateTime sentAt;
   final DateTime? readAt;
 
@@ -18,6 +19,7 @@ class Message {
     this.senderPhotoUrl,
     this.contentType = MessageContentType.text,
     this.content = '',
+    this.metadata,
     DateTime? sentAt,
     this.readAt,
   }) : sentAt = sentAt ?? DateTime.now();
@@ -43,6 +45,7 @@ class Message {
           json['sender_photo_url'] as String?,
       contentType: _parseContentType(json['content_type'] as String?),
       content: json['content'] as String? ?? '',
+      metadata: json['metadata'] as Map<String, dynamic>?,
       sentAt: json['sent_at'] != null
           ? DateTime.parse(json['sent_at'] as String)
           : DateTime.now(),
@@ -58,6 +61,7 @@ class Message {
     'sender_id': senderId,
     'content_type': contentType.name,
     'content': content,
+    if (metadata != null) 'metadata': metadata,
     'sent_at': sentAt.toIso8601String(),
     if (readAt != null) 'read_at': readAt!.toIso8601String(),
   };

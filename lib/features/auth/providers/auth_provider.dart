@@ -49,16 +49,21 @@ class AuthNotifier extends Notifier<void> {
     // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
       if (digits.length == 12) return '+$digits';
-      throw FormatException(
-        'Invalid Pakistani mobile number: $phone. '
-        'Expected 12 digits starting with 92 (e.g. 923001234567).',
+      throw const FormatException(
+        'Invalid Pakistani mobile number. Expected 12 digits (e.g. 923001234567).',
       );
     }
     if (digits.startsWith('0')) {
-      final withoutLeading = digits.substring(1);
-      return '+92$withoutLeading';
+      if (digits.length == 11) return '+92${digits.substring(1)}';
+      throw const FormatException(
+        'Invalid Pakistani mobile number. Expected 11 digits starting with 0 (e.g. 03001234567).',
+      );
     }
-    return '+92$digits';
+    if (digits.length == 10) return '+92$digits';
+
+    throw const FormatException(
+      'Invalid Pakistani mobile number. Please enter a valid 10 or 11 digit mobile number.',
+    );
   }
 
   /// Send OTP code to the given phone number
