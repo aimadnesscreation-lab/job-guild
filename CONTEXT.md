@@ -49,6 +49,14 @@
 
 5. **✅ Full Flutter Test Suite** — 140/140 passing, `dart analyze`: 0 issues
 
+**Post-Session: Edge Function Redeployment + Live Smoke Test (2026-07-29):**
+- All 4 Edge Functions re-deployed via `npx supabase functions deploy` (no changes detected — local files match deployed)
+- Live smoke test with valid payloads:
+  - **bright-api**: ✅ `200` — parsed "leaking faucet" → `Plumbing`, `today`, `3000 PKR`, skills `[Plumbing, Faucet Repair]`
+  - **rapid-worker**: ✅ `200` — generated professional bio + `[Plumbing, Electrical]` categories
+  - **send-sms**: ⚠️ `500` — expected "Twilio credentials not configured" (no env vars set)
+  - **send-push-notification**: ⚠️ `200` — expected "No FCM token found" (test user doesn't exist)
+
 **Changed Files (3):**
 | File | Changes |
 |------|---------|
