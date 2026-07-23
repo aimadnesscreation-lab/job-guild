@@ -10,7 +10,32 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-28 — Session 33: 4th Audit Pass — 15 Bugs Fixed + 2 Edge Functions Deployed)
+## Current State (Updated 2026-07-29 — Session 34: 5th Audit Pass — 1 Bug Fixed + New Migration)
+
+### Session 34: Comprehensive End-to-End Audit — 1 Bug Found & Fixed Across 2 Files + New Migration
+
+*Session 34 (complete file-by-file audit of entire codebase — 51 Dart files, 26 SQL migrations, 10 TS files, 9 test files):*
+
+**Audit Summary:** The codebase is in excellent health. Four previous audit passes (Sessions 30-33) have fixed 55+ bugs. This audit found only 1 remaining bug.
+
+🔴 **Bug Fixed (1):**
+1. **🔴 BUG-34-01 — `is_featured` admin flag overwritten to NULL on every profile save** — `WorkerProfile.toJson()` intentionally excludes `is_featured` (admin-managed flag), but the `upsert_worker_profile` RPC receives NULL for `p_is_featured` and the `ON CONFLICT DO UPDATE` clause sets `is_featured = EXCLUDED.is_featured` (NULL), wiping admin-set featured status. **Fix:** Created new migration `20260729000000_fix_is_featured_preserve.sql` that uses `CREATE OR REPLACE FUNCTION` with `COALESCE(EXCLUDED.is_featured, worker_profiles.is_featured)` for UPDATE and `COALESCE(p_is_featured, false)` for INSERT.
+
+**New Migration:**
+| File | Description |
+|------|-------------|
+| `supabase/migrations/20260729000000_fix_is_featured_preserve.sql` | Replace `upsert_worker_profile` to preserve `is_featured` on update and default to `false` on insert |
+
+**Changed Files (1):**
+| File | Changes |
+|------|---------|
+| `supabase/migrations/20260729000000_fix_is_featured_preserve.sql` | **NEW** — hardened RPC function |
+
+**Code Health:**
+- `dart analyze`: **0 issues** ✅
+- `flutter test`: **117/117 pass** ✅
+
+---
 
 ### Session 33: End-to-End Audit Part 4 — 15 Bugs Fixed Across 14 Files + 2 Edge Functions Redeployed
 
