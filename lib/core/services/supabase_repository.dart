@@ -136,42 +136,47 @@ class SupabaseRepository {
     final client = _client;
     if (client == null) return false;
 
-    // Step 1: Update the application.
-    await client
-        .from('applications')
-        .update({'status': 'hired'})
-        .eq('job_id', jobId)
-        .eq('worker_id', workerId)
-        .neq('status', 'hired');
+    try {
+      // Step 1: Update the application.
+      await client
+          .from('applications')
+          .update({'status': 'hired'})
+          .eq('job_id', jobId)
+          .eq('worker_id', workerId)
+          .neq('status', 'hired');
 
-    // Step 2: Update the job.
-    await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
+      // Step 2: Update the job.
+      await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
 
-    // Step 3: Verify both updates actually took effect.
-    final appCheck = await client
-        .from('applications')
-        .select('status')
-        .eq('job_id', jobId)
-        .eq('worker_id', workerId)
-        .maybeSingle();
-    if (appCheck == null || appCheck['status'] != 'hired') {
-      debugPrint('[Hire] Application status verification failed — status is '
-          '${appCheck?['status']}');
+      // Step 3: Verify both updates actually took effect.
+      final appCheck = await client
+          .from('applications')
+          .select('status')
+          .eq('job_id', jobId)
+          .eq('worker_id', workerId)
+          .maybeSingle();
+      if (appCheck == null || appCheck['status'] != 'hired') {
+        debugPrint('[Hire] Application status verification failed — status is '
+            '${appCheck?['status']}');
+        return false;
+      }
+
+      // Step 4: Verify the job row.
+      final jobCheck = await client
+          .from('jobs')
+          .select('status')
+          .eq('id', jobId)
+          .maybeSingle();
+      if (jobCheck == null || jobCheck['status'] != 'hired') {
+        debugPrint('[Hire] Job status verification failed — status is '
+            '${jobCheck?['status']}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[Hire] hireWorker error: $e');
       return false;
     }
-
-    // Step 4: Verify the job row.
-    final jobCheck = await client
-        .from('jobs')
-        .select('status')
-        .eq('id', jobId)
-        .maybeSingle();
-    if (jobCheck == null || jobCheck['status'] != 'hired') {
-      debugPrint('[Hire] Job status verification failed — status is '
-          '${jobCheck?['status']}');
-      return false;
-    }
-    return true;
   }
 
   /// Fetch the current worker's own applications, joined with job details
@@ -416,7 +421,8 @@ class SupabaseRepository {
           .eq('favorited_user_id', favoritedUserId)
           .maybeSingle();
 
-      if (existing != null) {
+      final isCurrentlyFavorited = existing != null;
+      if (isCurrentlyFavorited) {
         // Already favorited — remove
         await client
             .from('favorites')
