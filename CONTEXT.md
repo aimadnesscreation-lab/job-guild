@@ -10,9 +10,34 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-24 — Session 23)
+## Current State (Updated 2026-07-24 — Session 24)
 
-### Branch `main` — 6 compilation bugs fixed in session 23. `dart analyze` clean (0 errors, 0 warnings).
+### Branch `main` — 6 compilation bugs + 3 info lints fixed. `dart analyze` completely clean (0 errors, 0 warnings, 0 info). Deno tests: 15/15 pass.
+
+### Latest Developments (2026-07-24 — Session 24: Lint Fixes + Deno Tests)
+
+*Session 24 (Fixed 3 remaining info-level lints; verified Edge Function tests):*
+
+🧹 **Info Lints (3):**
+1. **FIX — `curly_braces_in_flow_control_structures` in `budget_parser.dart`** — Added braces to `if (...) continue;` statements.
+2. **FIX — `use_build_context_synchronously` in `language_selection_view.dart` (×2)** — Changed `context.mounted` to `mounted` (State's built-in property), properly recognized by the linter.
+
+✅ **Deno Tests:** Installed Deno 2.9.3, ran all 4 Edge Function test suites — **15/15 pass** (bright-api: 3, rapid-worker: 5, send-sms: 2, send-push-notification: 5).
+
+⚠️ **Supabase Deploy:** Blocked — requires `npx supabase login` for authentication.
+
+**Changed Files:**
+| File | Changes |
+|------|---------|
+| `lib/core/utils/budget_parser.dart` | Curly braces on if-continue statements |
+| `lib/features/auth/views/language_selection_view.dart` | `context.mounted` → `mounted` |
+
+**Code Health:**
+- `dart analyze`: **0 errors, 0 warnings, 0 info** ✅
+- `flutter test`: **110/110 pass, 2 skip** ✅
+- Deno tests: **15/15 pass** ✅
+
+---
 
 ### Latest Developments (2026-07-24 — Session 23: Audit Bug Fixes)
 
@@ -469,7 +494,7 @@ test/
 - Widget/UI: `widget_test.dart`, `worker_dashboard_test.dart`, `reviews_list_view_test.dart`, `ui_fixes_test.dart`
 - Integration: `supabase_connection_test.dart`, `e2e_flow_test.dart`
 
-### Edge Function Tests (16 Deno tests, all pass)
+### Edge Function Tests (15 Deno tests, all pass)
 - `send-sms/index_test.ts`, `bright-api/index_test.ts`, `rapid-worker/index_test.ts`, `send-push-notification/index_test.ts`
 - Added shared utility tests for Base64URL and budget logic.
 
