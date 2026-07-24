@@ -84,7 +84,11 @@ class NotificationService {
     if (_token == null) return;
     try {
       final client = Supabase.instance.client;
-      await client.from('fcm_tokens').delete().eq('token', _token!);
+      await client
+          .from('fcm_tokens')
+          .delete()
+          .eq('token', _token!)
+          .eq('user_id', _currentUserId!);
       debugPrint('[FCM] Token deleted from Supabase on logout');
       _token = null;
       _currentUserId = null;

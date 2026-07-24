@@ -125,7 +125,7 @@ async function removeDeadToken(token: string) {
 
   try {
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/fcm_tokens?token=eq.${token}`,
+      `${supabaseUrl}/rest/v1/fcm_tokens?token=eq.${encodeURIComponent(token)}`,
       {
         method: "DELETE",
         headers: {

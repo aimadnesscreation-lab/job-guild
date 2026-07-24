@@ -147,7 +147,7 @@ class OpenRouterService {
     try {
       return await call();
     } catch (e) {
-      if (retries > 0 && e is Exception) {
+      if (retries > 0) {
         final msg = e.toString();
         final isRetryable = msg.contains('HTTP 429') ||
             msg.contains('HTTP 502') ||

@@ -42,7 +42,7 @@ BEGIN
       st_distance(u.current_location, st_setsrid(st_makepoint(lng, lat), 4326)::geography),
       999999
     ) as distance_meters,
-    wp.availability_status as availability,
+    wp.availability_status,
     ARRAY(
       SELECT c.name_en
       FROM worker_categories wc
@@ -53,8 +53,8 @@ BEGIN
     wp.hourly_rate_pkr
   FROM users u
   JOIN worker_profiles wp ON u.id = wp.id
-  WHERE u.current_location IS NULL
-    OR st_dwithin(
+  WHERE u.current_location IS NOT NULL
+    AND st_dwithin(
       u.current_location,
       st_setsrid(st_makepoint(lng, lat), 4326)::geography,
       radius_km * 1000

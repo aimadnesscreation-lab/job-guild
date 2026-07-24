@@ -84,6 +84,7 @@ BEGIN
     JOIN public.users u ON wp.id = u.id
     WHERE wp.id IS NOT NULL
       AND wp.id <> v_employer_id
+      AND wp.availability_status <> 'offline'
   ),
   worker_scores AS (
     SELECT

@@ -34,6 +34,7 @@ class ChatState {
     List<Conversation>? conversations,
     List<Message>? currentMessages,
     String? activeConversationId,
+    bool clearActiveConversation = false,
     bool? isLoading,
     bool? isSending,
     String? errorMessage,
@@ -43,7 +44,9 @@ class ChatState {
     return ChatState(
       conversations: conversations ?? this.conversations,
       currentMessages: currentMessages ?? this.currentMessages,
-      activeConversationId: activeConversationId ?? this.activeConversationId,
+      activeConversationId: clearActiveConversation
+          ? null
+          : (activeConversationId ?? this.activeConversationId),
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -134,6 +137,7 @@ class ChatNotifier extends Notifier<ChatState> {
       Supabase.instance.client.removeChannel(_messagesChannel!);
       _messagesChannel = null;
     }
+    state = state.copyWith(clearActiveConversation: true);
   }
 
   static const _uuid = Uuid();
@@ -174,7 +178,7 @@ class ChatNotifier extends Notifier<ChatState> {
             .from('applications')
             .select('job_id')
             .eq('worker_id', userId);
-        jobIds.addAll(_parseJobIds(appliedJobs));
+        jobIds.addAll(_parseJobIds(appliedJobs, key: 'job_id'));
       } catch (_) {
         // applications table not available or user has no worker profile —
         // fall through with just the employer job IDs.
@@ -352,9 +356,11 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// Extract job IDs from a Supabase list response.
-  List<String> _parseJobIds(dynamic response) {
+  /// [key] defaults to 'id' (for the jobs table) but can be overridden
+  /// to 'job_id' when parsing the applications table.
+  List<String> _parseJobIds(dynamic response, {String key = 'id'}) {
     return _safeList(response)
-        .map((j) => j['id'] as String?)
+        .map((j) => j[key] as String?)
         .whereType<String>()
         .toList();
   }
@@ -812,14 +818,20 @@ class ChatNotifier extends Notifier<ChatState> {
           continue;
         }
         try {
-          await client.from('messages').insert({
-            'id': msg['id'] as String?,
+          final insertData = <String, dynamic>{
             'job_id': msg['job_id'],
             'sender_id': currentUserId,
             'content': msg['content'],
-            'content_type': msg['content_type'],
-            if (msg['metadata'] != null) 'metadata': msg['metadata'],
-          });
+            'content_type': msg['content_type'] ?? 'text',
+          };
+          // Only include ID if it exists (let DB generate UUID otherwise)
+          if (msg['id'] != null) {
+            insertData['id'] = msg['id'];
+          }
+          if (msg['metadata'] != null) {
+            insertData['metadata'] = msg['metadata'];
+          }
+          await client.from('messages').insert(insertData);
           debugPrint('[OfflineQueue] Delivered queued message');
         } on PostgrestException catch (e) {
           // FK violation (code 23503): the referenced job was deleted while

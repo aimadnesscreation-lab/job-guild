@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:local_services_marketplace/core/services/notification_service.dart';
 
@@ -55,8 +54,15 @@ class AuthNotifier extends Notifier<void> {
     } on AuthException catch (e) {
       debugPrint('[Auth] Email sign-up failed: ${e.message}');
       throw Exception('Sign-up failed: ${e.message}');
-    } on SocketException {
-      throw Exception('Network error: Please check your connection.');
+    } on Exception catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('socketexception') ||
+          msg.contains('network') ||
+          msg.contains('connection') ||
+          msg.contains('timeout')) {
+        throw Exception('Network error: Please check your connection.');
+      }
+      rethrow;
     }
   }
 
@@ -73,8 +79,15 @@ class AuthNotifier extends Notifier<void> {
     } on AuthException catch (e) {
       debugPrint('[Auth] Email sign-in failed: ${e.message}');
       throw Exception('Sign-in failed: ${e.message}');
-    } on SocketException {
-      throw Exception('Network error: Please check your connection.');
+    } on Exception catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('socketexception') ||
+          msg.contains('network') ||
+          msg.contains('connection') ||
+          msg.contains('timeout')) {
+        throw Exception('Network error: Please check your connection.');
+      }
+      rethrow;
     }
   }
 
@@ -137,15 +150,18 @@ class AuthNotifier extends Notifier<void> {
         type: OtpType.sms,
       );
       if (response.session == null) throw Exception('Invalid session');
-    } on SocketException catch (e) {
-      debugPrint('[Auth] Network error: $e');
-      throw Exception('Network error: Please check your connection.');
     } on AuthException catch (e) {
       debugPrint('[Auth] OTP verification failed: ${e.message}');
       throw Exception('Verification failed: ${e.message}');
-    } catch (e) {
-      debugPrint('[Auth] OTP verification error: $e');
-      throw Exception('An unexpected error occurred during verification.');
+    } on Exception catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('socketexception') ||
+          msg.contains('network') ||
+          msg.contains('connection') ||
+          msg.contains('timeout')) {
+        throw Exception('Network error: Please check your connection.');
+      }
+      rethrow;
     }
   }
 

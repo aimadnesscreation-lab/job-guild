@@ -103,9 +103,9 @@ export function estimateBudget(category: string, text: string): number {
     const isNearKeyword = budgetKeywords.some(kw => surrounding.includes(kw));
 
     if (
-      extractedValue === null ||
-      (currentHasK && !hasK) ||
-      (isNearKeyword && scaled >= BUDGET_MIN_PKR && scaled <= BUDGET_MAX_PKR)
+      (isNearKeyword && scaled >= BUDGET_MIN_PKR && scaled <= BUDGET_MAX_PKR) ||
+      (extractedValue === null && isNearKeyword) ||
+      (currentHasK && !hasK && isNearKeyword)
     ) {
       // Clamping and validation
       if (scaled >= BUDGET_MIN_PKR && scaled <= BUDGET_MAX_PKR) {

@@ -47,6 +47,14 @@ BEGIN
   -- 1. Messages: sender_id has no CASCADE to users.
   DELETE FROM public.messages WHERE sender_id = p_user_id;
 
+  -- Delete messages on jobs the user applied to as a worker
+  -- (covers conversations the worker participated in)
+  DELETE FROM public.messages
+  WHERE job_id IN (
+      SELECT job_id FROM public.applications
+      WHERE worker_id = p_user_id
+  );
+
   -- 2. Reviews: reviewer_id/reviewee_id have no CASCADE to users.
   DELETE FROM public.reviews
     WHERE reviewer_id = p_user_id OR reviewee_id = p_user_id;

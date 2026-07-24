@@ -78,7 +78,7 @@ serve(async (req) => {
             apikey: apiKey,
             numbers: payload.phone.replace(/[^0-9]/g, ""),
             sender: sender || "LXSERV",
-            message: payload.message,
+            message: payload.message || `Your verification code is ${payload.otp}`,
           }),
         },
       );

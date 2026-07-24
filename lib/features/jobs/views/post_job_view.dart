@@ -643,6 +643,7 @@ class _CategorySelector extends StatelessWidget {
     ('Mechanic', 18),
     ('Bike Repair', 19),
     ('Car Wash', 20),
+    ('Labor', 21),
     ('Welding', 22),
     ('Steel Fixing', 23),
     ('Cleaning', 7),

@@ -411,7 +411,7 @@ class _WorkerResult {
       hourlyRate: hourly != null ? 'PKR $hourly/hr' : 'Negotiable',
       categories: _parseCategories(m),
       isVerified: m['is_verified'] as bool? ?? false,
-      availability: m['availability'] as String? ?? 'Today',
+      availability: m['availability_status'] as String? ?? 'offline',
     );
   }
 }

@@ -140,52 +140,24 @@ class SupabaseRepository {
     }
   }
 
-  /// Hire a worker: updates application and job to 'hired' status.
-  /// Uses a best-effort two-step approach with verification.
+  /// Hire a worker atomically via RPC. Updates both the application and
+  /// the job to 'hired' in a single database transaction.
   /// Returns whether the hire was successful.
   Future<bool> hireWorker(String jobId, String workerId) async {
     final client = _client;
     if (client == null) return false;
 
     try {
-      // Step 1: Update the application.
-      await client
-          .from('applications')
-          .update({'status': 'hired'})
-          .eq('job_id', jobId)
-          .eq('worker_id', workerId)
-          .neq('status', 'hired');
-
-      // Step 2: Update the job.
-      await client.from('jobs').update({'status': 'hired'}).eq('id', jobId);
-
-      // Step 3: Verify both updates actually took effect.
-      final appCheck = await client
-          .from('applications')
-          .select('status')
-          .eq('job_id', jobId)
-          .eq('worker_id', workerId)
-          .maybeSingle();
-      if (appCheck == null || appCheck['status'] != 'hired') {
-        debugPrint('[Hire] Application status verification failed — status is '
-            '${appCheck?['status']}');
-        return false;
-      }
-
-      // Step 4: Verify the job row.
-      final jobCheck = await client
-          .from('jobs')
-          .select('status')
-          .eq('id', jobId)
-          .maybeSingle();
-      if (jobCheck == null || jobCheck['status'] != 'hired') {
-        debugPrint('[Hire] Job status verification failed — status is '
-            '${jobCheck?['status']}');
-        return false;
-      }
-      return true;
+      final result = await client.rpc(
+        'hire_worker',
+        params: {
+          'p_job_id': jobId,
+          'p_worker_id': workerId,
+        },
+      );
+      return result == true;
     } catch (e) {
-      debugPrint('[Hire] hireWorker error: $e');
+      debugPrint('[Hire] hireWorker RPC error: $e');
       return false;
     }
   }
@@ -200,7 +172,7 @@ class SupabaseRepository {
       final response = await client
           .from('applications')
           .select(
-            '*, jobs!inner(title, budget_amount, budget_type, status, urgency, location_text)',
+            '*, jobs!inner(title, description, budget_amount, budget_type, status, urgency, location_text)',
           )
           .eq('worker_id', workerId)
           .order('applied_at', ascending: false);

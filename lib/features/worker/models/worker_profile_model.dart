@@ -63,6 +63,7 @@ class WorkerProfile {
     bool clearHeadline = false,
     bool clearBio = false,
     bool clearFixedRateNote = false,
+    bool clearHourlyRate = false,
   }) {
     return WorkerProfile(
       userId: userId ?? this.userId,
@@ -73,7 +74,9 @@ class WorkerProfile {
       headline: clearHeadline ? null : (headline ?? this.headline),
       bio: clearBio ? null : (bio ?? this.bio),
       yearsExperience: yearsExperience ?? this.yearsExperience,
-      hourlyRatePkr: hourlyRatePkr ?? this.hourlyRatePkr,
+      hourlyRatePkr: clearHourlyRate
+          ? null
+          : (hourlyRatePkr ?? this.hourlyRatePkr),
       fixedRateNote: clearFixedRateNote
           ? null
           : (fixedRateNote ?? this.fixedRateNote),
