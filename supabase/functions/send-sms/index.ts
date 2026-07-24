@@ -21,8 +21,15 @@ serve(async (req) => {
 
     if (provider === "log") {
   const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
-  const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID") != null;
-  if (!isProduction) {
+  // FIX (Bug #15): Default to production-safe — never log OTPs unless
+  // explicitly running in a development environment.  Previously only
+  // checked DENO_DEPLOYMENT_ID, which is absent in some self-hosted
+  // Supabase instances, causing OTPs to be logged in plaintext.
+  const isDev =
+    Deno.env.get("ENVIRONMENT") === "development" ||
+    Deno.env.get("SUPABASE_ENV") === "development" ||
+    Deno.env.get("DENO_ENV") === "development";
+  if (isDev) {
     console.log(`[SMS Hook] [DEV] OTP: ${otp}`);
   }
   return new Response(

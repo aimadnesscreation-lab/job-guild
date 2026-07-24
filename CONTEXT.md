@@ -75,6 +75,35 @@
 - `supabase db push`: ⏳ Pending (complete_job RPC migration needs deploying)
 - `git push origin main`: ✅ Pushed commit `69592ca`
 
+### Session 42-B: patch2.md Cross-Check — Bugs #14-#16 Verified & Fixed
+
+*Session 42-B (cross-checked the 3 bugs previously marked as "skipped" against the codebase — found all 3 still present and fixed them):*
+
+#### ❌ Previous Assessment Was Incorrect
+
+The Session 42 report incorrectly stated that Bugs #14, #15, and #16 were "already fixed" in Sessions 40-41. A line-by-line cross-check against the actual source files revealed all three bugs were still present.
+
+#### ✅ Bugs Actually Fixed (3 bugs across 3 files)
+
+| Bug | Severity | File | Previous (Wrong) Reason | Actual Status | Fix |
+|-----|----------|------|--------------------------|---------------|-----|
+| #14 | 🟡 | `lib/features/jobs/models/job_model.dart` | Claimed fixed as "BUG-41-14 — PostJobView stale form" (different bug!) | ❌ Zero-check `(parsedLat == 0.0 && parsedLng == 0.0)` still present | `_parseCoordinates` now returns `(double?, double?)` — returns `(null, null)` when no coordinates found. `fromJson` uses `??` null-coalescing instead of zero-check. |
+| #15 | 🔴 | `supabase/functions/send-sms/index.ts` | Claimed fixed as "BUG-41-16 — OTP logged in production" | ❌ Still only checked `DENO_DEPLOYMENT_ID` (absent in some self-hosted instances) | Defaults to production-safe (no OTP logging). Only logs when `ENVIRONMENT`, `SUPABASE_ENV`, or `DENO_ENV` are explicitly `"development"` |
+| #16 | 🟡 | `lib/features/worker/repositories/worker_repository.dart` | Claimed "Not applicable — no such method" (wrong file checked!) | ❌ `searchWorkers()` in `WorkerRepository` had no `.limit()` on non-location branch — full table scan | Added `.limit(20)` to non-location `searchWorkers` branch. Applied after filters to avoid `PostgrestTransformBuilder` type loss |
+
+**Key Lesson:** Bug #14 was confused with patch.md's Bug #14 (stale form state in PostJobView — a completely different bug in a different file). Bug #15's Session 41 fix (`DENO_DEPLOYMENT_ID` check) was the same flawed approach — it was "fixed" to the same weak pattern described in patch2.md as broken. Bug #16 was checked against the wrong repository (`SupabaseRepository` instead of `WorkerRepository`).
+
+**Files Changed (3):**
+| File | Bug |
+|------|-----|
+| `lib/features/jobs/models/job_model.dart` | #14 |
+| `supabase/functions/send-sms/index.ts` | #15 |
+| `lib/features/worker/repositories/worker_repository.dart` | #16 |
+
+**Code Health:**
+- `flutter analyze`: **0 errors** (2 pre-existing info only) ✅
+- `flutter test`: **140/140 pass** ✅
+
 ---
 
 ### Session 41: End-to-End Audit Remediation — 16 Bugs Fixed Across 12 Files

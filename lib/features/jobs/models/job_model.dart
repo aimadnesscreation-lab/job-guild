@@ -44,7 +44,10 @@ class Job {
   ///   { "type": "Point", "coordinates": [lng, lat] }
   /// Or as WKT string:
   ///   "POINT(lng lat)"
-  static (double lat, double lng) _parseCoordinates(Map<String, dynamic> json) {
+  ///
+  /// Returns `(null, null)` when no coordinates are found in any format,
+  /// allowing callers to distinguish missing data from valid (0,0) coords.
+  static (double?, double?) _parseCoordinates(Map<String, dynamic> json) {
     // Try reading from a parsed GeoJSON "location_coords" field
     final coords = json['location_coords'];
     if (coords is Map<String, dynamic>) {
@@ -63,19 +66,25 @@ class Job {
         return (_parseDouble(match.group(2)), _parseDouble(match.group(1)));
       }
     }
-    // Fallback: read old-style separate lat/lng columns (pre-migration data)
-    return (
-      _parseDouble(json['location_lat']),
-      _parseDouble(json['location_lng']),
-    );
+    // Fallback: read old-style separate lat/lng columns (pre-migration data).
+    // Use null-check instead of zero-check so that valid (0,0) coordinates
+    // (rare but possible) are not incorrectly treated as missing data.
+    // FIX (Bug #14): Detect missing coordinates via null, not zero values.
+    final rawLat = json['location_lat'];
+    final rawLng = json['location_lng'];
+    if (rawLat != null && rawLng != null) {
+      return (_parseDouble(rawLat), _parseDouble(rawLng));
+    }
+    return (null, null);
   }
 
   factory Job.fromJson(Map<String, dynamic> json) {
     final (parsedLat, parsedLng) = _parseCoordinates(json);
     
-    // Check if coordinates are valid (not 0,0), otherwise use Lahore defaults
-    final lat = (parsedLat == 0.0 && parsedLng == 0.0) ? 31.5204 : parsedLat;
-    final lng = (parsedLat == 0.0 && parsedLng == 0.0) ? 74.3587 : parsedLng;
+    // FIX (Bug #14): Use null checks instead of zero-check so valid (0,0)
+    // coordinates are not incorrectly treated as missing data.
+    final lat = parsedLat ?? 31.5204;
+    final lng = parsedLng ?? 74.3587;
 
     return Job(
       id: json['id'] as String? ?? '',

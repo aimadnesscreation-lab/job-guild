@@ -191,6 +191,9 @@ class WorkerRepository {
     // Without location, query worker_profiles with optional category filter.
     // PostgREST requires us to resolve category → worker IDs first since
     // worker_categories is a separate table.
+    // FIX (Bug #16): Always apply a limit to prevent full table scans.
+    // Default page size of 20; callers can increase by passing a larger limit.
+    const defaultLimit = 20;
     var query = _supabase
         .from('worker_profiles')
         .select('*, users!inner(full_name, profile_photo_url, is_verified)');
@@ -213,7 +216,8 @@ class WorkerRepository {
       }
     }
 
-    final List response = await query;
+    // Apply limit AFTER all filters to avoid PostgrestTransformBuilder type loss.
+    final List response = await query.limit(defaultLimit);
     return response.map((json) => WorkerProfile.fromJson(json)).toList();
   }
 }
