@@ -68,6 +68,27 @@
 **Code Health:**
 - `flutter analyze`: **2 info-level issues** (pre-existing only) ✅
 - `flutter test`: **140/140 pass** ✅
+- `flutter build web --release`: **Zero errors** ✅ (dart:io removal confirmed working for web)
+
+**Deployment Status:**
+- `supabase db push`: ✅ All migrations applied (incl. new `20260730000000_hire_worker_rpc`)
+- `supabase functions deploy send-sms`: ✅ Deployed (24 kB)
+- `supabase functions deploy send-push-notification`: ✅ Deployed (27 kB)
+- `git push origin main`: ✅ Pushed commit `eaf5a12`
+
+**E2E Verification — Interactive Tests (manual, run locally):**
+| # | Test Case | Status |
+|---|-----------|--------|
+| 4 | Chat: Employer → Worker first message | 🔵 Manual |
+| 5 | Chat: Bidirectional replies | 🔵 Manual |
+| 6 | Worker search: correct availability status | 🔵 Manual |
+| 7 | Nearby search: no NULL-location workers | 🔵 Manual |
+| 8 | Hire: atomic application + job update | 🔵 Manual |
+| 9 | Offline message queue retry | 🔵 Manual |
+| 10 | Clear activeConversationId on leave | 🔵 Manual |
+| 11 | Worker app detail: description visible | 🔵 Manual |
+| 12 | Post job: "Labor" category available | 🔵 Manual |
+| 13 | Account deletion: all messages cleaned | 🔵 Manual |
 
 ---
 
