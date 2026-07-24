@@ -195,8 +195,8 @@ void main() {
         addTearDown(container.dispose);
         final result = await container.read(workerCompletedJobsProvider.future);
         expect(result.length, equals(3));
-        expect(result[0]['status'], equals('hired'));
-        expect(result[2]['status'], equals('hired'));
+        expect(result[0]['status'], equals('completed'));
+        expect(result[2]['status'], equals('completed'));
       },
     );
   });

@@ -95,6 +95,7 @@ class AuthNotifier extends Notifier<void> {
 
   /// Normalize a Pakistani phone number to international format (+92xxxxxxxxx).
   /// Throws [FormatException] if the number is not a valid Pakistani mobile.
+  /// Valid Pakistani mobile prefixes: 300–349 (Jazz, Zong, Telenor, Ufone, SCOM).
   static String normalizePhone(String phone) {
     if (phone.length > 30) {
       throw const FormatException('Phone number is too long.');
@@ -103,18 +104,41 @@ class AuthNotifier extends Notifier<void> {
     // Pakistani mobile numbers are +92 followed by exactly 10 digits,
     // so the full digit string must be 12 characters long.
     if (digits.startsWith('92')) {
-      if (digits.length == 12) return '+$digits';
+      if (digits.length == 12) {
+        final localPart = digits.substring(2); // 10-digit local number
+        if (!RegExp(r'^3[0-4]\d{8}$').hasMatch(localPart)) {
+          throw const FormatException(
+            'Invalid Pakistani mobile number. Must start with a valid mobile prefix (e.g. 0300-0349).',
+          );
+        }
+        return '+$digits';
+      }
       throw const FormatException(
         'Invalid Pakistani mobile number. Expected 12 digits (e.g. 923001234567).',
       );
     }
     if (digits.startsWith('0')) {
-      if (digits.length == 11) return '+92${digits.substring(1)}';
+      if (digits.length == 11) {
+        final localPart = digits.substring(1); // 10-digit local number
+        if (!RegExp(r'^3[0-4]\d{8}$').hasMatch(localPart)) {
+          throw const FormatException(
+            'Invalid Pakistani mobile number. Must start with a valid mobile prefix (e.g. 0300-0349).',
+          );
+        }
+        return '+92$localPart';
+      }
       throw const FormatException(
         'Invalid Pakistani mobile number. Expected 11 digits starting with 0 (e.g. 03001234567).',
       );
     }
-    if (digits.length == 10) return '+92$digits';
+    if (digits.length == 10) {
+      if (!RegExp(r'^3[0-4]\d{8}$').hasMatch(digits)) {
+        throw const FormatException(
+          'Invalid Pakistani mobile number. Must start with a valid mobile prefix (e.g. 0300-0349).',
+        );
+      }
+      return '+92$digits';
+    }
 
     throw const FormatException(
       'Invalid Pakistani mobile number. Please enter a valid 10 or 11 digit mobile number.',

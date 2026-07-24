@@ -15,17 +15,22 @@ enum AppRole { employer, worker }
 /// The role is persisted in local state during the session and can be
 /// changed via [setRole].
 class RoleNotifier extends Notifier<AppRole> {
-  bool _loaded = false;
+  bool _initialized = false;
 
   @override
   AppRole build() {
-    // Load the persisted role from the users table exactly once.
-    // The `_loaded` guard prevents redundant DB calls on every rebuild
-    // and eliminates the role-flicker where employer appears briefly
-    // before switching to worker.
-    if (!_loaded) {
-      _loaded = true;
+    // Load the persisted role from the users table when the user is signed in.
+    // Also listen to auth state changes so we can load the role as soon as the
+    // user becomes available on cold start (when auth state arrives async).
+    if (!_initialized) {
+      _initialized = true;
       _loadPersistedRole();
+      // Listen for user changes to handle cold-start race conditions.
+      ref.listen(currentUserProvider, (_, next) {
+        if (next != null) {
+          _loadPersistedRole();
+        }
+      });
     }
     return AppRole.employer; // safe default until loaded
   }
@@ -95,16 +100,28 @@ final userRolesProvider = FutureProvider<({bool isEmployer, bool isWorker})>((
   }
 });
 
-/// Enable a role for the current user (called from Settings).
-final enableRoleProvider = FutureProvider.family<void, AppRole>((
-  ref,
-  role,
-) async {
-  final userId = ref.watch(currentUserProvider)?.id;
+/// Enable or disable a role for the current user.
+///
+/// This is a plain async function, not a FutureProvider — it performs a
+/// mutation (database write + cache invalidation), not a data read.
+Future<void> updateUserRole({
+  required Ref ref,
+  required AppRole role,
+  required bool enabled,
+}) async {
+  final userId = ref.read(currentUserProvider)?.id;
   if (userId == null) return;
 
   final client = Supabase.instance.client;
   final column = role == AppRole.employer ? 'is_employer' : 'is_worker';
-  await client.from('users').update({column: true}).eq('id', userId);
+  await client.from('users').update({column: enabled}).eq('id', userId);
   ref.invalidate(userRolesProvider);
-});
+}
+
+/// Convenience: enable a role for the current user.
+Future<void> enableRole(Ref ref, AppRole role) =>
+    updateUserRole(ref: ref, role: role, enabled: true);
+
+/// Convenience: disable a role for the current user.
+Future<void> disableRole(Ref ref, AppRole role) =>
+    updateUserRole(ref: ref, role: role, enabled: false);

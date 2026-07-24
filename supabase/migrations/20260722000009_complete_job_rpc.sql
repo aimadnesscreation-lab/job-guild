@@ -16,14 +16,14 @@ RETURNS VOID
   SET search_path = public
 AS $$
 BEGIN
-  -- Verify the caller owns this job and that it's in a valid pre-completion
-  -- state (open or hired). Already-completed, cancelled, or expired jobs
-  -- cannot be completed again.
+  -- Verify the caller owns this job AND that it's in 'hired' status.
+  -- A job in 'open' status has no worker assigned and cannot be completed.
+  -- Already-completed, cancelled, or expired jobs cannot be completed again.
   IF NOT EXISTS (
     SELECT 1 FROM public.jobs
     WHERE id = p_job_id
       AND employer_id = auth.uid()
-      AND status IN ('open', 'hired')
+      AND status = 'hired'
   ) THEN
     RAISE EXCEPTION 'Not authorized to complete this job or job is not in a valid state';
   END IF;

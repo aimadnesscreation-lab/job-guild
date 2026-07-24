@@ -183,7 +183,7 @@ class SupabaseRepository {
       final response = await client
           .from('applications')
           .select(
-            '*, jobs!inner(title, description, budget_amount, budget_type, status, urgency, location_text)',
+            '*, jobs!inner(title, description, budget_amount, budget_type, status, urgency, location_text, employer_id, category_id, created_at)',
           )
           .eq('worker_id', workerId)
           .order('applied_at', ascending: false);
@@ -681,7 +681,7 @@ class SupabaseRepository {
 
   static final _mockCompletedJobs = [
     {
-      'status': 'hired',
+      'status': 'completed',
       'jobs': {
         'title': 'AC repair - 3 hours',
         'budget_amount': 1500,
@@ -690,7 +690,7 @@ class SupabaseRepository {
       },
     },
     {
-      'status': 'hired',
+      'status': 'completed',
       'jobs': {
         'title': 'Plumbing - 2 hours',
         'budget_amount': 1000,
@@ -701,11 +701,11 @@ class SupabaseRepository {
       },
     },
     {
-      'status': 'hired',
+      'status': 'completed',
       'jobs': {
         'title': 'Electrical work - 4 hours',
         'budget_amount': 2000,
-        'status': 'hired',
+        'status': 'completed',
         'updated_at': DateTime.now()
             .subtract(const Duration(days: 3))
             .toIso8601String(),

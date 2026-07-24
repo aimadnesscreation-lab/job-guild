@@ -133,11 +133,21 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
     return user?['is_verified'] as bool? ?? false;
   }
 
+  /// Match score that considers rating, verification, experience, and category.
+  /// Mirrors the weighting logic in the backend match_workers_for_job function.
   int _matchScore(Map<String, dynamic> a) {
     final rating = _workerRating(a);
     final verified = _isVerified(a);
-    final score = (rating / 5 * 70).round() + (verified ? 25 : 0) + 5;
-    return score.clamp(0, 100);
+    final wp = a['worker_profiles'] as Map<String, dynamic>?;
+    final completedJobs = (wp?['total_jobs_completed'] as num?)?.toInt() ?? 0;
+    // Rating: up to 70 points (scaled from 5-star rating)
+    final ratingScore = (rating / 5 * 70).round();
+    // Verification: 15 points
+    final verifiedScore = verified ? 15 : 0;
+    // Experience: up to 10 points (1 pt per 10 completed jobs, max 10)
+    final experienceScore = (completedJobs / 10).round().clamp(0, 10);
+    // Base: 5 points
+    return (ratingScore + verifiedScore + experienceScore + 5).clamp(0, 100);
   }
 
   @override

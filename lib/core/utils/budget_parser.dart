@@ -96,31 +96,58 @@ int estimateBudget(String input, String category) {
 }
 
 /// Keyword-based category detection from freeform job description text.
+/// Uses word-boundary regex matching to prevent false positives (e.g.
+/// "move" matching inside "remove", "movement", or "improve").
 String guessCategory(String text) {
   final lower = text.toLowerCase();
   if (lower.contains('plumb')) return 'Plumbing';
   if (lower.contains('electr')) return 'Electrical';
   if (lower.contains('paint')) return 'Painting';
   if (lower.contains('carpent')) return 'Carpentry';
-  if (lower.contains('clean')) return 'Cleaning';
+  if (RegExp(r'\bclean(ing|er)?\b').hasMatch(lower)) return 'Cleaning';
   if (lower.contains('tutor') || lower.contains('teach')) return 'Tutor';
   if (lower.contains('mechanic')) return 'Mechanic';
-  if (lower.contains('cook') || lower.contains('food')) return 'Cook';
-  if (lower.contains('move') || lower.contains('shift')) return 'Moving';
+  if (RegExp(r'\bcook(ing|er)?\b').hasMatch(lower) ||
+      RegExp(r'\bfood\b').hasMatch(lower)) {
+    return 'Cook';
+  }
+  if (RegExp(r'\bmove|\bshift(ing|er)?\b').hasMatch(lower)) return 'Moving';
   if (lower.contains('photo')) return 'Photographer';
   if (lower.contains('laptop') || lower.contains('computer')) return 'Laptop Repair';
-  if (lower.contains('mobile') || lower.contains('phone')) return 'Mobile Repair';
-  if (lower.contains('web') || lower.contains('website')) return 'Web Developer';
+  if (RegExp(r'\bmobile\b').hasMatch(lower) ||
+      RegExp(r'\bphone\b').hasMatch(lower)) {
+    return 'Mobile Repair';
+  }
+  if (RegExp(r'\bweb\b').hasMatch(lower) ||
+      RegExp(r'\bwebsite\b').hasMatch(lower)) {
+    return 'Web Developer';
+  }
   if (lower.contains('mason')) return 'Masonry';
   if (lower.contains('weld')) return 'Welding';
-  if (lower.contains('bike')) return 'Bike Repair';
-  if (lower.contains('car wash')) return 'Car Wash';
-  if (lower.contains('dj')) return 'DJ';
+  if (RegExp(r'\bbike\b').hasMatch(lower)) return 'Bike Repair';
+  if (RegExp(r'\bcar\s*wash\b').hasMatch(lower)) return 'Car Wash';
+  if (RegExp(r'\bdj\b').hasMatch(lower)) return 'DJ';
   if (lower.contains('beaut')) return 'Beauty';
-  if (lower.contains('health') || lower.contains('medi') || lower.contains('nurse') || lower.contains('doctor')) return 'Healthcare';
-  if (lower.contains('pet') || lower.contains('dog') || lower.contains('cat')) return 'Pet Care';
-  if (lower.contains('labor') || lower.contains('labour') || lower.contains('general')) return 'General Labor';
-  if (lower.contains('teacher') || lower.contains('language')) return 'Language Teacher';
+  if (lower.contains('health') ||
+      lower.contains('medi') ||
+      lower.contains('nurse') ||
+      lower.contains('doctor')) {
+    return 'Healthcare';
+  }
+  if (RegExp(r'\bpet\b').hasMatch(lower) ||
+      RegExp(r'\bdog\b').hasMatch(lower) ||
+      RegExp(r'\bcat\b').hasMatch(lower)) {
+    return 'Pet Care';
+  }
+  if (RegExp(r'\blabor\b').hasMatch(lower) ||
+      RegExp(r'\blabour\b').hasMatch(lower) ||
+      RegExp(r'\bgeneral\b').hasMatch(lower)) {
+    return 'General Labor';
+  }
+  if (lower.contains('teacher') ||
+      RegExp(r'\blanguage\b').hasMatch(lower)) {
+    return 'Language Teacher';
+  }
   if (lower.contains('steel')) return 'Steel Fixing';
   return 'General Labor';
 }

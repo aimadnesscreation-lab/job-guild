@@ -271,12 +271,15 @@ class WorkerDashboard extends ConsumerWidget {
 
                   // Total should match ALL recent entries (not just displayed),
                   // so the user sees accurate weekly earnings.
+                  // Prefer proposed_price (agreed amount) over budget_amount.
                   final totalEarnings = recentEntries.fold<int>(
                     0,
                     (sum, entry) {
                       final jobData =
                           entry['jobs'] as Map<String, dynamic>? ?? {};
-                      final amount = jobData['budget_amount'] as num? ?? 0;
+                      final proposedPrice = entry['proposed_price'] as num?;
+                      final budgetAmount = jobData['budget_amount'] as num?;
+                      final amount = proposedPrice ?? budgetAmount ?? 0;
                       return sum + amount.toInt();
                     },
                   );
@@ -287,7 +290,10 @@ class WorkerDashboard extends ConsumerWidget {
                         final jobData =
                             entry['jobs'] as Map<String, dynamic>? ?? {};
                         final title = jobData['title'] as String? ?? '';
-                        final amount = jobData['budget_amount'] as num? ?? 0;
+                        // Prefer proposed_price (agreed amount) over budget_amount.
+                        final proposedPrice = entry['proposed_price'] as num?;
+                        final budgetAmount = jobData['budget_amount'] as num?;
+                        final amount = proposedPrice ?? budgetAmount ?? 0;
                         final updatedAt = jobData['updated_at'] as String?;
                         final createdAt = jobData['created_at'] as String?;
                         final dateStr = _formatDate(

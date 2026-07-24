@@ -10,7 +10,72 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-31 — Session 41: Audit Remediation — 17 Bug Fixes (patch.md cross-applied))
+## Current State (Updated 2026-07-31 — Session 42: patch2.md Bug Remediation — 9 Bugs Fixed Across 7 Files)
+
+### Session 42: patch2.md Bug Remediation — 9 Fixes Applied, 7 Bugs Skipped
+
+*Session 42 (systematic comparison of patch2.md against the current codebase — applied only fixes for bugs still present; skipped those already resolved in Sessions 40-41):*
+
+#### ✅ Bugs Fixed (9 bugs across 7 files)
+
+**Phase 1 — Critical (data integrity, functional correctness):**
+| Bug | Severity | File | Description | Fix |
+|-----|----------|------|-------------|-----|
+| #2 | 🔴 | `supabase/migrations/20260722000009_complete_job_rpc.sql` | `complete_job` RPC allowed completing jobs in `'open'` status (no worker assigned) | Changed `AND status IN ('open', 'hired')` → `AND status = 'hired'` |
+| #5 | 🔴 | `lib/features/home/providers/role_provider.dart` | `RoleNotifier` never retried role lookup on cold start when auth state arrived after `build()` | Added `ref.listen(currentUserProvider, ...)` listener to reload role when user becomes available |
+| #7 | 🔴 | `lib/features/auth/providers/auth_provider.dart` | `normalizePhone()` accepted any 10-digit number, including invalid prefixes like +921234567890 | Added `RegExp(r'^3[0-4]\\d{8}$')` validation for Pakistani mobile prefixes (300–349) across all three input formats (92-prefix, 0-prefix, bare) |
+
+**Phase 2 — Data Display (mock data, missing fields, incorrect earnings):**
+| Bug | Severity | File | Description | Fix |
+|-----|----------|------|-------------|-----|
+| #1 | 🟡 | `lib/core/services/supabase_repository.dart` | Mock completed jobs had `'status': 'hired'` but `getWorkerCompletedJobs()` filters for `status == 'completed'` → mock earnings never showed | Changed all 3 mock entries + nested `.jobs.status` from `'hired'` → `'completed'` |
+| #4 | 🟡 | `lib/core/services/supabase_repository.dart` | `getMyApplications()` didn't include `employer_id` and `category_id` in the `jobs!inner()` select → `_jobFromApplication()` couldn't populate these fields | Added `employer_id, category_id, created_at` to the select |
+| #13 | 🟡 | `lib/features/home/views/worker_dashboard.dart` | Earnings total + individual entries used `budget_amount` (posted budget) instead of `proposed_price` (agreed amount) | Both `totalEarnings` fold and per-entry display now prefer `proposed_price`, falling back to `budget_amount` |
+
+**Phase 3 — Code Quality (mutation pattern, scoring, keyword matching):**
+| Bug | Severity | File | Description | Fix |
+|-----|----------|------|-------------|-----|
+| #6 | 🟡 | `lib/features/home/providers/role_provider.dart` | `enableRoleProvider` was a `FutureProvider.family<void, AppRole>` — FutureProvider is for reading data, not mutations | Replaced with `updateUserRole()`, `enableRole()`, `disableRole()` plain async functions taking `Ref` |
+| #9 | 🟡 | `lib/features/jobs/views/job_detail_view.dart` | `_matchScore()` only considered rating + verification (too simplistic, misleading employers) | Now includes experience: rating 70%, verification 15%, experience 10% (1pt per 10 completed jobs), base 5% |
+| #11 | 🟡 | `lib/core/utils/budget_parser.dart` | `guessCategory()` used simple `contains()` — "move" matched "remove"/"improve", "web" matched "website" unnecessarily, etc. | Changed critical keywords to word-boundary regex: `RegExp(r'\\bmove|\\bshift(ing|er)?\\b')`, `\\bweb\\b`, `\\bpet\\b`, `\\bmobile\\b`, etc. |
+
+#### ⏭️ Bugs Skipped (7 bugs — already fixed or not applicable)
+
+| Bug | Reason Skipped |
+|-----|---------------|
+| #3 — NULL-location workers in `get_nearby_workers` | **Already fixed** by migration `20260728000000_fix_nearby_workers_categories.sql` — dropped old function, recreated with `WHERE u.current_location IS NOT NULL AND st_dwithin(...)` |
+| #8 — Voice recording race condition (`onLongPressEnd` before `_startRecording` finishes) | **Already fixed** in Session 41 (BUG-41-08) — current code uses `onLongPressStart/End/Cancel` with `_recordingStarted` guard |
+| #10 — Wrong user mapping in multi-applicant conversations | **Already fixed** — the chat provider was completely rewritten in Sessions 40-41 with proper participant resolution via `_loadConversations()` batch-lookup pattern |
+| #12 — Missing incoming messages when `allJobIds` is empty | **Already fixed** — current `_loadConversations()` already has a fallback `query.eq('sender_id', userId)` when no job IDs are found |
+| #14 — PostJobView stale form on tab revisit | **Already fixed** in Session 41 (BUG-41-14) — `resetOnInit: true` in `_PostJobRoute` |
+| #15 — Favorites navigating with incomplete profile | **Already fixed** in Session 41 (BUG-41-15) — fetches full `WorkerProfile` via `repo.getWorkerProfile()` before navigating |
+| #16 — No `limit` on worker search causing full table scans | **Not applicable** — the actual codebase's `SupabaseRepository` doesn't have a `searchWorkers()` method in the form described in patch2.md; worker search uses the `get_nearby_workers` RPC which already limits results |
+
+**Files Changed (7):**
+| File | Bugs |
+|------|------|
+| `supabase/migrations/20260722000009_complete_job_rpc.sql` | #2 |
+| `lib/features/auth/providers/auth_provider.dart` | #7 |
+| `lib/features/home/providers/role_provider.dart` | #5, #6 |
+| `lib/core/services/supabase_repository.dart` | #1, #4 |
+| `lib/features/home/views/worker_dashboard.dart` | #13 |
+| `lib/features/jobs/views/job_detail_view.dart` | #9 |
+| `lib/core/utils/budget_parser.dart` | #11 |
+
+**Test Update:**
+| File | Change |
+|------|--------|
+| `test/worker_dashboard_test.dart` | Updated `workerCompletedJobsProvider` mock test expectations from `'hired'` → `'completed'` to match Bug #1 fix |
+
+**Code Health:**
+- `flutter analyze`: **0 issues** (no errors or warnings) ✅
+- `flutter test`: **140/140 pass** ✅
+
+**Deployment Status:**
+- `supabase db push`: ⏳ Pending (complete_job RPC migration needs deploying)
+- `git push origin main`: ⏳ Pending
+
+---
 
 ### Session 41: End-to-End Audit Remediation — 16 Bugs Fixed Across 12 Files
 
