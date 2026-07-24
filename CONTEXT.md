@@ -73,7 +73,7 @@
 
 **Deployment Status:**
 - `supabase db push`: ⏳ Pending (complete_job RPC migration needs deploying)
-- `git push origin main`: ⏳ Pending
+- `git push origin main`: ✅ Pushed commit `69592ca`
 
 ---
 
