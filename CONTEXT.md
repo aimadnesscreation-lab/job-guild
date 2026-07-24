@@ -73,6 +73,12 @@
 - `flutter analyze`: **2 info-level issues** (pre-existing only) ✅
 - `flutter test`: **140/140 pass** ✅
 
+**Deployment Status:**
+- `supabase db push`: ✅ All migrations applied (incl. new `20260731000000` & `20260731000001`)
+- `supabase functions deploy send-sms`: ✅ Deployed (24 kB) — OTP log fix
+- `supabase functions deploy send-push-notification`: ✅ Confirmed deployed
+- `git push origin main`: ⏳ Pending (commit `2ac2a86`)
+
 ### patch.md Cross-Reference
 
 The `patch.md` file (18 files, complete rewrites) was cross-referenced against the current codebase. **17 of 18 files** already had their fixes applied via the Session 41 targeted patches. The only missing change — `updated_at` triggers (BUG #22) — was created as migration `20260731000001`. The patch.md versions use `ChangeNotifier`/`StatefulWidget` architecture; the actual codebase uses Riverpod `Notifier`/`ConsumerStatefulWidget`, so the targeted Session 41 patches were applied instead of full file replacements.
