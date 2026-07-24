@@ -77,7 +77,7 @@
 - `supabase db push`: ✅ All migrations applied (incl. new `20260731000000` & `20260731000001`)
 - `supabase functions deploy send-sms`: ✅ Deployed (24 kB) — OTP log fix
 - `supabase functions deploy send-push-notification`: ✅ Confirmed deployed
-- `git push origin main`: ⏳ Pending (commit `2ac2a86`)
+- `git push origin main`: ✅ Pushed (commits `2ac2a86` → `4ddb305`)
 
 ### patch.md Cross-Reference
 
