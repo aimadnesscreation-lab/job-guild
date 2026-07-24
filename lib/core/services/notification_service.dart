@@ -81,7 +81,7 @@ class NotificationService {
 
   /// Clean up FCM token on logout
   Future<void> signOut() async {
-    if (_token == null) return;
+    if (_token == null || _currentUserId == null) return;
     try {
       final client = Supabase.instance.client;
       await client

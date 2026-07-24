@@ -152,7 +152,11 @@ BEGIN
   DELETE FROM public.fcm_tokens WHERE user_id = p_user_id;
   DELETE FROM public.jobs WHERE employer_id = p_user_id;
   
-  -- Delete the public user profile itself
-  DELETE FROM public.users WHERE id = p_user_id;
+  -- NOTE: We intentionally do NOT delete the public.users row here.
+  -- Deleting it would leave an orphaned auth.users row (which requires
+  -- the Admin API to remove). The user remains authenticated with a valid
+  -- session but no profile, breaking all subsequent queries.
+  -- The public.users row is cleaned up by the ON DELETE CASCADE from
+  -- auth.users when account deletion is handled via the Admin API.
 END;
 $$;

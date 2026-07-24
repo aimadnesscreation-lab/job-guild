@@ -45,9 +45,13 @@ class RoleNotifier extends Notifier<AppRole> {
       if (response == null) return;
 
       final isWorker = response['is_worker'] as bool? ?? false;
-      // When both roles are enabled, default to the role this user registered
-      // with (is_worker was set true at signup for worker accounts).
-      state = isWorker ? AppRole.worker : AppRole.employer;
+      final isEmployer = response['is_employer'] as bool? ?? false;
+      // When both roles are enabled, prefer employer (the app default).
+      // Worker-only users still get worker mode automatically.
+      if (isWorker && !isEmployer) {
+        state = AppRole.worker;
+      }
+      // Otherwise stay employer (the safe default)
     } catch (_) {
       // If the query fails (e.g. new migration not yet applied), keep default.
     }

@@ -145,10 +145,24 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Generate a v4 UUID using the uuid package.
   String _generateUuid() => _uuid.v4();
 
+  /// Safe accessor for Supabase client — returns null when Supabase hasn't
+  /// been initialized (e.g. in widget tests or startup race conditions).
+  SupabaseClient? get _safeClient {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Fetch the current user's conversations from Supabase
   Future<void> _loadConversations() async {
     try {
-      final client = Supabase.instance.client;
+      final client = _safeClient;
+      if (client == null) {
+        state = const ChatState(isLoading: false);
+        return;
+      }
       final userId = client.auth.currentUser?.id;
 
       if (userId == null) {
@@ -371,13 +385,14 @@ class ChatNotifier extends Notifier<ChatState> {
   /// list updates live when a new message arrives — even if the user is not
   /// currently viewing that conversation.
   void _subscribeToConversations(String userId) {
+    final client = _safeClient;
+    if (client == null) return;
+
     // Unsubscribe and remove previous channel before creating a new one.
     if (_conversationsChannel != null) {
       _conversationsChannel!.unsubscribe();
       Supabase.instance.client.removeChannel(_conversationsChannel!);
     }
-
-    final client = Supabase.instance.client;
 
     _conversationsChannel = client.channel('conversations:$userId');
     _conversationsChannel!.onPostgresChanges(
@@ -692,7 +707,8 @@ class ChatNotifier extends Notifier<ChatState> {
     final conversationId = state.activeConversationId;
     if (conversationId == null) return;
 
-    final client = Supabase.instance.client;
+    final client = _safeClient;
+    if (client == null) return;
     final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
@@ -760,7 +776,8 @@ class ChatNotifier extends Notifier<ChatState> {
       final queue = existing != null ? _safeList(jsonDecode(existing)) : <Map<String, dynamic>>[];
       // Tag queued messages with the current user so they are not sent on
       // behalf of a different account after logout/login.
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final client = _safeClient;
+      final userId = client?.auth.currentUser?.id;
       final taggedMsg = {...msg, 'queued_user_id': userId};
       queue.add(taggedMsg);
       await prefs.setString('message_queue', jsonEncode(queue));
@@ -784,7 +801,8 @@ class ChatNotifier extends Notifier<ChatState> {
       final queue = _safeList(jsonDecode(existing));
       if (queue.isEmpty) return;
 
-      final client = Supabase.instance.client;
+      final client = _safeClient;
+      if (client == null) return;
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
@@ -873,7 +891,8 @@ class ChatNotifier extends Notifier<ChatState> {
     final conversationId = state.activeConversationId;
     if (conversationId == null) return;
 
-    final client = Supabase.instance.client;
+    final client = _safeClient;
+    if (client == null) return;
     final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 

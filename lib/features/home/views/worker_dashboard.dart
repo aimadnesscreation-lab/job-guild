@@ -269,9 +269,9 @@ class WorkerDashboard extends ConsumerWidget {
 
                   final displayEntries = recentEntries.take(10).toList();
 
-                  // Total should match only the displayed entries so the
-                  // user can verify the sum against what they see.
-                  final totalEarnings = displayEntries.fold<int>(
+                  // Total should match ALL recent entries (not just displayed),
+                  // so the user sees accurate weekly earnings.
+                  final totalEarnings = recentEntries.fold<int>(
                     0,
                     (sum, entry) {
                       final jobData =

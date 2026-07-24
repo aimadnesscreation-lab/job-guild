@@ -68,7 +68,18 @@ class SupabaseRepository {
     final json = job.toJson();
     // The draft job has an empty employerId; stamp it with the authenticated user.
     if (userId != null) json['employer_id'] = userId;
-    await client.from('jobs').insert(json);
+
+    // Editing an existing job → UPDATE; new job → INSERT.
+    if (job.id.isNotEmpty) {
+      // Remove fields that shouldn't be overwritten on update.
+      json.remove('id');
+      json.remove('employer_id');
+      json.remove('created_at');
+      await client.from('jobs').update(json).eq('id', job.id);
+    } else {
+      json.remove('id'); // Let the DB generate the UUID.
+      await client.from('jobs').insert(json);
+    }
   }
 
   /// Update the status of a job. If status is 'completed', uses the
@@ -207,11 +218,12 @@ class SupabaseRepository {
           .eq('worker_id', workerId)
           .order('applied_at', ascending: false);
       final allApps = _safeList(response);
-      // Client-side filter: only include applications where THIS worker was 
-      // hired or successfully completed the job (Bug #6 Fix).
+      // Client-side filter: only include applications where this worker
+      // has actually completed the job (status = 'completed'). 'hired' means
+      // the worker was hired but the job is still in progress.
       return allApps.where((a) {
         final status = a['status'] as String?;
-        return status == 'hired' || status == 'completed';
+        return status == 'completed';
       }).toList();
     } catch (e) {
       return [];

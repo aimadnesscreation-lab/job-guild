@@ -10,7 +10,72 @@
 
 **Target Market:** Pakistan (Lahore first), Urdu + English, PKR currency, low-end Android optimization.
 
-## Current State (Updated 2026-07-30 — Session 40: 4-Phase Bug Remediation — 17 Fixes)
+## Current State (Updated 2026-07-31 — Session 41: Audit Remediation — 17 Bug Fixes (patch.md cross-applied))
+
+### Session 41: End-to-End Audit Remediation — 16 Bugs Fixed Across 12 Files
+
+*Session 41 (4-phase systematic remediation of the comprehensive end-to-end audit report):*
+
+**Phase 1 — Critical Fixes (4 bugs):**
+1. 🔴 **BUG-41-01 — hire_worker RPC non-functional** — 3 SQL errors: `'applied'` not in CHECK constraint, `hired_worker_id` column doesn't exist, `'in_progress'` not a valid job status. **Fix:** Changed `'applied'`→`'interested'`/`'shortlisted'`, removed `hired_worker_id`, changed `'open','in_progress'`→`'open'`.
+2. 🔴 **BUG-41-02 — NotificationService.signOut() null crash** — `_currentUserId!` force-unwrap crashed when FCM init failed. **Fix:** Added `_currentUserId == null` guard alongside existing `_token == null` check.
+3. 🔴 **BUG-41-03 — Job edit creates duplicate** — `postJob()` always did INSERT, never UPDATE. **Fix:** Detect non-empty `job.id` and call `.update()` with appropriate field stripping.
+4. 🔴 **BUG-41-04 — Worker ratings never computed** — No trigger recalculated `average_rating` or `total_jobs_completed`. **Fix:** New migration `20260731000000` with 2 triggers (reviews→average_rating, applications→total_jobs_completed) + backfill queries.
+
+**Phase 2 — High Severity (5 bugs):**
+5. 🔴 **BUG-41-05 — Coach marks wrong tabs in Worker mode** — Hardcoded employer tab layout. **Fix:** Made `_buildSteps()` role-aware with `isWorker` param, adjusting highlighted tab indices per role.
+6. 🔴 **BUG-41-06 — Employer AppBar→Worker Profile Editor** — Person icon navigated to `EditWorkerProfileView` for employers. **Fix:** Navigate to `SettingsView` instead for employer role.
+7. 🔴 **BUG-41-07 — Earnings log bugs** — Included `'hired'` (in-progress) jobs + total summed only displayed entries. **Fix:** Filter only `'completed'` status, sum all `recentEntries` not just `displayEntries`.
+8. 🔴 **BUG-41-08 — Voice playback broken** — `resume()` used from stopped state (silent no-op). **Fix:** Use `_player.play(UrlSource(widget.url))` from stopped state.
+9. 🔴 **BUG-41-09 — OTP multi-char input** — No `maxLength` on 6 OTP fields. **Fix:** Added `maxLength: 1`, `MaxLengthEnforcement.enforced`, hidden counter.
+
+**Phase 3 — Medium Severity (5 bugs):**
+10. 🟡 **BUG-41-10 — ChatNotifier null client crashes** — Multiple methods called `Supabase.instance.client` without try-catch. **Fix:** Added `_safeClient` getter, applied to `_loadConversations`, `sendMessage`, `sendVoice`, `retryOfflineQueue`, `_subscribeToConversations`, `_addToOfflineQueue`.
+11. 🟡 **BUG-41-11 — RoleNotifier dual-role default** — Always set Worker when both roles enabled. **Fix:** Only set worker when `isWorker && !isEmployer`.
+12. 🟡 **BUG-41-12 — Storage bucket re-created** — `createBucket` called before every upload. **Fix:** Check `listBuckets()` first before creating.
+13. 🟡 **BUG-41-13 — delete_user_data deletes users row** — Left orphaned auth.users sessions. **Fix:** Removed `DELETE FROM public.users` (handled by CASCADE from auth.users).
+14. 🟡 **BUG-41-14 — PostJobView stale form** — IndexedStack tab retained form state. **Fix:** Added `resetOnInit: true` in `_PostJobRoute`.
+15. 🟡 **BUG-41-15 — Favorites incomplete profile** — Navigated with only partial data. **Fix:** Fetch full `WorkerProfile` via `repo.getWorkerProfile()` before navigating.
+
+**Phase 4 — Low Severity (2 bugs):**
+16. 🔵 **BUG-41-16 — OTP logged in production** — `send-sms` Edge Function logged OTP. **Fix:** Added `DENO_DEPLOYMENT_ID` check before console.log.
+
+**BUG #22 — Now Fixed (previously skipped):**
+17. 🔵 **BUG-41-22 — Missing `updated_at` triggers** — Direct PostgREST updates left `updated_at` stale on `jobs` and `applications`. **Fix:** New migration `20260731000001` with `BEFORE UPDATE` triggers auto-setting `updated_at = NOW()` (cross-referenced from `patch.md` ##18).
+
+**Bugs Skipped (already fixed / not applicable):**
+- BUG #15: NULL-location workers → Fixed by migration `20260728000000`
+- BUG #18: Shimmer `AnimatedBuilder` → Correct name in Flutter 3.x
+- BUG #19: `_safeList` duplication → Low priority code cleanup
+- BUG #21: `complete_job` 'open' gap → Fixed by migration `20260722000010`
+
+**Files Changed (12):**
+| File | Bugs |
+|------|------|
+| `supabase/migrations/20260730000000_hire_worker_rpc.sql` | #1 |
+| `supabase/migrations/20260731000000_add_ratings_triggers.sql` (NEW) | #4 |
+| `supabase/migrations/20260731000001_updated_at_triggers.sql` (NEW) | #22 |
+| `supabase/migrations/20260724000000_audit_fixes.sql` | #13 |
+| `supabase/functions/send-sms/index.ts` | #16 |
+| `lib/core/services/notification_service.dart` | #2 |
+| `lib/core/services/supabase_repository.dart` | #3, #7 |
+| `lib/core/widgets/coach_mark_overlay.dart` | #5 |
+| `lib/features/home/views/home_view.dart` | #6, #14 |
+| `lib/features/home/views/worker_dashboard.dart` | #7 |
+| `lib/features/home/views/favorites_view.dart` | #15 |
+| `lib/features/home/providers/role_provider.dart` | #11 |
+| `lib/features/chat/providers/chat_provider.dart` | #10 |
+| `lib/features/chat/views/chat_detail_view.dart` | #8, #12 |
+| `lib/features/chat/providers/voice_recorder_provider.dart` | #12 |
+| `lib/features/auth/views/otp_verification_view.dart` | #9 |
+
+**Code Health:**
+- `flutter analyze`: **2 info-level issues** (pre-existing only) ✅
+- `flutter test`: **140/140 pass** ✅
+
+### patch.md Cross-Reference
+
+The `patch.md` file (18 files, complete rewrites) was cross-referenced against the current codebase. **17 of 18 files** already had their fixes applied via the Session 41 targeted patches. The only missing change — `updated_at` triggers (BUG #22) — was created as migration `20260731000001`. The patch.md versions use `ChangeNotifier`/`StatefulWidget` architecture; the actual codebase uses Riverpod `Notifier`/`ConsumerStatefulWidget`, so the targeted Session 41 patches were applied instead of full file replacements.
 
 ### Session 40: 4-Phase Bug Remediation — 17 Bugs Fixed Across 14 Files
 

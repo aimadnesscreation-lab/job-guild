@@ -31,23 +31,27 @@ BEGIN
         RAISE EXCEPTION 'Not authorized to hire for this job';
     END IF;
 
-    -- Atomic: update both in one transaction
+    -- Atomic: update both in one transaction.
+    -- The applications CHECK constraint allows: interested, shortlisted,
+    -- hired, rejected, completed. The default status is 'interested'.
     UPDATE public.applications
     SET status = 'hired', updated_at = now()
     WHERE job_id = p_job_id
       AND worker_id = p_worker_id
-      AND status = 'applied';
+      AND status IN ('interested', 'shortlisted');
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'No pending application found for this worker';
     END IF;
 
+    -- The jobs table has no hired_worker_id column; the worker-hire
+    -- relationship is tracked via applications.status = 'hired'.
+    -- Valid job statuses: open, hired, completed, cancelled, expired.
     UPDATE public.jobs
     SET status = 'hired',
-        hired_worker_id = p_worker_id,
         updated_at = now()
     WHERE id = p_job_id
-      AND status IN ('open', 'in_progress');
+      AND status = 'open';
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Job is not in a hireable state';

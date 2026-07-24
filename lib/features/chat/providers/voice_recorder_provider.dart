@@ -185,8 +185,13 @@ class VoiceRecorderNotifier extends Notifier<VoiceRecorderState> {
           'voice_${conversationId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
       const bucket = 'voice_messages';
 
+      // Create bucket if it doesn't exist (best-effort).
       try {
-        await Supabase.instance.client.storage.createBucket(bucket);
+        final buckets = await Supabase.instance.client.storage.listBuckets();
+        final exists = buckets.any((b) => b.name == bucket);
+        if (!exists) {
+          await Supabase.instance.client.storage.createBucket(bucket);
+        }
       } catch (_) {}
 
       await Supabase.instance.client.storage

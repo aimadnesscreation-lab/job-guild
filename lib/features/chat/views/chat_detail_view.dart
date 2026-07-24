@@ -111,11 +111,16 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
       final fileName = 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg';
       const bucket = 'chat_images';
 
-      // Ensure bucket exists (best-effort); log failure for debugging.
+      // Create bucket if it doesn't exist (best-effort).
+      // Use listBuckets to check first to avoid unnecessary API calls.
       try {
-        await Supabase.instance.client.storage.createBucket(bucket);
+        final buckets = await Supabase.instance.client.storage.listBuckets();
+        final exists = buckets.any((b) => b.name == bucket);
+        if (!exists) {
+          await Supabase.instance.client.storage.createBucket(bucket);
+        }
       } catch (e) {
-        debugPrint('[Chat] createBucket $bucket failed: $e');
+        debugPrint('[Chat] Bucket check/create failed: $e');
       }
 
       if (kIsWeb) {
@@ -1156,10 +1161,9 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
       } else if (_playerState == PlayerState.paused) {
         await _player.resume();
       } else {
-        // Stopped or completed — play from start
-        await _player.stop();
-        await _player.seek(Duration.zero);
-        await _player.resume();
+        // Stopped or completed — play from start.
+        // resume() only works from paused state; use play() from stopped.
+        await _player.play(UrlSource(widget.url));
       }
     } catch (_) {
       if (context.mounted) setState(() => _playerState = PlayerState.stopped);

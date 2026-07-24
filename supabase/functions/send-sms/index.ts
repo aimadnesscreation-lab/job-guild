@@ -21,7 +21,10 @@ serve(async (req) => {
 
     if (provider === "log") {
   const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
-  console.log(`[SMS Hook] [DEV] OTP: ${otp}`);
+  const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID") != null;
+  if (!isProduction) {
+    console.log(`[SMS Hook] [DEV] OTP: ${otp}`);
+  }
   return new Response(
         JSON.stringify({
           success: true,

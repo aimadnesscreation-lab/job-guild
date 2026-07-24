@@ -4,6 +4,7 @@ import 'package:local_services_marketplace/core/localization/locale_provider.dar
 import 'package:local_services_marketplace/core/localization/strings.dart';
 import 'package:local_services_marketplace/core/providers/tutorial_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
+import 'package:local_services_marketplace/features/home/providers/role_provider.dart';
 
 /// A step in the coach marks tutorial
 class _CoachStep {
@@ -49,23 +50,46 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
 
-  List<_CoachStep> _buildSteps(AppStrings s) => [
-    _CoachStep(
-      targetTabIndex: 1,
-      title: s.tutorialTabSearchTitle,
-      description: s.tutorialTabSearchDesc,
-    ),
-    _CoachStep(
-      targetTabIndex: 2,
-      title: s.tutorialTabPostTitle,
-      description: s.tutorialTabPostDesc,
-    ),
-    _CoachStep(
-      targetTabIndex: 3,
-      title: s.tutorialTabChatTitle,
-      description: s.tutorialTabChatDesc,
-    ),
-  ];
+  List<_CoachStep> _buildSteps(AppStrings s, bool isWorker) {
+    if (isWorker) {
+      // Worker tab layout: 0=Home(Job Feed), 1=Search, 2=Messages, 3=Dashboard
+      return [
+        _CoachStep(
+          targetTabIndex: 1,
+          title: s.tutorialTabSearchTitle,
+          description: s.tutorialTabSearchDesc,
+        ),
+        _CoachStep(
+          targetTabIndex: 2,
+          title: s.tutorialTabChatTitle,
+          description: s.tutorialTabChatDesc,
+        ),
+        _CoachStep(
+          targetTabIndex: 3,
+          title: s.tabDashboard,
+          description: s.tutorialTabChatDesc,
+        ),
+      ];
+    }
+    // Employer tab layout: 0=Dashboard, 1=Search Workers, 2=Post Job, 3=Messages
+    return [
+      _CoachStep(
+        targetTabIndex: 1,
+        title: s.tutorialTabSearchTitle,
+        description: s.tutorialTabSearchDesc,
+      ),
+      _CoachStep(
+        targetTabIndex: 2,
+        title: s.tutorialTabPostTitle,
+        description: s.tutorialTabPostDesc,
+      ),
+      _CoachStep(
+        targetTabIndex: 3,
+        title: s.tutorialTabChatTitle,
+        description: s.tutorialTabChatDesc,
+      ),
+    ];
+  }
 
   @override
   void initState() {
@@ -95,7 +119,8 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
   }
 
   void _nextStep() {
-    final totalSteps = _buildSteps(ref.read(appStringsProvider)).length;
+    final isWorker = ref.read(currentRoleProvider) == AppRole.worker;
+    final totalSteps = _buildSteps(ref.read(appStringsProvider), isWorker).length;
     if (_currentStep < totalSteps - 1) {
       _animController.reverse().then((_) {
         if (!context.mounted) return;
@@ -114,7 +139,8 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(appStringsProvider);
-    final steps = _buildSteps(s);
+    final isWorker = ref.watch(currentRoleProvider) == AppRole.worker;
+    final steps = _buildSteps(s, isWorker);
     final step = steps[_currentStep];
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;

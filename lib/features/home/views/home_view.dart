@@ -103,7 +103,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const EditWorkerProfileView(),
+                        builder: (_) => const SettingsView(),
                       ),
                     ),
                   ),
@@ -634,7 +634,7 @@ class _PostJobRoute extends StatelessWidget {
       overrides: [
         postJobProvider.overrideWith(() => PostJobNotifier()),
       ],
-      child: const PostJobView(),
+      child: const PostJobView(resetOnInit: true),
     );
   }
 }

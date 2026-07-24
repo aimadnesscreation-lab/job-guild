@@ -106,12 +106,16 @@ class FavoritesView extends ConsumerWidget {
                     }
                   },
                 ),
-                onTap: () {
+                onTap: () async {
+                  // Fetch the full worker profile for a complete view.
+                  final repo = ref.read(supabaseRepositoryProvider);
+                  final fullProfile = await repo.getWorkerProfile(workerId);
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => WorkerPublicProfileView(
-                        profile: WorkerProfile(
+                        profile: fullProfile ?? WorkerProfile(
                           userId: workerId,
                           fullName: name,
                           headline: headline,
