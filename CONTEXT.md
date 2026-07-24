@@ -135,7 +135,22 @@ All 6 tests **must** pass before this bug can be considered fixed.
 **Code Health:**
 - `flutter analyze`: **No issues found** ✅
 - `flutter test`: **140/140 pass** ✅
+- `deno test supabase/functions/`: **35/35 pass** ✅
 - `./scripts/pre-push.sh`: All 3 checks pass ✅
+
+#### 🧪 Edge Function Test Suite (35 tests, 5 modules)
+
+All 4 Edge Functions refactored to export `handler` functions (with `if (import.meta.main) serve(handler)`) for direct testability. Tests mock `globalThis.fetch` and `Deno.env.get` — no real API calls.
+
+| Module | Tests | Key Regression Coverage |
+|--------|-------|------------------------|
+| `_shared/openrouter_test.ts` | 6 (NEW) | API key validation, success, 503/429 retry, no-retry on 404 |
+| `send-sms/index_test.ts` | 11 | Log/twilio/textlocal providers, OTP logging guard, **BUG #2: Messaging API URL** |
+| `bright-api/index_test.ts` | 8 | **BUG #12: 401 unauthorized**, 405/400 validation, fallbackParse, urgency |
+| `rapid-worker/index_test.ts` | 6 | Validation, fallback, category dedup+limit, empty categories fallback |
+| `send-push-notification/index_test.ts` | 4 | No-token error, full mock chain, **BUG #13: dead token DELETE** |
+
+**Run:** `deno test --allow-env --allow-net supabase/functions/`
 
 ---
 

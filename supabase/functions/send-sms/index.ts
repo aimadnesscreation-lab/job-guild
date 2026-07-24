@@ -10,7 +10,7 @@ interface SendSmsPayload {
   otp?: string;
   type: string;
 }
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   try {
     const payload: SendSmsPayload = await req.json();
     const provider = Deno.env.get("SMS_PROVIDER") || "log";
@@ -20,7 +20,7 @@ serve(async (req) => {
     console.log(`[SMS Hook] Type: ${payload.type}`);
 
     if (provider === "log") {
-  const otp = payload.otp || extractOtpFromMessage(payload.message) || "N/A";
+  const otp: string = payload.otp || extractOtpFromMessage(payload.message ?? '') || "N/A";
   // FIX (Bug #15): Default to production-safe — never log OTPs unless
   // explicitly running in a development environment.  Previously only
   // checked DENO_DEPLOYMENT_ID, which is absent in some self-hosted
@@ -119,4 +119,7 @@ serve(async (req) => {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+// Start the server (only when run directly, not during tests)
+if (import.meta.main) serve(handler);

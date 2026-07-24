@@ -101,7 +101,7 @@ function fallbackParse(text: string): ProfileResponse {
   };
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -162,4 +162,7 @@ serve(async (req) => {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+// Start the server (only when run directly, not during tests)
+if (import.meta.main) serve(handler);

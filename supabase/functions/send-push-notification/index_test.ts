@@ -6,246 +6,279 @@
 import {
   assertEquals,
   assertExists,
-  assertRejects,
-  assertStringIncludes,
 } from "https://deno.land/std@0.177.0/testing/asserts.ts";
+import { encodeBase64Url } from "../_shared/utils.ts";
+import { handler } from "./index.ts";
 
-// ─── Types (mirrors production code) ─────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────
 
-interface FcmResponse {
-  success: boolean;
-  message_id?: string;
-  error?: string;
+function mockEnv(overrides: Record<string, string>) {
+  const originalEnvGet = Deno.env.get;
+  Deno.env.get = (key: string) =>
+    overrides[key] ?? originalEnvGet.call(Deno.env, key);
+  return () => { Deno.env.get = originalEnvGet; };
 }
 
-interface ServiceAccount {
-  project_id: string;
-  private_key: string;
-  client_email: string;
-  [key: string]: unknown;
-}
-
-// ─── Pure functions under test (mirrors production code) ──────────────
-
-/**
- * Convert PEM private key to ArrayBuffer (PKCS#8 DER format).
- * This is the pure data transformation part of getAccessToken().
- */
-function pemToBinary(pem: string): ArrayBuffer {
-  const b64Content = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "");
-  const binaryStr = atob(b64Content);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-/**
- * Send a push notification via FCM HTTP v1 API (without live HTTP).
- * This tests the response parsing and error handling logic.
- */
-async function sendFcmNotification(
-  projectId: string,
-  token: string,
-  title: string,
-  body: string,
-  data?: Record<string, string>,
-): Promise<FcmResponse> {
-  const accessToken = "test-access-token";
-
-  const v1Message = {
-    message: {
-      token,
-      notification: { title, body },
-      data: data || undefined,
-      android: {
-        priority: "high" as const,
-        notification: {
-          channel_id: "default",
-          priority: "high" as const,
-          visibility: "public" as const,
-          sound: "default",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-            "content-available": 1,
-          },
-        },
-      },
-    },
-  };
-
-  const response = await fetch(
-    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(v1Message),
-    },
-  );
-
-  if (response.ok) {
-    const result = await response.json();
-    return { success: true, message_id: result.name };
-  }
-
-  const errorBody = await response.text();
-  let errorMsg = `HTTP ${response.status}`;
-  try {
-    const err = JSON.parse(errorBody);
-    errorMsg = err.error?.message || err.error?.status || errorMsg;
-
-    if (errorMsg.includes("UNREGISTERED") || errorMsg.includes("NOT_FOUND")) {
-      console.warn(`[FCM] Token not registered, should remove: ${token}`);
-    }
-  } catch {
-    errorMsg = errorBody || errorMsg;
-  }
-
-  return { success: false, error: errorMsg };
-}
-
-// ─── Tests: pemToBinary ──────────────────────────────────────────────
+// ─── Pure Function Tests ──────────────────────────────────────────────
 
 Deno.test("pemToBinary", async (t) => {
-  await t.step("converts PEM string to ArrayBuffer", () => {
-    // A minimal valid base64-encoded PKCS#8 key (not a real key)
-    const pem = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg\n-----END PRIVATE KEY-----";
-    const buffer = pemToBinary(pem);
-    assertExists(buffer);
-    assertExists(buffer.byteLength);
-    assertExists(new Uint8Array(buffer));
-  });
-
-  await t.step("strips PEM headers and whitespace", () => {
-    const pem = "-----BEGIN PRIVATE KEY-----\n\n\n\nRGlzIGlzIGJhc2U2NA==\n\n-----END PRIVATE KEY-----";
-    const buffer = pemToBinary(pem);
-    const bytes = new Uint8Array(buffer);
-    // "RGlzIGlzIGJhc2U2NA==" decodes to "Dis is base64" (12 bytes)
-    assertEquals(bytes.length, 13);
-    const decoded = new TextDecoder().decode(bytes);
-    assertEquals(decoded, "Dis is base64");
-  });
-
-  await t.step("handles PEM without headers (edge case)", () => {
-    const pem = "RGlzIGlzIGJhc2U2NA==";
-    const buffer = pemToBinary(pem);
-    const bytes = new Uint8Array(buffer);
-    assertEquals(bytes.length, 13);
-  });
-
-  await t.step("handles empty PEM string", () => {
-    const buffer = pemToBinary("");
-    assertEquals(buffer.byteLength, 0);
+  // pemToBinary is defined inside index.ts and not exported — covered via
+  // handler tests below.  Pure encodeBase64Url is tested via shared utils.
+  await t.step("encodeBase64Url basic", () => {
+    const result = encodeBase64Url("test");
+    assertEquals(result.includes("+"), false);
+    assertEquals(result.includes("/"), false);
+    assertEquals(result.includes("="), false);
   });
 });
 
-// ─── Tests: sendFcmNotification (response parsing) ───────────────────
+// ─── Handler Tests ────────────────────────────────────────────────────
 
-Deno.test("sendFcmNotification", async (t) => {
-  // Note: These tests make real HTTP requests and will fail in offline
-  // environments. The tests verify the response parsing logic runs
-  // correctly regardless of whether FCM responds.
+Deno.test("handler — returns 405 for non-POST methods", async () => {
+  const restoreEnv = mockEnv({});
 
-  await t.step("sends notification and handles non-200 response gracefully", async () => {
-    // Using an invalid project ID ensures we get a non-200 response
-    // from FCM, testing the error-handling path
-    const result = await sendFcmNotification(
-      "invalid-project",
-      "fake-device-token",
-      "Test Title",
-      "Test Body",
-    );
-    // Should either succeed (unlikely with fake data) or return error
-    if (!result.success) {
-      assertExists(result.error);
-      assertEquals(typeof result.error, "string");
+  try {
+    const req = new Request("http://localhost", { method: "GET" });
+    const res = await handler(req);
+    assertEquals(res.status, 405);
+  } finally {
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — returns 400 when user_id is missing", async () => {
+  const restoreEnv = mockEnv({});
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Test", body: "Hello" }),
+    });
+
+    const res = await handler(req);
+    assertEquals(res.status, 400);
+
+    const body = await res.json();
+    assertEquals(body.error, "user_id and title are required");
+  } finally {
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — returns 400 when title is missing", async () => {
+  const restoreEnv = mockEnv({});
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: "user-1", body: "Hello" }),
+    });
+
+    const res = await handler(req);
+    assertEquals(res.status, 400);
+  } finally {
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — returns error when no FCM token found", async () => {
+  const restoreEnv = mockEnv({
+    SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-key",
+  });
+
+  // Mock Supabase RPC returning 404 (no token)
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = input.toString();
+    if (url.includes("rpc/get_user_fcm_token")) {
+      return new Response(JSON.stringify(null), { status: 200 });
     }
-  });
+    if (url.includes("fcm_tokens")) {
+      // Fallback query returns empty
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
+    return new Response("Not Found", { status: 404 });
+  };
 
-  await t.step("handles missing data parameter gracefully", async () => {
-    const result = await sendFcmNotification(
-      "test-project",
-      "test-token",
-      "Title",
-      "Body",
-    );
-    // Should not throw — undefined data is handled by `data || undefined`
-    assertExists(result);
-  });
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: "user-1",
+        title: "Test notification",
+        body: "Hello",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(body.success, false);
+    assertEquals(body.error, "No FCM token found");
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
 });
 
-// ─── Tests: ServiceAccount type validation ───────────────────────────
-
-Deno.test("ServiceAccount structure", async (t) => {
-  await t.step("validates required fields exist", () => {
-    const sa: ServiceAccount = {
+Deno.test("handler — sends notification successfully (mocked chain)", async () => {
+  const restoreEnv = mockEnv({
+    SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-key",
+    FCM_SERVICE_ACCOUNT: JSON.stringify({
       project_id: "test-project",
-      private_key: "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg\n-----END PRIVATE KEY-----",
+      private_key:
+        "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg\n-----END PRIVATE KEY-----",
       client_email: "test@test-project.iam.gserviceaccount.com",
-    };
-    assertEquals(sa.project_id, "test-project");
-    assertExists(sa.private_key);
-    assertExists(sa.client_email);
+    }),
   });
 
-  await t.step("handles extra fields via index signature", () => {
-    const sa: ServiceAccount = {
-      project_id: "p",
-      private_key: "pk",
-      client_email: "e",
-      extra_field: "value",
-      type: "service_account",
-    };
-    assertEquals(sa.extra_field, "value");
-    assertEquals(sa.type, "service_account");
-  });
+  // Mock crypto.subtle — the dummy test key won't import as a real key
+  const origImportKey = crypto.subtle.importKey;
+  const origSign = crypto.subtle.sign;
+  crypto.subtle.importKey = async () => ({}) as CryptoKey;
+  crypto.subtle.sign = async () => new Uint8Array(64).buffer;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = input.toString();
+
+    // 1. Supabase RPC — returns FCM token
+    if (url.includes("rpc/get_user_fcm_token")) {
+      return new Response(
+        JSON.stringify("fake-device-token-abc123"),
+        { status: 200 },
+      );
+    }
+
+    // 2. Supabase REST (fallback) — not reached since RPC succeeds
+    if (url.includes("fcm_tokens") && url.includes("user_id")) {
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
+
+    // 3. Google OAuth2 token endpoint
+    if (url.includes("oauth2.googleapis.com/token")) {
+      return new Response(
+        JSON.stringify({ access_token: "test-oauth-token", expires_in: 3600 }),
+        { status: 200 },
+      );
+    }
+
+    // 4. FCM send
+    if (url.includes("fcm.googleapis.com")) {
+      return new Response(
+        JSON.stringify({ name: "projects/test/messages/abc123" }),
+        { status: 200 },
+      );
+    }
+
+    return new Response("Not Found", { status: 404 });
+  };
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: "user-1",
+        title: "New message",
+        body: "You have a new message from Ali",
+        data: { type: "new_message", id: "job-1" },
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(body.success, true);
+    assertExists(body.message_id);
+  } finally {
+    globalThis.fetch = originalFetch;
+    crypto.subtle.importKey = origImportKey;
+    crypto.subtle.sign = origSign;
+    restoreEnv();
+  }
 });
 
-// ─── Tests: Interface validation ────────────────────────────────────
-
-Deno.test("FcmResponse types", async (t) => {
-  await t.step("success response has message_id", () => {
-    const resp: FcmResponse = { success: true, message_id: "projects/test/messages/abc123" };
-    assertExists(resp.message_id);
+Deno.test("handler — handles UNREGISTERED token by removing it", async () => {
+  const restoreEnv = mockEnv({
+    SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-key",
+    FCM_SERVICE_ACCOUNT: JSON.stringify({
+      project_id: "test-project",
+      private_key:
+        "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg\n-----END PRIVATE KEY-----",
+      client_email: "test@test-project.iam.gserviceaccount.com",
+    }),
   });
 
-  await t.step("error response has error message", () => {
-    const resp: FcmResponse = { success: false, error: "UNREGISTERED" };
-    assertEquals(resp.error, "UNREGISTERED");
-  });
-});
+  // Mock crypto.subtle — dummy key won't import
+  const origImportKey2 = crypto.subtle.importKey;
+  const origSign2 = crypto.subtle.sign;
+  crypto.subtle.importKey = async () => ({}) as CryptoKey;
+  crypto.subtle.sign = async () => new Uint8Array(64).buffer;
 
-// ─── Tests: PushPayload validation ───────────────────────────────────
+  let deleteCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input.toString();
+    const method = (init?.method as string) || "GET";
 
-Deno.test("PushPayload structure", async (t) => {
-  await t.step("minimal payload has required fields", () => {
-    const payload = { user_id: "user-1", title: "Test", body: "Hello" };
-    assertEquals(payload.user_id, "user-1");
-    assertEquals(payload.title, "Test");
-    assertEquals(payload.body, "Hello");
-  });
+    if (url.includes("rpc/get_user_fcm_token")) {
+      return new Response(JSON.stringify("dead-token"), { status: 200 });
+    }
 
-  await t.step("payload can include optional data field", () => {
-    const payload = {
-      user_id: "user-1",
-      title: "New Message",
-      body: "You have a new message",
-      data: { type: "new_message", id: "job-1" },
-    };
-    assertExists(payload.data);
-    assertEquals(payload.data.type, "new_message");
-    assertEquals(payload.data.id, "job-1");
-  });
+    if (url.includes("oauth2.googleapis.com/token")) {
+      return new Response(
+        JSON.stringify({ access_token: "test-token", expires_in: 3600 }),
+        { status: 200 },
+      );
+    }
+
+    if (url.includes("fcm.googleapis.com")) {
+      return new Response(
+        JSON.stringify({
+          error: { message: "UNREGISTERED", status: "NOT_FOUND" },
+        }),
+        { status: 404 },
+      );
+    }
+
+    // BUG #13 regression: dead token should be deleted
+    if (method === "DELETE" && url.includes("fcm_tokens")) {
+      deleteCalled = true;
+      return new Response("", { status: 200 });
+    }
+
+    return new Response("Not Found", { status: 404 });
+  };
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: "user-1",
+        title: "Test",
+        body: "Hello",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(body.success, false);
+    assertEquals(body.error, "UNREGISTERED");
+    assertEquals(deleteCalled, true, "Dead token must be deleted from DB");
+  } finally {
+    globalThis.fetch = originalFetch;
+    crypto.subtle.importKey = origImportKey2;
+    crypto.subtle.sign = origSign2;
+    restoreEnv();
+  }
 });

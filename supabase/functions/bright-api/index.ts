@@ -118,7 +118,7 @@ function fallbackParse(text: string): ParseResponse {
   };
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   // Verify the caller has a valid Supabase JWT.  Supabase automatically
   // passes the Authorization header when invoked via `client.functions.invoke()`.
   const authHeader = req.headers.get("Authorization");
@@ -192,4 +192,7 @@ serve(async (req) => {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+// Start the server (only when run directly, not during tests)
+if (import.meta.main) serve(handler);

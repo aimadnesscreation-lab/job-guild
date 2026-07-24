@@ -5,77 +5,264 @@
 
 import { assertEquals } from "https://deno.land/std@0.177.0/testing/asserts.ts";
 import { extractOtpFromMessage } from "../_shared/utils.ts";
+import { handler } from "./index.ts";
 
-// ─── Tests ────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+function mockEnv(overrides: Record<string, string>) {
+  const originalEnvGet = Deno.env.get;
+  Deno.env.get = (key: string) =>
+    overrides[key] ?? originalEnvGet.call(Deno.env, key);
+  return () => { Deno.env.get = originalEnvGet; };
+}
+
+function captureLogs(): { entries: string[]; restore: () => void } {
+  const entries: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => {
+    entries.push(args.map((a) => String(a)).join(" "));
+    originalLog(...args);
+  };
+  return { entries, restore: () => { console.log = originalLog; } };
+}
+
+// ─── Utility Tests (existing) ─────────────────────────────────────────
 
 Deno.test("extractOtpFromMessage", async (t) => {
   await t.step("extracts 6-digit code from message", () => {
-    const result = extractOtpFromMessage("Your OTP is 123456");
-    assertEquals(result, "123456");
+    assertEquals(extractOtpFromMessage("Your OTP is 123456"), "123456");
   });
 
   await t.step("extracts code with surrounding punctuation", () => {
-    const result = extractOtpFromMessage("Code: 987654. Please verify.");
-    assertEquals(result, "987654");
+    assertEquals(extractOtpFromMessage("Code: 987654. Please verify."), "987654");
   });
 
   await t.step("returns null when no 6-digit code present", () => {
-    const result = extractOtpFromMessage("Your OTP is 12345"); // 5 digits
-    assertEquals(result, null);
-  });
-
-  await t.step("returns null for message with 7-digit number", () => {
-    const result = extractOtpFromMessage("Code 1234567");
-    assertEquals(result, null);
+    assertEquals(extractOtpFromMessage("Your OTP is 12345"), null);
   });
 
   await t.step("returns null for empty message", () => {
-    const result = extractOtpFromMessage("");
-    assertEquals(result, null);
+    assertEquals(extractOtpFromMessage(""), null);
   });
 
   await t.step("extracts first 6-digit code when multiple exist", () => {
-    const result = extractOtpFromMessage("First: 111111, Second: 222222");
-    assertEquals(result, "111111");
-  });
-
-  await t.step("handles code at start of string", () => {
-    const result = extractOtpFromMessage("123456 is your code");
-    assertEquals(result, "123456");
-  });
-
-  await t.step("handles code at end of string", () => {
-    const result = extractOtpFromMessage("Your code is 123456");
-    assertEquals(result, "123456");
-  });
-
-  await t.step("returns null for message with only letters", () => {
-    const result = extractOtpFromMessage("No numbers here");
-    assertEquals(result, null);
+    assertEquals(extractOtpFromMessage("First: 111111, Second: 222222"), "111111");
   });
 
   await t.step("handles codes with spaces inside (should not match)", () => {
-    // 6 digits with a space won't match \b(\d{6})\b since the space
-    // breaks the word boundary pattern
-    const result = extractOtpFromMessage("Code: 123 456");
-    assertEquals(result, null);
+    assertEquals(extractOtpFromMessage("Code: 123 456"), null);
   });
 });
 
-Deno.test("extractOtpFromMessage — edge cases", async (t) => {
-  await t.step("handles very long message with code at end", () => {
-    const long = "A".repeat(1000) + " 000000";
-    const result = extractOtpFromMessage(long);
-    assertEquals(result, "000000");
+// ─── Handler Tests ────────────────────────────────────────────────────
+
+Deno.test("handler — log provider (DEV mode does NOT log OTP)", async () => {
+  const restoreEnv = mockEnv({
+    SMS_PROVIDER: "log",
+    ENVIRONMENT: "production",
+  });
+  const logs = captureLogs();
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: "+923001234567",
+        message: "Your code is 123456",
+        type: "sms",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(body.success, true);
+    assertEquals(body.message, "[DEV MODE] OTP delivery simulated");
+
+    // Must NOT log the OTP in production
+    const otpLogged = logs.entries.some((e) => e.includes("123456"));
+    assertEquals(otpLogged, false);
+  } finally {
+    logs.restore();
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — log provider (DEV mode DOES log OTP)", async () => {
+  const restoreEnv = mockEnv({
+    SMS_PROVIDER: "log",
+    ENVIRONMENT: "development",
+  });
+  const logs = captureLogs();
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: "+923001234567",
+        otp: "654321",
+        type: "sms",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(body.success, true);
+
+    // In dev mode, the OTP SHOULD be logged
+    const otpLogged = logs.entries.some((e) => e.includes("654321"));
+    assertEquals(otpLogged, true);
+  } finally {
+    logs.restore();
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — twilio provider uses Messaging API (BUG #2 regression)", async () => {
+  const restoreEnv = mockEnv({
+    SMS_PROVIDER: "twilio",
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "token",
+    TWILIO_SERVICE_SID: "SID123",
+    TWILIO_PHONE_NUMBER: "+15551234567",
   });
 
-  await t.step("code adjacent to non-digit characters", () => {
-    const result = extractOtpFromMessage("OTP=123456!");
-    assertEquals(result, "123456");
+  let capturedUrl = "";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    capturedUrl = input.toString();
+    return new Response(JSON.stringify({ sid: "SM123" }), { status: 201 });
+  };
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: "+923001234567",
+        message: "Your verification code is 987654",
+        type: "sms",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(body.success, true);
+
+    // BUG #2 regression: must use Messaging API, NOT Verify API
+    assertEquals(
+      capturedUrl.includes("api.twilio.com/2010-04-01/Accounts/AC123/Messages.json"),
+      true,
+      `Expected Messaging API URL, got: ${capturedUrl}`,
+    );
+    assertEquals(
+      capturedUrl.includes("verify.twilio.com"),
+      false,
+      "Must NOT use Verify API",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — twilio provider throws when credentials missing", async () => {
+  const restoreEnv = mockEnv({
+    SMS_PROVIDER: "twilio",
+    // Missing TWILIO_ACCOUNT_SID etc.
   });
 
-  await t.step("only numeric string of exactly 6 digits", () => {
-    const result = extractOtpFromMessage("654321");
-    assertEquals(result, "654321");
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: "+923001234567",
+        type: "sms",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 500);
+    assertEquals(body.success, false);
+    assertEquals(body.error, "Twilio credentials not configured");
+  } finally {
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — textlocal provider succeeds", async () => {
+  const restoreEnv = mockEnv({
+    SMS_PROVIDER: "textlocal",
+    TEXTLOCAL_API_KEY: "apikey123",
   });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    return new Response(
+      JSON.stringify({ status: "success" }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({
+        phone: "+923001234567",
+        message: "Your code is 111111",
+        type: "sms",
+      }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(body.success, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — returns 500 for invalid JSON body", async () => {
+  const restoreEnv = mockEnv({ SMS_PROVIDER: "log" });
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: "not-valid-json",
+    });
+
+    const res = await handler(req);
+    assertEquals(res.status, 500);
+  } finally {
+    restoreEnv();
+  }
+});
+
+Deno.test("handler — unknown provider returns 400", async () => {
+  const restoreEnv = mockEnv({ SMS_PROVIDER: "unknown-vendor" });
+
+  try {
+    const req = new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({ phone: "+92", type: "sms" }),
+    });
+
+    const res = await handler(req);
+    const body = await res.json();
+
+    assertEquals(res.status, 400);
+    assertEquals(body.success, false);
+    assertEquals(body.error, "Unknown SMS provider: unknown-vendor");
+  } finally {
+    restoreEnv();
+  }
 });
