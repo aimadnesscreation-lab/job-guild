@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/features/auth/providers/auth_provider.dart';
 import 'package:local_services_marketplace/features/chat/models/message_model.dart';
 import 'package:local_services_marketplace/features/jobs/models/job_model.dart';
@@ -629,7 +630,8 @@ void main() {
       expect(AuthNotifier.normalizePhone('0300-1234567'), '+923001234567');
       expect(AuthNotifier.normalizePhone('+92 300 1234567'), '+923001234567');
       expect(AuthNotifier.normalizePhone('(92) 300-123-4567'), '+923001234567');
-    });      test('handles empty string', () {
+    });
+    test('handles empty string', () {
       // Empty string → no valid digits → throws FormatException
       expect(
         () => AuthNotifier.normalizePhone(''),
@@ -643,63 +645,48 @@ void main() {
   // ═════════════════════════════════════════════════════════════════════
 
   group('AuthNotifier email + OTP methods', () {
-    test(
-      'signUpWithEmail throws when Supabase is not initialized',
-      () async {
-        final notifier = AuthNotifier();
-        // Without Supabase initialized, signUpWithEmail will throw an error.
-        // Use throwsAny to catch any Error type since Supabase.instance.client
-        // throws a FlutterError when not initialized (not an Exception).
-        expectLater(
-          () => notifier.signUpWithEmail(
-            email: 'test@example.com',
-            password: 'password123',
-            fullName: 'Test User',
-            initialRole: 'employer',
-          ),
-          throwsA(anything),
-        );
-      },
-    );
+    test('signUpWithEmail throws when Supabase is not initialized', () async {
+      final notifier = AuthNotifier();
+      // Without Supabase initialized, signUpWithEmail will throw an error.
+      // Use throwsAny to catch any Error type since Supabase.instance.client
+      // throws a FlutterError when not initialized (not an Exception).
+      expectLater(
+        () => notifier.signUpWithEmail(
+          email: 'test@example.com',
+          password: 'password123',
+          fullName: 'Test User',
+          initialRole: 'employer',
+        ),
+        throwsA(anything),
+      );
+    });
 
-    test(
-      'signInWithEmail throws when Supabase is not initialized',
-      () async {
-        final notifier = AuthNotifier();
-        expectLater(
-          () => notifier.signInWithEmail(
-            email: 'test@example.com',
-            password: 'password123',
-          ),
-          throwsA(anything),
-        );
-      },
-    );
+    test('signInWithEmail throws when Supabase is not initialized', () async {
+      final notifier = AuthNotifier();
+      expectLater(
+        () => notifier.signInWithEmail(
+          email: 'test@example.com',
+          password: 'password123',
+        ),
+        throwsA(anything),
+      );
+    });
 
-    test(
-      'sendOtp throws when Supabase is not initialized',
-      () async {
-        final notifier = AuthNotifier();
-        expectLater(
-          () => notifier.sendOtp(
-            phone: '03001234567',
-            initialRole: 'worker',
-          ),
-          throwsA(anything),
-        );
-      },
-    );
+    test('sendOtp throws when Supabase is not initialized', () async {
+      final notifier = AuthNotifier();
+      expectLater(
+        () => notifier.sendOtp(phone: '03001234567', initialRole: 'worker'),
+        throwsA(anything),
+      );
+    });
 
-    test(
-      'sendOtp works without initialRole (optional param)',
-      () async {
-        final notifier = AuthNotifier();
-        expectLater(
-          () => notifier.sendOtp(phone: '03001234567'),
-          throwsA(anything),
-        );
-      },
-    );
+    test('sendOtp works without initialRole (optional param)', () async {
+      final notifier = AuthNotifier();
+      expectLater(
+        () => notifier.sendOtp(phone: '03001234567'),
+        throwsA(anything),
+      );
+    });
   });
 
   // ═════════════════════════════════════════════════════════════════════
@@ -1079,6 +1066,109 @@ void main() {
       final updatedProfile = baseProfile.copyWith(fullName: 'Updated Name');
       final updated = state.copyWith(profile: updatedProfile);
       expect(updated.profile.fullName, 'Updated Name');
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════
+  //  BUG #1 Regression: _generateTitle regex
+  // ═════════════════════════════════════════════════════════════════════
+  //
+  // The old code used RegExp(r'[.!?\\n]') — a raw string where \\n is
+  // literal backslash + 'n', not a newline escape.  The character class
+  // [.!?] plus backslash + 'n' meant it split on the letter 'n', producing
+  // garbage titles like "Pai" from "Painting".
+  //
+  // Fix: RegExp('[.!?\\n]') (non-raw string, \\n = newline).
+
+  group('PostJobNotifier._generateTitle regression (BUG #1)', () {
+    test('does NOT split on the letter n', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      // "Painting needed for bedroom renovation."
+      // Old buggy regex → title = "Pai"  (split at 'n' in "Painting")
+      // Fixed regex → title = "Painting needed for bedroom renovation"
+      notifier.updateFreeformText(
+        'Painting needed for bedroom renovation.',
+      );
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title, 'Painting needed for bedroom renovation');
+      // The letter 'n' appears in several words — none should cause a split.
+      expect(title.contains('n'), isTrue);
+    });
+
+    test('does NOT split on n in multiple-word scenarios', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      // "Installing new AC unit" — old bug would split at 'n' in "Installing"
+      // producing title = "I" — completely useless.
+      notifier.updateFreeformText('Installing new AC unit in the bedroom.');
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title, 'Installing new AC unit in the bedroom');
+    });
+
+    test('splits correctly on sentence-ending punctuation', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      notifier.updateFreeformText('Fix the sink. It is leaking badly!');
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title, 'Fix the sink');
+    });
+
+    test('splits correctly on literal newlines', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      notifier.updateFreeformText('AC repair needed\nPrice is negotiable.');
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title, 'AC repair needed');
+    });
+
+    test('truncates titles longer than 60 characters', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      final longText =
+          'We need a professional electrician to rewire the entire house.';
+      notifier.updateFreeformText(longText);
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title.length, 60);
+      expect(title.endsWith('...'), isTrue);
+      expect(
+        title,
+        startsWith('We need a professional electrician to rewire'),
+      );
+    });
+
+    test('short text without punctuation returns as-is', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(postJobProvider.notifier);
+
+      // "Plumbing work needed" also serves as an 'n' regression check:
+      // the buggy regex would split on the 'n' in "Plumbing" → "Plumbi".
+      notifier.updateFreeformText('Plumbing work needed');
+      await notifier.parseWithAi();
+
+      final title = container.read(postJobProvider).draftJob.title;
+      expect(title, 'Plumbing work needed');
     });
   });
 }

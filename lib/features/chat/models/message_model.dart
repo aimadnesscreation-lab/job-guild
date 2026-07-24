@@ -132,8 +132,7 @@ class Conversation {
       otherUserPhotoUrl: clearOtherUserPhotoUrl
           ? null
           : (otherUserPhotoUrl ?? this.otherUserPhotoUrl),
-      lastMessage:
-          clearLastMessage ? null : (lastMessage ?? this.lastMessage),
+      lastMessage: clearLastMessage ? null : (lastMessage ?? this.lastMessage),
       unreadCount: unreadCount ?? this.unreadCount,
       updatedAt: updatedAt ?? this.updatedAt,
     );

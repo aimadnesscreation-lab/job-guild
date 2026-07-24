@@ -104,8 +104,19 @@ class NotificationService {
     try {
       final client = Supabase.instance.client;
 
-      // Upsert: if this exact token exists, update it; else insert.
+      // Clean up stale tokens for this user on the same platform before
+      // inserting the new one, so tokens from previous app installs don't
+      // accumulate indefinitely.
       final platform = _detectPlatform();
+      if (platform != 'other') {
+        await client
+            .from('fcm_tokens')
+            .delete()
+            .eq('user_id', userId)
+            .eq('platform', platform)
+            .neq('token', token);
+      }
+      // Upsert: if this exact token exists, update it; else insert.
       await client.from('fcm_tokens').upsert({
         'user_id': userId,
         'token': token,
@@ -123,8 +134,9 @@ class NotificationService {
   String _detectPlatform() {
     if (kIsWeb) return 'web';
     if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
+    if (defaultTargetPlatform == TargetPlatform.android) return 'android';
     if (defaultTargetPlatform == TargetPlatform.macOS) return 'macos';
-    return 'android';
+    return 'other'; // Linux, Windows, Fuchsia — not a mobile notification target
   }
 
   /// Handle a foreground message (show local notification)
@@ -162,14 +174,31 @@ Future<void> initializeFirebase() async {
   try {
     if (kIsWeb) {
       // Web requires explicit FirebaseOptions — read from env vars.
-      final apiKey = const String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '');
-      final appId = const String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
-      final messagingSenderId = const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: '');
-      final projectId = const String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
-      final authDomain = const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: '');
+      final apiKey = const String.fromEnvironment(
+        'FIREBASE_API_KEY',
+        defaultValue: '',
+      );
+      final appId = const String.fromEnvironment(
+        'FIREBASE_APP_ID',
+        defaultValue: '',
+      );
+      final messagingSenderId = const String.fromEnvironment(
+        'FIREBASE_MESSAGING_SENDER_ID',
+        defaultValue: '',
+      );
+      final projectId = const String.fromEnvironment(
+        'FIREBASE_PROJECT_ID',
+        defaultValue: '',
+      );
+      final authDomain = const String.fromEnvironment(
+        'FIREBASE_AUTH_DOMAIN',
+        defaultValue: '',
+      );
 
       if (apiKey.isEmpty || appId.isEmpty) {
-        debugPrint('Firebase web options not configured via --dart-define — skipping Firebase init on web');
+        debugPrint(
+          'Firebase web options not configured via --dart-define — skipping Firebase init on web',
+        );
         return;
       }
 
@@ -194,7 +223,9 @@ Future<void> initializeFirebase() async {
     if (!kDebugMode) {
       // TODO: Log the error to a crash reporting tool (e.g., Sentry) here.
       // Sentry.captureException(e, stackTrace: st);
-      debugPrint('Firebase init failed in production, continuing without notifications: $e');
+      debugPrint(
+        'Firebase init failed in production, continuing without notifications: $e',
+      );
     }
   }
 }

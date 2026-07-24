@@ -654,10 +654,7 @@ void main() {
       });
 
       test('handles neither flag as no-op', () async {
-        await expectLater(
-          repo.updateUserRole('user-1'),
-          completes,
-        );
+        await expectLater(repo.updateUserRole('user-1'), completes);
       });
 
       test('handles setting isEmployer to false', () async {

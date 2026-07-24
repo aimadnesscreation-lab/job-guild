@@ -87,7 +87,7 @@ class WorkerProfileNotifier extends Notifier<WorkerProfileState> {
     if (_seededForUserId != null && _seededForUserId == currentUserId) {
       return state;
     }
-    
+
     // Seed the state for this user
     _seededForUserId = currentUserId;
 

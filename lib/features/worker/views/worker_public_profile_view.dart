@@ -393,7 +393,11 @@ void _showReportUserDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.flag_outlined, color: AppTheme.errorColor, size: 22),
+            const Icon(
+              Icons.flag_outlined,
+              color: AppTheme.errorColor,
+              size: 22,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -410,7 +414,10 @@ void _showReportUserDialog(
             children: [
               Text(
                 s.reportWhyReason,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -441,52 +448,59 @@ void _showReportUserDialog(
           ),
         ),
         actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(ref.read(appStringsProvider).cancel),
-        ),
-        FilledButton(
-          onPressed: () async {
-            final userId = ref.read(currentUserProvider)?.id;
-            if (userId == null) return;
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.read(appStringsProvider).cancel),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final userId = ref.read(currentUserProvider)?.id;
+              if (userId == null) return;
 
-            try {
-              await ref.read(supabaseRepositoryProvider).submitReport(
-                    reporterId: userId,
-                    reportedUserId: reportedUserId,
-                    reason: selectedReason,
-                    details: detailsController.text.trim(),
-                  );
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ref.read(appStringsProvider).reportSubmitted),
-                  backgroundColor: AppTheme.primaryColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            } catch (e) {
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${s.reportSubmitFailed}$e'),
-                  backgroundColor: AppTheme.errorColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-          child: Text(ref.read(appStringsProvider).submit),
-        ),        ],
+              try {
+                await ref
+                    .read(supabaseRepositoryProvider)
+                    .submitReport(
+                      reporterId: userId,
+                      reportedUserId: reportedUserId,
+                      reason: selectedReason,
+                      details: detailsController.text.trim(),
+                    );
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ref.read(appStringsProvider).reportSubmitted),
+                    backgroundColor: AppTheme.primaryColor,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${s.reportSubmitFailed}$e'),
+                    backgroundColor: AppTheme.errorColor,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: Text(ref.read(appStringsProvider).submit),
+          ),
+        ],
       ),
     ),
   );
 }
 
 /// Show a full-screen image viewer for the given image URL.
-void _showFullScreenImage(BuildContext context, WidgetRef ref, String imageUrl) {
+void _showFullScreenImage(
+  BuildContext context,
+  WidgetRef ref,
+  String imageUrl,
+) {
   final s = ref.read(appStringsProvider);
   Navigator.push(
     context,
@@ -631,7 +645,8 @@ class _PublicProfileHeader extends ConsumerWidget {
                   size: 16,
                   color: AppTheme.textSecondary,
                 ),
-                const SizedBox(width: 4),                  Text(
+                const SizedBox(width: 4),
+                Text(
                   distanceKm != null
                       ? '${distanceKm!.toStringAsFixed(1)} ${ref.watch(appStringsProvider).kmAway}'
                       : ref.watch(appStringsProvider).nearbyFallback,

@@ -50,8 +50,11 @@ serve(async (req) => {
         throw new Error("Twilio credentials not configured");
       }
 
+      // Use Twilio Messaging API (not Verify) so the OTP that Supabase
+      // generated is delivered verbatim.  The Verify API generates its own
+      // code which would not match what Supabase expects.
       const twilioResponse = await fetch(
-        `https://verify.twilio.com/v2/Services/${serviceSid}/Verifications`,
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
         {
           method: "POST",
           headers: {
@@ -60,7 +63,8 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             To: payload.phone,
-            Channel: "sms",
+            From: Deno.env.get("TWILIO_PHONE_NUMBER") || "",
+            Body: payload.message || `Your verification code is ${payload.otp}`,
           }),
         },
       );

@@ -67,7 +67,9 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
       if (!success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${ref.read(appStringsProvider).error}: Hire failed — the job state may have changed. Please refresh.'),
+            content: Text(
+              '${ref.read(appStringsProvider).error}: Hire failed — the job state may have changed. Please refresh.',
+            ),
             backgroundColor: AppTheme.errorColor,
           ),
         );
@@ -170,7 +172,9 @@ class _JobDetailViewState extends ConsumerState<JobDetailView> {
                       MaterialPageRoute(
                         builder: (_) => ProviderScope(
                           overrides: [
-                            postJobProvider.overrideWith(() => PostJobNotifier()),
+                            postJobProvider.overrideWith(
+                              () => PostJobNotifier(),
+                            ),
                           ],
                           child: PostJobView(job: widget.job),
                         ),

@@ -492,8 +492,18 @@ class _ChatDetailViewState extends ConsumerState<ChatDetailView> {
     try {
       final repo = ref.read(supabaseRepositoryProvider);
       final currentUserId = ref.read(currentUserProvider)?.id;
+      if (currentUserId == null) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.chatCannotBlockUnknown),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+        return;
+      }
       await repo.submitReport(
-        reporterId: currentUserId ?? '',
+        reporterId: currentUserId,
         reportedUserId: _otherUserId,
         jobId: widget.conversationId,
         reason: result.trim(),
@@ -781,9 +791,7 @@ class _MessageBubble extends StatelessWidget {
                     message.content,
                     style: TextStyle(
                       fontSize: 15,
-                      color: isMine
-                          ? AppTheme.textPrimary
-                          : Colors.black87,
+                      color: isMine ? AppTheme.textPrimary : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -948,7 +956,10 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
             const SizedBox(height: 8),
             Text(
               ref.watch(appStringsProvider).voiceRecording,
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ] else ...[
             const Icon(
@@ -963,7 +974,10 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet>
             ),
             Text(
               ref.watch(appStringsProvider).voiceReleaseToSend,
-              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+              ),
             ),
           ],
 
@@ -1126,7 +1140,8 @@ class _VoiceMessageWidgetState extends State<_VoiceMessageWidget> {
 
     // Set source with error handling for expired/invalid URLs.
     _player.setSourceUrl(widget.url).catchError((_) {
-      if (!_disposed && mounted) setState(() => _playerState = PlayerState.stopped);
+      if (!_disposed && mounted)
+        setState(() => _playerState = PlayerState.stopped);
     });
   }
 

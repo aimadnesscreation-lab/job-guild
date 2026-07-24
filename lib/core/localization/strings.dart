@@ -16,10 +16,8 @@ class AppStrings {
   );
 
   // ─── Role Selection ──────────────────────────────────────
-  String get roleSelectionTitle => _t(
-    'How would you like to get started?',
-    'آپ کیسے شروع کرنا چاہیں گے؟',
-  );
+  String get roleSelectionTitle =>
+      _t('How would you like to get started?', 'آپ کیسے شروع کرنا چاہیں گے؟');
   String get roleSelectionSubtitle => _t(
     'You can always enable the other role later in Settings.',
     'آپ بعد میں ترتیبات میں دوسرا کردار فعال کر سکتے ہیں۔',
@@ -29,10 +27,7 @@ class AppStrings {
     'Post jobs and find nearby workers for your tasks',
     'نوکریاں پوسٹ کریں اور اپنے کاموں کے لیے قریبی کارکن تلاش کریں',
   );
-  String get roleWorkTitle => _t(
-    'I want to work',
-    'میں کام کرنا چاہتا ہوں',
-  );
+  String get roleWorkTitle => _t('I want to work', 'میں کام کرنا چاہتا ہوں');
   String get roleWorkSubtitle => _t(
     'Find jobs nearby and get hired for your skills',
     'قریبی نوکریاں تلاش کریں اور اپنی مہارتوں کے لیے بھرتی ہوں',
@@ -46,46 +41,32 @@ class AppStrings {
     'Sign up with your email address',
     'اپنے ای میل پتے کے ساتھ سائن اپ کریں',
   );
-  String get emailAuthSignInSubtitle => _t(
-    'Sign in to continue',
-    'جاری رکھنے کے لیے سائن ان کریں',
-  );
+  String get emailAuthSignInSubtitle =>
+      _t('Sign in to continue', 'جاری رکھنے کے لیے سائن ان کریں');
   String get emailAuthFullNameLabel => _t('Full Name', 'پورا نام');
   String get emailAuthFullNameHint =>
       _t('Enter your full name', 'اپنا پورا نام درج کریں');
   String get emailAuthEmailLabel => _t('Email', 'ای میل');
-  String get emailAuthEmailHint =>
-      _t('you@example.com', 'you@example.com');
+  String get emailAuthEmailHint => _t('you@example.com', 'you@example.com');
   String get emailAuthPasswordLabel => _t('Password', 'پاس ورڈ');
   String get emailAuthPasswordHint =>
       _t('At least 6 characters', 'کم از کم 6 حروف');
   String get emailAuthPasswordSignInHint =>
       _t('Enter your password', 'اپنا پاس ورڈ درج کریں');
-  String get emailAuthCreateButton =>
-      _t('Create Account', 'اکاؤنٹ بنائیں');
+  String get emailAuthCreateButton => _t('Create Account', 'اکاؤنٹ بنائیں');
   String get emailAuthSignInButton => _t('Sign In', 'سائن ان کریں');
-  String get emailAuthHasAccount => _t(
-    'Already have an account? ',
-    'پہلے سے اکاؤنٹ ہے؟ ',
-  );
-  String get emailAuthNoAccount => _t(
-    "Don't have an account? ",
-    'اکاؤنٹ نہیں ہے؟ ',
-  );
+  String get emailAuthHasAccount =>
+      _t('Already have an account? ', 'پہلے سے اکاؤنٹ ہے؟ ');
+  String get emailAuthNoAccount =>
+      _t("Don't have an account? ", 'اکاؤنٹ نہیں ہے؟ ');
   String get emailAuthToggleSignUp => _t('Sign Up', 'سائن اپ کریں');
   String get emailAuthOr => _t('or', 'یا');
-  String get emailAuthPhoneFallback => _t(
-    'Continue with Phone Number',
-    'فون نمبر کے ساتھ جاری رکھیں',
-  );
-  String get emailAuthEmptyFieldsError => _t(
-    'Please fill in all fields',
-    'براہ کرم تمام فیلڈز پُر کریں',
-  );
-  String get emailAuthEmptyNameError => _t(
-    'Please enter your name',
-    'براہ کرم اپنا نام درج کریں',
-  );
+  String get emailAuthPhoneFallback =>
+      _t('Continue with Phone Number', 'فون نمبر کے ساتھ جاری رکھیں');
+  String get emailAuthEmptyFieldsError =>
+      _t('Please fill in all fields', 'براہ کرم تمام فیلڈز پُر کریں');
+  String get emailAuthEmptyNameError =>
+      _t('Please enter your name', 'براہ کرم اپنا نام درج کریں');
   String get emailAuthShortPasswordError => _t(
     'Password must be at least 6 characters',
     'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے',
@@ -127,16 +108,15 @@ class AppStrings {
   String get jobPostFailed =>
       _t('Failed to post job: ', 'نوکری پوسٹ کرنے میں ناکام: ');
   String get updateAvailability => _t('Update', 'اپ ڈیٹ');
-  String get tutorialLoadFailed => _t(
-    'Failed to load tutorial state',
-    'ٹیوٹوریل لوڈ کرنے میں ناکام',
-  );
+  String get tutorialLoadFailed =>
+      _t('Failed to load tutorial state', 'ٹیوٹوریل لوڈ کرنے میں ناکام');
   String get viewDetails => _t('View Details', 'تفصیلات دیکھیں');
   String get urgentBadge => _t('⚡ URGENT', '⚡ فوری');
   String categoryFallback(int id) {
     final template = _t('Cat #{id}', 'زمرہ #{id}');
     return template.replaceAll('{id}', id.toString());
   }
+
   List<String> get monthsShort => [
     _t('Jan', 'جنوری'),
     _t('Feb', 'فروری'),
@@ -264,18 +244,13 @@ class AppStrings {
     'Upload a clear photo of your government-issued ID (CNIC) to earn the Verified badge. This helps build trust with employers.',
     'تصدیق شدہ بیج حاصل کرنے کے لیے اپنے سرکاری شناختی کارڈ (CNIC) کی واضح تصویر اپ لوڈ کریں۔ یہ آجروں کے ساتھ اعتماد بڑھانے میں مدد کرتا ہے۔',
   );
-  String get verifyIdCardLabel =>
-      _t('ID Card (Front)', 'شناختی کارڈ (سامنے)');
-  String get verifySelfieLabel =>
-      _t('Selfie (Optional)', 'سیلفی (اختیاری)');
+  String get verifyIdCardLabel => _t('ID Card (Front)', 'شناختی کارڈ (سامنے)');
+  String get verifySelfieLabel => _t('Selfie (Optional)', 'سیلفی (اختیاری)');
   String get verifyTapToUpload =>
       _t('Tap to upload', 'اپ لوڈ کرنے کے لیے تھپتھپائیں');
-  String get verifySubmitting =>
-      _t('Submitting...', 'جمع کیا جا رہا ہے...');
-  String get verifySubmitButton => _t(
-    'Submit for Verification',
-    'تصدیق کے لیے جمع کروائیں',
-  );
+  String get verifySubmitting => _t('Submitting...', 'جمع کیا جا رہا ہے...');
+  String get verifySubmitButton =>
+      _t('Submit for Verification', 'تصدیق کے لیے جمع کروائیں');
   String get verifySubmittedSuccess => _t(
     'Verification submitted! Your documents are being reviewed.',
     'تصدیق جمع ہو گئی! آپ کے دستاویزات کا جائزہ لیا جا رہا ہے۔',
@@ -351,6 +326,7 @@ class AppStrings {
       _t('View Job Details', 'نوکری کی تفصیلات دیکھیں');
   String get failedToSend => _t('Failed to send:', 'بھیجنے میں ناکام:');
   String get isTyping => _t('is typing...', 'ٹائپ کر رہا ہے...');
+
   /// Localized "You" shown for optimistic/outgoing chat messages.
   String get you => _t('You', 'آپ');
   String get gallery => _t('Gallery', 'گیلری');
@@ -359,22 +335,16 @@ class AppStrings {
   String get now => _t('Now', 'ابھی');
   String get chatLocationShared =>
       _t('Location shared', 'مقام شیئر کر دیا گیا');
-  String get chatVoiceCallingSoon => _t(
-    'Voice calling — coming soon',
-    'وائس کالنگ — جلد آرہی ہے',
-  );
+  String get chatVoiceCallingSoon =>
+      _t('Voice calling — coming soon', 'وائس کالنگ — جلد آرہی ہے');
   String get chatImageSendFailed =>
       _t('Failed to send image: ', 'تصویر بھیجنے میں ناکام: ');
-  String get chatLocationShareFailed => _t(
-    'Failed to share location: ',
-    'مقام شیئر کرنے میں ناکام: ',
-  );
+  String get chatLocationShareFailed =>
+      _t('Failed to share location: ', 'مقام شیئر کرنے میں ناکام: ');
   String get chatBlockFailed =>
       _t('Failed to block user: ', 'صارف کو بلاک کرنے میں ناکام: ');
-  String get chatUserBlocked => _t(
-    'User blocked on this device.',
-    'صارف اس ڈیوائس پر بلاک کر دیا گیا۔',
-  );
+  String get chatUserBlocked =>
+      _t('User blocked on this device.', 'صارف اس ڈیوائس پر بلاک کر دیا گیا۔');
   String get voiceRecording => _t('Recording...', 'ریکارڈنگ ہو رہی ہے...');
   String get voiceTapAndHold =>
       _t('Tap and hold to record', 'ریکارڈ کرنے کے لیے تھپتھپا کر رکھیں');
@@ -447,16 +417,13 @@ class AppStrings {
       _t('Details (optional)', 'تفصیلات (اختیاری)');
   String get reportDetailsHint =>
       _t('Describe the issue...', 'مسئلہ بیان کریں...');
-  String get reportSubmittedThanks => _t(
-    'Report submitted. Thank you.',
-    'رپورٹ جمع ہو گئی۔ شکریہ۔',
-  );
+  String get reportSubmittedThanks =>
+      _t('Report submitted. Thank you.', 'رپورٹ جمع ہو گئی۔ شکریہ۔');
   String get reportSubmitFailed =>
       _t('Failed to submit report: ', 'رپورٹ جمع کرنے میں ناکام: ');
   String get reportReasonSpam => _t('Spam', 'سپیم');
   String get reportReasonHarassment => _t('Harassment', 'ہراسانی');
-  String get reportReasonFakeProfile =>
-      _t('Fake profile', 'جعلی پروفائل');
+  String get reportReasonFakeProfile => _t('Fake profile', 'جعلی پروفائل');
   String get reportReasonScam => _t('Scam', 'دھوکہ');
   String get reportReasonOther => _t('Other', 'دیگر');
 
@@ -466,10 +433,8 @@ class AppStrings {
   String get accountMode => _t('Account Mode', 'اکاؤنٹ موڈ');
   String get workerMode => _t('Worker Mode', 'کارکن موڈ');
   String get employerMode => _t('Employer Mode', 'آجر موڈ');
-  String get browsingJobsSubtitle => _t(
-    'Browsing jobs and applying',
-    'نوکریاں دیکھنا اور درخواست دینا',
-  );
+  String get browsingJobsSubtitle =>
+      _t('Browsing jobs and applying', 'نوکریاں دیکھنا اور درخواست دینا');
   String get postingJobsSubtitle => _t(
     'Posting jobs and hiring workers',
     'نوکریاں پوسٹ کرنا اور کارکن بھرتی کرنا',
@@ -481,25 +446,19 @@ class AppStrings {
     );
     return template.replaceAll('{mode}', mode);
   }
-  String get switchToEmployer =>
-      _t('Switch to Employer', 'آجر میں تبدیل کریں');
+
+  String get switchToEmployer => _t('Switch to Employer', 'آجر میں تبدیل کریں');
   String get switchToWorker => _t('Switch to Worker', 'کارکن میں تبدیل کریں');
   String get enableWorkerMode =>
       _t('Enable Worker Mode', 'کارکن موڈ فعال کریں');
   String get enableEmployerMode =>
       _t('Enable Employer Mode', 'آجر موڈ فعال کریں');
-  String get deleteUndoneWarning => _t(
-    'This action cannot be undone',
-    'یہ عمل واپس نہیں کیا جا سکتا',
-  );
-  String get accountDataCleared => _t(
-    'Account data cleared',
-    'اکاؤنٹ کا ڈیٹا صاف کر دیا گیا',
-  );
-  String get deleteAccountFailed => _t(
-    'Failed to delete account: ',
-    'اکاؤنٹ حذف کرنے میں ناکام: ',
-  );
+  String get deleteUndoneWarning =>
+      _t('This action cannot be undone', 'یہ عمل واپس نہیں کیا جا سکتا');
+  String get accountDataCleared =>
+      _t('Account data cleared', 'اکاؤنٹ کا ڈیٹا صاف کر دیا گیا');
+  String get deleteAccountFailed =>
+      _t('Failed to delete account: ', 'اکاؤنٹ حذف کرنے میں ناکام: ');
   String get helpCenterError => _t(
     'Could not open help center. Please visit localservices.app/help in your browser.',
     'ہیلپ سینٹر نہیں کھل سکا۔ براہ کرم اپنے براؤزر میں localservices.app/help ملاحظہ کریں۔',
@@ -512,7 +471,8 @@ class AppStrings {
     'Employer mode enabled! Switch to it above.',
     'آجر موڈ فعال ہو گیا! اوپر سے اس میں تبدیل کریں۔',
   );
-  String get failedToEnable => _t('Failed to enable: ', 'فعال کرنے میں ناکام: ');
+  String get failedToEnable =>
+      _t('Failed to enable: ', 'فعال کرنے میں ناکام: ');
   String get appLanguage => _t('App Language', 'ایپ کی زبان');
   String get pushNotifications => _t('Push Notifications', 'پش اطلاعات');
   String get jobAlerts => _t('Job Alerts', 'نوکری کے الرٹس');
@@ -533,6 +493,7 @@ class AppStrings {
     final template = _t('Report {name}', '{name} کی رپورٹ کریں');
     return template.replaceAll('{name}', name);
   }
+
   String get cancel => _t('Cancel', 'منسوخ کریں');
   String get verifyIdentityBadge => _t(
     'Verify your identity to earn a trusted badge',
@@ -672,8 +633,7 @@ class AppStrings {
     'اس کارکن کی نوکریوں میں سے کسی پر درخواست دے کر پیغام بھیجیں',
   );
   String get lahorePakistan => _t('Lahore, Pakistan', 'لاہور، پاکستان');
-  String get portfolioImageDialog =>
-      _t('Portfolio Image', 'پورٹ فولیو تصویر');
+  String get portfolioImageDialog => _t('Portfolio Image', 'پورٹ فولیو تصویر');
   String get nearbyFallback => _t('Nearby', 'قریب');
   String get imageLoadFailed =>
       _t('Could not load image', 'تصویر لوڈ نہیں ہو سکی');
@@ -718,8 +678,7 @@ class AppStrings {
   String get asap => _t('ASAP', 'فوری');
   String get todayStr => _t('Today', 'آج');
   String get scheduledStr => _t('Scheduled', 'مقررہ');
-  String get setAvailabilityTitle =>
-      _t('Set Availability', 'دستعدی مقرر کریں');
+  String get setAvailabilityTitle => _t('Set Availability', 'دستعدی مقرر کریں');
   String get letEmployersKnow => _t(
     'Let nearby employers know when you can work',
     'قریبی آجروں کو بتائیں کہ آپ کب کام کر سکتے ہیں',
@@ -728,10 +687,12 @@ class AppStrings {
     final template = _t('{n}h ago', '{n} گھنٹے پہلے');
     return template.replaceAll('{n}', hours.toString());
   }
+
   String relativeDaysAgo(int days) {
     final template = _t('{n}d ago', '{n} دن پہلے');
     return template.replaceAll('{n}', days.toString());
   }
+
   String get availablePrefix => _t('Available:', 'دستاب:');
   String get weekdays => _t('Weekdays', 'ہفتے کے دن');
   String get weekends => _t('Weekends', 'ہفتہ وار');
@@ -786,14 +747,17 @@ class AppStrings {
     final template = _t('{n}m', '{n}منٹ');
     return template.replaceAll('{n}', n.toString());
   }
+
   String relativeTimeHours(int n) {
     final template = _t('{n}h', '{n}گھنٹے');
     return template.replaceAll('{n}', n.toString());
   }
+
   String relativeTimeDays(int n) {
     final template = _t('{n}d', '{n}دن');
     return template.replaceAll('{n}', n.toString());
   }
+
   String get share => _t('Share', 'شیئر کریں');
   String get close => _t('Close', 'بند کریں');
   String get skip => _t('Skip', 'چھوڑیں');
@@ -820,7 +784,10 @@ class AppStrings {
     'نوکریوں کے بارے میں کارکنوں اور آجروں سے بات کریں۔ تصاویر، صوتی پیغامات بھیجیں اور اپنا مقام شیئر کریں۔',
   );
   String tutorialStepCounter(int current, int total) {
-    final template = _t('Step {current} of {total}', 'مرحلہ {current} از {total}');
+    final template = _t(
+      'Step {current} of {total}',
+      'مرحلہ {current} از {total}',
+    );
     return template
         .replaceAll('{current}', current.toString())
         .replaceAll('{total}', total.toString());

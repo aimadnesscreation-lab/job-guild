@@ -55,12 +55,12 @@ class PostJobState {
 class PostJobNotifier extends Notifier<PostJobState> {
   @override
   PostJobState build() => PostJobState(
-        draftJob: Job(
-          locationText: AppConstants.defaultCity,
-          lat: AppConstants.defaultLatitude,
-          lng: AppConstants.defaultLongitude,
-        ),
-      );
+    draftJob: Job(
+      locationText: AppConstants.defaultCity,
+      lat: AppConstants.defaultLatitude,
+      lng: AppConstants.defaultLongitude,
+    ),
+  );
 
   /// Reset the form to a clean default state. Called when PostJobView is
   /// opened without an existing job so the tab and pushed route don't share
@@ -271,7 +271,7 @@ class PostJobNotifier extends Notifier<PostJobState> {
 
   String _generateTitle(String text) {
     // Take first sentence or first 60 chars as title
-    final firstSentence = text.split(RegExp(r'[.!?\n]')).first.trim();
+    final firstSentence = text.split(RegExp('[.!?\n]')).first.trim();
     if (firstSentence.length <= 60) return firstSentence;
     return '${firstSentence.substring(0, 57)}...';
   }

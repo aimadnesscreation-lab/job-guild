@@ -61,177 +61,187 @@ class _HomeViewState extends ConsumerState<HomeView> {
         final isWorker = role == AppRole.worker;
 
         Widget scaffold = Scaffold(
-      appBar: _currentTabIndex == 0 || _currentTabIndex == 3
-          ? AppBar(
-              title: Text(
-                _currentTabIndex == 0
-                    ? ref.watch(appStringsProvider).appName
-                    : _tabTitle(_currentTabIndex),
-              ),
-              actions: [
-                if (_currentTabIndex == 0 && !isWorker) ...[
-                  IconButton(
-                    icon: const Icon(Icons.favorite_border_rounded),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const FavoritesView()),
-                    ),
+          appBar: _currentTabIndex == 0 || _currentTabIndex == 3
+              ? AppBar(
+                  title: Text(
+                    _currentTabIndex == 0
+                        ? ref.watch(appStringsProvider).appName
+                        : _tabTitle(_currentTabIndex),
                   ),
-                  Badge(
-                    isLabelVisible: unreadCount > 0,
-                    label: Text(
-                      '$unreadCount',
-                      style: const TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      onPressed: () async {
-                        await Navigator.push(
+                  actions: [
+                    if (_currentTabIndex == 0 && !isWorker) ...[
+                      IconButton(
+                        icon: const Icon(Icons.favorite_border_rounded),
+                        onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const NotificationsView(),
+                            builder: (_) => const FavoritesView(),
                           ),
-                        );
-                        if (context.mounted) {
-                          ref.invalidate(unreadNotificationCountProvider);
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.person_outline),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SettingsView(),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-                if (_currentTabIndex == 0 && isWorker) ...[
-                  Badge(
-                    isLabelVisible: unreadCount > 0,
-                    label: Text(
-                      '$unreadCount',
-                      style: const TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      onPressed: () async {
-                        await Navigator.push(
+                      Badge(
+                        isLabelVisible: unreadCount > 0,
+                        label: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.notifications_outlined),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationsView(),
+                              ),
+                            );
+                            if (context.mounted) {
+                              ref.invalidate(unreadNotificationCountProvider);
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.person_outline),
+                        onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const NotificationsView(),
+                            builder: (_) => const SettingsView(),
                           ),
-                        );
-                        if (context.mounted) {
-                          ref.invalidate(unreadNotificationCountProvider);
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.person_outline),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EditWorkerProfileView(),
+                        ),
                       ),
+                    ],
+                    if (_currentTabIndex == 0 && isWorker) ...[
+                      Badge(
+                        isLabelVisible: unreadCount > 0,
+                        label: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.notifications_outlined),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationsView(),
+                              ),
+                            );
+                            if (context.mounted) {
+                              ref.invalidate(unreadNotificationCountProvider);
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.person_outline),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const EditWorkerProfileView(),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_currentTabIndex == 3) ...[
+                      IconButton(
+                        icon: const Icon(Icons.settings_outlined),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsView(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              : null,
+          body: IndexedStack(
+            index: _currentTabIndex,
+            children: isWorker
+                ? const [
+                    _HomeFeedTab(), // Job feed (index 0)
+                    SearchWorkersContent(), // Search jobs (index 1)
+                    ChatListView(), // Messages (index 2)
+                    WorkerDashboard(), // Dashboard (index 3)
+                  ]
+                : const [
+                    EmployerDashboard(), // Dashboard (index 0)
+                    SearchWorkersContent(), // Find Workers (index 1)
+                    _PostJobRoute(), // Post a Job (index 2)
+                    ChatListView(), // Messages (index 3)
+                  ],
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            key: _navBarGlobalKey,
+            currentIndex: _currentTabIndex,
+            onTap: (index) {
+              setState(() {
+                _currentTabIndex = index;
+              });
+            },
+            items: isWorker
+                ? [
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.home_outlined),
+                      activeIcon: const Icon(Icons.home_rounded),
+                      label: ref.watch(appStringsProvider).tabHome,
                     ),
-                  ),
-                ],
-                if (_currentTabIndex == 3) ...[
-                  IconButton(
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsView()),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.search_outlined),
+                      activeIcon: const Icon(Icons.search_rounded),
+                      label: ref.watch(appStringsProvider).tabSearch,
                     ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.chat_outlined),
+                      activeIcon: const Icon(Icons.chat_rounded),
+                      label: ref.watch(appStringsProvider).tabMessages,
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.dashboard_outlined),
+                      activeIcon: const Icon(Icons.dashboard_rounded),
+                      label: ref.watch(appStringsProvider).tabDashboard,
+                    ),
+                  ]
+                : [
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.space_dashboard_outlined),
+                      activeIcon: const Icon(Icons.space_dashboard_rounded),
+                      label: ref.watch(appStringsProvider).tabDashboard,
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.search_outlined),
+                      activeIcon: const Icon(Icons.search_rounded),
+                      label: ref.watch(appStringsProvider).tabSearch,
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.add_circle_outline),
+                      activeIcon: const Icon(Icons.add_circle_rounded),
+                      label: ref.watch(appStringsProvider).tabPostJob,
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.chat_outlined),
+                      activeIcon: const Icon(Icons.chat_rounded),
+                      label: ref.watch(appStringsProvider).tabMessages,
+                    ),
+                  ],
+          ),
+          floatingActionButton: _currentTabIndex == 0 && !isWorker
+              ? FloatingActionButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const _PostJobRoute()),
                   ),
-                ],
-              ],
-            )
-          : null,
-      body: IndexedStack(
-        index: _currentTabIndex,
-        children: isWorker
-            ? const [
-                _HomeFeedTab(),        // Job feed (index 0)
-                SearchWorkersContent(), // Search jobs (index 1)
-                ChatListView(),        // Messages (index 2)
-                WorkerDashboard(),     // Dashboard (index 3)
-              ]
-            : const [
-                EmployerDashboard(),   // Dashboard (index 0)
-                SearchWorkersContent(), // Find Workers (index 1)
-                _PostJobRoute(),        // Post a Job (index 2)
-                ChatListView(),         // Messages (index 3)
-              ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        key: _navBarGlobalKey,
-        currentIndex: _currentTabIndex,
-        onTap: (index) {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
-        items: isWorker
-            ? [
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.home_outlined),
-                  activeIcon: const Icon(Icons.home_rounded),
-                  label: ref.watch(appStringsProvider).tabHome,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.search_outlined),
-                  activeIcon: const Icon(Icons.search_rounded),
-                  label: ref.watch(appStringsProvider).tabSearch,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.chat_outlined),
-                  activeIcon: const Icon(Icons.chat_rounded),
-                  label: ref.watch(appStringsProvider).tabMessages,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.dashboard_outlined),
-                  activeIcon: const Icon(Icons.dashboard_rounded),
-                  label: ref.watch(appStringsProvider).tabDashboard,
-                ),
-              ]
-            : [
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.space_dashboard_outlined),
-                  activeIcon: const Icon(Icons.space_dashboard_rounded),
-                  label: ref.watch(appStringsProvider).tabDashboard,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.search_outlined),
-                  activeIcon: const Icon(Icons.search_rounded),
-                  label: ref.watch(appStringsProvider).tabSearch,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.add_circle_outline),
-                  activeIcon: const Icon(Icons.add_circle_rounded),
-                  label: ref.watch(appStringsProvider).tabPostJob,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.chat_outlined),
-                  activeIcon: const Icon(Icons.chat_rounded),
-                  label: ref.watch(appStringsProvider).tabMessages,
-                ),
-              ],
-      ),
-      floatingActionButton: _currentTabIndex == 0 && !isWorker
-          ? FloatingActionButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const _PostJobRoute()),
-              ),
-              child: const Icon(Icons.add_rounded),
-            )
-          : null,
-    );
+                  child: const Icon(Icons.add_rounded),
+                )
+              : null,
+        );
 
         // Wrap scaffold in a Stack to overlay coach marks on first launch
         if (!tutorialCompleted) {
@@ -253,11 +263,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
         return scaffold;
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, st) => Scaffold(
-        body: Center(child: Text(ref.read(appStringsProvider).tutorialLoadFailed)),
+        body: Center(
+          child: Text(ref.read(appStringsProvider).tutorialLoadFailed),
+        ),
       ),
     );
   }
@@ -330,9 +341,7 @@ class _HomeFeedTab extends ConsumerWidget {
           if (hadError && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                  '${strings.couldNotLoadJobs} $capturedError',
-                ),
+                content: Text('${strings.couldNotLoadJobs} $capturedError'),
                 backgroundColor: AppTheme.errorColor,
               ),
             );
@@ -535,11 +544,10 @@ class _RealtimeJobCard extends ConsumerWidget {
                     ),
                     child: Text(
                       (() {
-                        final entry = categoryNameToId.entries
-                            .firstWhere(
-                              (e) => e.value == job.categoryId,
-                              orElse: () => const MapEntry('', 0),
-                            );
+                        final entry = categoryNameToId.entries.firstWhere(
+                          (e) => e.value == job.categoryId,
+                          orElse: () => const MapEntry('', 0),
+                        );
                         return entry.key.isNotEmpty
                             ? entry.key
                             : s.categoryFallback(job.categoryId);
@@ -631,9 +639,7 @@ class _PostJobRoute extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      overrides: [
-        postJobProvider.overrideWith(() => PostJobNotifier()),
-      ],
+      overrides: [postJobProvider.overrideWith(() => PostJobNotifier())],
       child: const PostJobView(resetOnInit: true),
     );
   }
@@ -646,5 +652,3 @@ final unreadNotificationCountProvider = FutureProvider<int>((ref) async {
   if (userId == null) return 0;
   return repo.getUnreadNotificationCount(userId);
 });
-
-

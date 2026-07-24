@@ -25,7 +25,8 @@ class SettingsView extends ConsumerWidget {
     final currentRole = ref.watch(currentRoleProvider);
     final userRoles = ref.watch(userRolesProvider);
     final isWorker = currentRole == AppRole.worker;
-    final hasBothRoles = userRoles.asData?.value != null &&
+    final hasBothRoles =
+        userRoles.asData?.value != null &&
         userRoles.asData!.value.isEmployer &&
         userRoles.asData!.value.isWorker;
 
@@ -50,15 +51,15 @@ class SettingsView extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                isWorker ? Icons.engineering_rounded : Icons.business_center_rounded,
+                isWorker
+                    ? Icons.engineering_rounded
+                    : Icons.business_center_rounded,
                 color: isWorker ? AppTheme.accentColor : AppTheme.primaryColor,
               ),
             ),
             title: Text(isWorker ? s.workerMode : s.employerMode),
             subtitle: Text(
-              isWorker
-                  ? s.browsingJobsSubtitle
-                  : s.postingJobsSubtitle,
+              isWorker ? s.browsingJobsSubtitle : s.postingJobsSubtitle,
             ),
             trailing: hasBothRoles
                 ? TextButton(
@@ -68,26 +69,32 @@ class SettingsView extends ConsumerWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            s.switchedToModeLabel(isWorker ? s.employer : s.worker),
+                            s.switchedToModeLabel(
+                              isWorker ? s.employer : s.worker,
+                            ),
                           ),
                           behavior: SnackBarBehavior.floating,
                           duration: const Duration(seconds: 2),
                         ),
                       );
                     },
-                    child: Text(isWorker ? s.switchToEmployer : s.switchToWorker),
+                    child: Text(
+                      isWorker ? s.switchToEmployer : s.switchToWorker,
+                    ),
                   )
-                : userRoles.asData?.value != null && !userRoles.asData!.value.isWorker
-                    ? TextButton(
-                        onPressed: () => _enableWorkerMode(context, ref),
-                        child: Text(s.enableWorkerMode),
-                      )
-                    : userRoles.asData?.value != null && !userRoles.asData!.value.isEmployer
-                        ? TextButton(
-                            onPressed: () => _enableEmployerMode(context, ref),
-                            child: Text(s.enableEmployerMode),
-                          )
-                        : null,
+                : userRoles.asData?.value != null &&
+                      !userRoles.asData!.value.isWorker
+                ? TextButton(
+                    onPressed: () => _enableWorkerMode(context, ref),
+                    child: Text(s.enableWorkerMode),
+                  )
+                : userRoles.asData?.value != null &&
+                      !userRoles.asData!.value.isEmployer
+                ? TextButton(
+                    onPressed: () => _enableEmployerMode(context, ref),
+                    child: Text(s.enableEmployerMode),
+                  )
+                : null,
           ),
           const Divider(height: 1),
 
@@ -110,9 +117,7 @@ class SettingsView extends ConsumerWidget {
             trailing: TextButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const IdVerificationView(),
-                ),
+                MaterialPageRoute(builder: (_) => const IdVerificationView()),
               ),
               child: Text(s.verifyNow),
             ),
@@ -136,9 +141,7 @@ class SettingsView extends ConsumerWidget {
               ],
               onChanged: (val) {
                 if (val != null) {
-                  ref
-                      .read(settingsProvider.notifier)
-                      .updateLanguage(val);
+                  ref.read(settingsProvider.notifier).updateLanguage(val);
                 }
               },
             ),
@@ -232,9 +235,7 @@ class SettingsView extends ConsumerWidget {
             title: Text(s.helpCenter),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () async {
-              final uri = Uri.parse(
-                'https://localservices.app/help',
-              );
+              final uri = Uri.parse('https://localservices.app/help');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               } else {
@@ -259,9 +260,7 @@ class SettingsView extends ConsumerWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const ReportsView(),
-                ),
+                MaterialPageRoute(builder: (_) => const ReportsView()),
               );
             },
           ),
@@ -460,7 +459,8 @@ class _AccountHeader extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
 
     final name = user?.userMetadata?['full_name'] as String? ?? '';
-    final phone = user?.phone ?? user?.email ?? ref.watch(appStringsProvider).notSignedIn;
+    final phone =
+        user?.phone ?? user?.email ?? ref.watch(appStringsProvider).notSignedIn;
 
     return ListTile(
       leading: CircleAvatar(
@@ -475,9 +475,7 @@ class _AccountHeader extends ConsumerWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => const EditWorkerProfileView(),
-          ),
+          MaterialPageRoute(builder: (_) => const EditWorkerProfileView()),
         );
       },
     );

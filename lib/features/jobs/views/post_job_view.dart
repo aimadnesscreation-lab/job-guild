@@ -132,7 +132,9 @@ class _PostJobViewState extends ConsumerState<PostJobView> {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${ref.read(appStringsProvider).jobPostFailed}$error'),
+              content: Text(
+                '${ref.read(appStringsProvider).jobPostFailed}$error',
+              ),
               backgroundColor: AppTheme.errorColor,
             ),
           );

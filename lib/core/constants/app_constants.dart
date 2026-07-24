@@ -45,7 +45,9 @@ class AppConstants {
 
   static String get openRouterApiKey {
     final value = _env('OPENROUTER_API_KEY');
-    return value != null && value.isNotEmpty ? value : _openRouterApiKeyPlaceholder;
+    return value != null && value.isNotEmpty
+        ? value
+        : _openRouterApiKeyPlaceholder;
   }
 
   /// True only when a real OpenRouter key (not the placeholder) is configured.
@@ -78,10 +80,8 @@ class AppConstants {
   // Free auto-router — picks the best available free model automatically
   static const String openRouterFreeModel = 'openrouter/free';
   // Google Gemma 4 — modern free model, reliable for JSON and text tasks
-  static const String openRouterJsonModel =
-      'google/gemma-4-26b-a4b-it:free';
-  static const String openRouterTextModel =
-      'google/gemma-4-26b-a4b-it:free';
+  static const String openRouterJsonModel = 'google/gemma-4-26b-a4b-it:free';
+  static const String openRouterTextModel = 'google/gemma-4-26b-a4b-it:free';
 
   // Feature flags
   static const bool enableAiJobParsing = true;

@@ -229,10 +229,12 @@ class _NotificationsViewState extends ConsumerState<NotificationsView> {
                               // title and body live inside it, not as top-level columns.
                               final payload =
                                   n['payload'] as Map<String, dynamic>? ?? {};
-                              final title = payload['title'] as String? ??
+                              final title =
+                                  payload['title'] as String? ??
                                   n['title'] as String? ??
                                   '';
-                              final body = payload['body'] as String? ??
+                              final body =
+                                  payload['body'] as String? ??
                                   n['body'] as String? ??
                                   '';
                               return _NotificationTile(

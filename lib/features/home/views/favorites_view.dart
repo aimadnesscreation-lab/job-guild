@@ -8,7 +8,9 @@ import 'package:local_services_marketplace/features/worker/models/worker_profile
 import 'package:local_services_marketplace/features/worker/views/worker_public_profile_view.dart';
 
 /// Provider that fetches the current user's favorite workers.
-final favoritesListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final favoritesListProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final repo = ref.watch(supabaseRepositoryProvider);
   final userId = ref.watch(currentUserProvider)?.id;
   if (userId == null) return [];
@@ -67,7 +69,8 @@ class FavoritesView extends ConsumerWidget {
               // The getFavorites() query returns data nested under favorited_user_id
               // with worker_profiles as a sub-object.
               final Map<String, dynamic> favoritedUser =
-                  (worker['favorited_user_id'] as Map<String, dynamic>?) ?? worker;
+                  (worker['favorited_user_id'] as Map<String, dynamic>?) ??
+                  worker;
               final Map<String, dynamic>? wp =
                   favoritedUser['worker_profiles'] as Map<String, dynamic>?;
               final name = favoritedUser['full_name'] as String? ?? 'Worker';
@@ -115,14 +118,16 @@ class FavoritesView extends ConsumerWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => WorkerPublicProfileView(
-                        profile: fullProfile ?? WorkerProfile(
-                          userId: workerId,
-                          fullName: name,
-                          headline: headline,
-                          averageRating: averageRating,
-                          totalJobsCompleted: totalJobsCompleted,
-                          isVerified: isVerified,
-                        ),
+                        profile:
+                            fullProfile ??
+                            WorkerProfile(
+                              userId: workerId,
+                              fullName: name,
+                              headline: headline,
+                              averageRating: averageRating,
+                              totalJobsCompleted: totalJobsCompleted,
+                              isVerified: isVerified,
+                            ),
                       ),
                     ),
                   );

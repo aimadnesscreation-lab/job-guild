@@ -96,9 +96,9 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
   Future<void> _submitVerification() async {
     final s = ref.read(appStringsProvider);
     if (_idFrontImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.verifyUploadIdFirst)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(s.verifyUploadIdFirst)));
       return;
     }
 
@@ -164,7 +164,9 @@ class _IdVerificationViewState extends ConsumerState<IdVerificationView> {
         try {
           await client.storage.from('verification_docs').remove([idFileName]);
           if (selfieFileName != null) {
-            await client.storage.from('verification_docs').remove([selfieFileName]);
+            await client.storage.from('verification_docs').remove([
+              selfieFileName,
+            ]);
           }
         } catch (_) {
           // Best-effort cleanup; original error is more important.
@@ -319,7 +321,8 @@ class _UploadCard extends StatelessWidget {
                     onPressed: onRemove,
                   )
                 : null,
-          ),            if (image != null)
+          ),
+          if (image != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(12),
@@ -332,9 +335,7 @@ class _UploadCard extends StatelessWidget {
                         if (bytes == null) {
                           return const SizedBox(
                             height: 160,
-                            child: Center(
-                              child: CircularProgressIndicator(),
-                            ),
+                            child: Center(child: CircularProgressIndicator()),
                           );
                         }
                         return Image.memory(

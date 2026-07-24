@@ -29,10 +29,7 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
   bool _verifiedOnly = false;
   String _selectedAvailability = 'Any';
 
-  final _categories = [
-    'All',
-    ...allWorkerCategories,
-  ];
+  final _categories = ['All', ...allWorkerCategories];
 
   final _availabilityOptions = [
     'Any',
@@ -48,7 +45,8 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
     final q = _searchController.text.toLowerCase();
     return workers.where((w) {
       final matchesCategory =
-          _selectedCategory == 'All' || w.categories.contains(_selectedCategory);
+          _selectedCategory == 'All' ||
+          w.categories.contains(_selectedCategory);
       final matchesRating = w.rating >= _minRating;
       final matchesVerified = !_verifiedOnly || w.isVerified;
       final matchesSearch =
@@ -57,8 +55,7 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
           w.categories.any((c) => c.toLowerCase().contains(q));
       final matchesAvailability =
           _selectedAvailability == 'Any' ||
-          w.availability.toLowerCase() ==
-              _selectedAvailability.toLowerCase();
+          w.availability.toLowerCase() == _selectedAvailability.toLowerCase();
       // distance_meters is returned by the nearby-workers RPC.
       final distanceKm = w.distanceMeters / 1000.0;
       final matchesDistance = distanceKm <= _maxDistance;
@@ -84,145 +81,141 @@ class _SearchWorkersContentState extends ConsumerState<SearchWorkersContent> {
     final filtered = _filtered(workers);
     return Column(
       children: [
-          // ─── Search Bar ────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: ref.watch(appStringsProvider).searchHint,
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (_) => setState(() {}),
+        // ─── Search Bar ────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.white,
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: ref.watch(appStringsProvider).searchHint,
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+
+        // ─── Filter Chips ──────────────────────────────────
+        Container(
+          padding: const EdgeInsets.only(bottom: 8),
+          color: Colors.white,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: _verifiedOnly
+                      ? '${ref.watch(appStringsProvider).verifiedOnly} ✓'
+                      : ref.watch(appStringsProvider).verifiedOnly,
+                  icon: Icons.verified_rounded,
+                  isSelected: _verifiedOnly,
+                  onTap: () => setState(() => _verifiedOnly = !_verifiedOnly),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Min ${_minRating.toStringAsFixed(1)} ★',
+                  icon: Icons.star_rounded,
+                  isSelected: _minRating > 3.0,
+                  onTap: () => _showRatingFilter(),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: '${_maxDistance.toInt()} km',
+                  icon: Icons.near_me_rounded,
+                  isSelected: _maxDistance < 50,
+                  onTap: () => _showDistanceFilter(),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: _selectedAvailability,
+                  icon: Icons.schedule_rounded,
+                  isSelected: _selectedAvailability != 'Any',
+                  onTap: () => _showAvailabilityFilter(),
+                ),
+              ],
             ),
           ),
+        ),
 
-          // ─── Filter Chips ──────────────────────────────────
-          Container(
-            padding: const EdgeInsets.only(bottom: 8),
-            color: Colors.white,
-            child: SingleChildScrollView(
+        // ─── Category Tabs ─────────────────────────────────
+        Container(
+          padding: const EdgeInsets.only(bottom: 8),
+          color: Colors.white,
+          child: SizedBox(
+            height: 36,
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: _verifiedOnly
-                        ? '${ref.watch(appStringsProvider).verifiedOnly} ✓'
-                        : ref.watch(appStringsProvider).verifiedOnly,
-                    icon: Icons.verified_rounded,
-                    isSelected: _verifiedOnly,
-                    onTap: () => setState(() => _verifiedOnly = !_verifiedOnly),
+              itemCount: _categories.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                final isSelected = _selectedCategory == cat;
+                return ChoiceChip(
+                  label: Text(cat, style: const TextStyle(fontSize: 12)),
+                  selected: isSelected,
+                  selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                  onSelected: (_) => setState(() => _selectedCategory = cat),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : AppTheme.borderColor,
                   ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'Min ${_minRating.toStringAsFixed(1)} ★',
-                    icon: Icons.star_rounded,
-                    isSelected: _minRating > 3.0,
-                    onTap: () => _showRatingFilter(),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: '${_maxDistance.toInt()} km',
-                    icon: Icons.near_me_rounded,
-                    isSelected: _maxDistance < 50,
-                    onTap: () => _showDistanceFilter(),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: _selectedAvailability,
-                    icon: Icons.schedule_rounded,
-                    isSelected: _selectedAvailability != 'Any',
-                    onTap: () => _showAvailabilityFilter(),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
+        ),
 
-          // ─── Category Tabs ─────────────────────────────────
-          Container(
-            padding: const EdgeInsets.only(bottom: 8),
-            color: Colors.white,
-            child: SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _categories.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 6),
-                itemBuilder: (context, index) {
-                  final cat = _categories[index];
-                  final isSelected = _selectedCategory == cat;
-                  return ChoiceChip(
-                    label: Text(cat, style: const TextStyle(fontSize: 12)),
-                    selected: isSelected,
-                    selectedColor: AppTheme.primaryColor.withValues(
-                      alpha: 0.15,
-                    ),
-                    onSelected: (_) => setState(() => _selectedCategory = cat),
-                    side: BorderSide(
-                      color: isSelected
-                          ? AppTheme.primaryColor
-                          : AppTheme.borderColor,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+        const Divider(height: 1),
 
-          const Divider(height: 1),
-
-          // ─── Results ───────────────────────────────────────
-          Expanded(
-            child: async.isLoading
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: WorkerSearchShimmer(),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async =>
-                        ref.invalidate(nearbyWorkersProvider),
-                    child: filtered.isEmpty
-                        ? ListView(
-                            children: [
-                              SizedBox(
-                                height:
-                                    MediaQuery.of(context).size.height * 0.2,
-                              ),
-                              Center(
-                                child: Text(
-                                  ref.watch(appStringsProvider).noWorkersMatch,
-                                  style: const TextStyle(
-                                    color: AppTheme.textSecondary,
-                                  ),
+        // ─── Results ───────────────────────────────────────
+        Expanded(
+          child: async.isLoading
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: WorkerSearchShimmer(),
+                )
+              : RefreshIndicator(
+                  onRefresh: () async => ref.invalidate(nearbyWorkersProvider),
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.2,
+                            ),
+                            Center(
+                              child: Text(
+                                ref.watch(appStringsProvider).noWorkersMatch,
+                                style: const TextStyle(
+                                  color: AppTheme.textSecondary,
                                 ),
                               ),
-                            ],
-                          )
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: filtered
-                                .map(
-                                  (worker) => _WorkerResultCard(worker: worker),
-                                )
-                                .toList(),
-                          ),
-                  ),
-          ),
-        ],
-      );
+                            ),
+                          ],
+                        )
+                      : ListView(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          children: filtered
+                              .map(
+                                (worker) => _WorkerResultCard(worker: worker),
+                              )
+                              .toList(),
+                        ),
+                ),
+        ),
+      ],
+    );
   }
 
   void _showRatingFilter() {
@@ -446,7 +439,8 @@ class _WorkerResultCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),            onTap: () {
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(

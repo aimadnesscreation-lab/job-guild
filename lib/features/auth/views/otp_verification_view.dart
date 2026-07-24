@@ -2,7 +2,8 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FilteringTextInputFormatter, MaxLengthEnforcement;
+import 'package:flutter/services.dart'
+    show FilteringTextInputFormatter, MaxLengthEnforcement;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_services_marketplace/core/localization/locale_provider.dart';
 import 'package:local_services_marketplace/core/theme/app_theme.dart';
@@ -13,11 +14,16 @@ import 'package:local_services_marketplace/features/home/views/home_view.dart';
 /// Handles auto-submit, resend, and error states.
 class OtpVerificationView extends ConsumerStatefulWidget {
   final String phoneNumber;
+
   /// The role selected during onboarding ('employer' or 'worker').
   /// Passed through so OTP resend preserves the correct role metadata.
   final String? initialRole;
 
-  const OtpVerificationView({super.key, required this.phoneNumber, this.initialRole});
+  const OtpVerificationView({
+    super.key,
+    required this.phoneNumber,
+    this.initialRole,
+  });
 
   @override
   ConsumerState<OtpVerificationView> createState() =>
@@ -148,10 +154,9 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
     _otpFocusNodes[0].requestFocus();
 
     try {
-      await ref.read(authProvider.notifier).sendOtp(
-        phone: widget.phoneNumber,
-        initialRole: widget.initialRole,
-      );
+      await ref
+          .read(authProvider.notifier)
+          .sendOtp(phone: widget.phoneNumber, initialRole: widget.initialRole);
       if (!mounted) return;
       _startResendCountdown();
     } catch (e) {
@@ -232,8 +237,16 @@ class _OtpVerificationViewState extends ConsumerState<OtpVerificationView> {
                         textAlign: TextAlign.center,
                         maxLength: 1,
                         maxLengthEnforcement: MaxLengthEnforcement.enforced,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        buildCounter: (context, {required currentLength, required bool isFocused, maxLength}) => null,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required bool isFocused,
+                              maxLength,
+                            }) => null,
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,

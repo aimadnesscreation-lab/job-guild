@@ -14,9 +14,21 @@ int estimateBudget(String input, String category) {
 
   // Budget-related context words in English and Urdu/Roman Urdu.
   final budgetWords = [
-    'budget', 'rs', 'rupees', 'rupee', 'pkr', 'price',
-    'cost', 'pay', 'rate', 'fee', 'charge', 'salary',
-    'kitne', 'kitna', 'qimat',
+    'budget',
+    'rs',
+    'rupees',
+    'rupee',
+    'pkr',
+    'price',
+    'cost',
+    'pay',
+    'rate',
+    'fee',
+    'charge',
+    'salary',
+    'kitne',
+    'kitna',
+    'qimat',
   ];
 
   final digitRegex = RegExp(r'(\d{1,3}(?:,\d{3})+|\d+)\s*([kK])?');
@@ -44,13 +56,19 @@ int estimateBudget(String input, String category) {
         final scaled = hasK ? value * 1000 : value;
 
         // Skip values that are too small or too large to be budgets.
-        if (scaled < 100) { continue; }
-        if (scaled > 100000) { continue; }
+        if (scaled < 100) {
+          continue;
+        }
+        if (scaled > 100000) {
+          continue;
+        }
 
         // Skip numbers that might be phone numbers (10-12 digits starting 03 or 92)
         final rawStr = match.group(0)!;
         if ((rawStr.startsWith('03') && rawStr.length >= 10) ||
-            (rawStr.startsWith('92') && rawStr.length >= 11)) { continue; }
+            (rawStr.startsWith('92') && rawStr.length >= 11)) {
+          continue;
+        }
 
         // Prefer K-suffix values, then larger values.
         if (bestValue == null ||
@@ -113,7 +131,8 @@ String guessCategory(String text) {
   }
   if (RegExp(r'\bmove|\bshift(ing|er)?\b').hasMatch(lower)) return 'Moving';
   if (lower.contains('photo')) return 'Photographer';
-  if (lower.contains('laptop') || lower.contains('computer')) return 'Laptop Repair';
+  if (lower.contains('laptop') || lower.contains('computer'))
+    return 'Laptop Repair';
   if (RegExp(r'\bmobile\b').hasMatch(lower) ||
       RegExp(r'\bphone\b').hasMatch(lower)) {
     return 'Mobile Repair';
@@ -144,8 +163,7 @@ String guessCategory(String text) {
       RegExp(r'\bgeneral\b').hasMatch(lower)) {
     return 'General Labor';
   }
-  if (lower.contains('teacher') ||
-      RegExp(r'\blanguage\b').hasMatch(lower)) {
+  if (lower.contains('teacher') || RegExp(r'\blanguage\b').hasMatch(lower)) {
     return 'Language Teacher';
   }
   if (lower.contains('steel')) return 'Steel Fixing';
@@ -155,10 +173,14 @@ String guessCategory(String text) {
 /// Detect urgency level from freeform text.
 String guessUrgency(String text) {
   final lower = text.toLowerCase();
-  if (lower.contains('urgent') || lower.contains('emergency') || lower.contains('asap')) {
+  if (lower.contains('urgent') ||
+      lower.contains('emergency') ||
+      lower.contains('asap')) {
     return 'instant';
   }
-  if (lower.contains('next') || lower.contains('tomorrow') || lower.contains('schedule')) {
+  if (lower.contains('next') ||
+      lower.contains('tomorrow') ||
+      lower.contains('schedule')) {
     return 'scheduled';
   }
   return 'today';
@@ -170,8 +192,10 @@ String guessUrgency(String text) {
 int estimateDuration(String input) {
   final lower = input.toLowerCase();
   // Explicit duration with a number: "3 hours", "2hrs", "5 hour"
-  final numericMatch = RegExp(r'(\d+)\s*(?:hour|hr)', caseSensitive: false)
-      .firstMatch(lower);
+  final numericMatch = RegExp(
+    r'(\d+)\s*(?:hour|hr)',
+    caseSensitive: false,
+  ).firstMatch(lower);
   if (numericMatch != null) {
     final hours = int.tryParse(numericMatch.group(1)!) ?? 1;
     return hours.clamp(1, 40);

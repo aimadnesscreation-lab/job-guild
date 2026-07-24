@@ -26,10 +26,9 @@ class WorkerRepository {
 
       // Upsert new rows first so data is never lost on partial failure.
       if (rows.isNotEmpty) {
-        await _supabase.from('worker_categories').upsert(
-          rows,
-          onConflict: 'worker_id,category_id',
-        );
+        await _supabase
+            .from('worker_categories')
+            .upsert(rows, onConflict: 'worker_id,category_id');
       }
 
       // Prune stale category assignments that are no longer selected.
@@ -107,10 +106,7 @@ class WorkerRepository {
     if (!rpcSucceeded) {
       // Fallback: atomic upsert via PostgREST. This avoids the race between
       // INSERT and UPDATE and correctly handles the id primary key.
-      await _supabase.from('worker_profiles').upsert(
-        payload,
-        onConflict: 'id',
-      );
+      await _supabase.from('worker_profiles').upsert(payload, onConflict: 'id');
     }
 
     // Persist categories (best-effort, but errors are surfaced so the caller

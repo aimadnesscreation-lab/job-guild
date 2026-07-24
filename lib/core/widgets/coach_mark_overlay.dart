@@ -28,7 +28,7 @@ class CoachMarkOverlay extends ConsumerStatefulWidget {
 
   /// The height of the bottom navigation bar.
   final double bottomNavHeight;
-  
+
   /// Number of items in the bottom navigation bar.
   final int tabCount;
 
@@ -120,7 +120,10 @@ class _CoachMarkOverlayState extends ConsumerState<CoachMarkOverlay>
 
   void _nextStep() {
     final isWorker = ref.read(currentRoleProvider) == AppRole.worker;
-    final totalSteps = _buildSteps(ref.read(appStringsProvider), isWorker).length;
+    final totalSteps = _buildSteps(
+      ref.read(appStringsProvider),
+      isWorker,
+    ).length;
     if (_currentStep < totalSteps - 1) {
       _animController.reverse().then((_) {
         if (!context.mounted) return;

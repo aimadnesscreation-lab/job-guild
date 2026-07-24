@@ -23,7 +23,9 @@ void main() {
 
     _configured = AppConstants.isSupabaseConfigured;
     if (!_configured) {
-      debugPrint('Skipping e2e tests: SUPABASE_URL/SUPABASE_ANON_KEY not configured');
+      debugPrint(
+        'Skipping e2e tests: SUPABASE_URL/SUPABASE_ANON_KEY not configured',
+      );
       return;
     }
 

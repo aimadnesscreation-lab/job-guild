@@ -45,13 +45,16 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   void _showSubmitReportDialog() {
     final s = ref.read(appStringsProvider);
     final detailsController = TextEditingController();
-    String                    selectedReason = 'Spam'; // Internal value matching dropdown item values
+    String selectedReason =
+        'Spam'; // Internal value matching dropdown item values
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(ref.watch(appStringsProvider).reportUser),
           content: SingleChildScrollView(
             child: Column(
@@ -62,7 +65,10 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                   value: selectedReason,
                   decoration: InputDecoration(labelText: s.reportReasonLabel),
                   items: [
-                    DropdownMenuItem(value: 'Spam', child: Text(s.reportReasonSpam)),
+                    DropdownMenuItem(
+                      value: 'Spam',
+                      child: Text(s.reportReasonSpam),
+                    ),
                     DropdownMenuItem(
                       value: 'Harassment',
                       child: Text(s.reportReasonHarassment),
@@ -71,8 +77,14 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                       value: 'Fake profile',
                       child: Text(s.reportReasonFakeProfile),
                     ),
-                    DropdownMenuItem(value: 'Scam', child: Text(s.reportReasonScam)),
-                    DropdownMenuItem(value: 'Other', child: Text(s.reportReasonOther)),
+                    DropdownMenuItem(
+                      value: 'Scam',
+                      child: Text(s.reportReasonScam),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Other',
+                      child: Text(s.reportReasonOther),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {

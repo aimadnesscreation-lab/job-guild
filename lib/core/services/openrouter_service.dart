@@ -30,13 +30,16 @@ class OpenRouterService {
     }
 
     try {
-      return await _callWithRetry(() => _doGenerateText(
-        prompt: prompt,
-        systemPrompt: systemPrompt,
-        model: model,
-        temperature: temperature,
-        maxTokens: maxTokens,
-      ), retries);
+      return await _callWithRetry(
+        () => _doGenerateText(
+          prompt: prompt,
+          systemPrompt: systemPrompt,
+          model: model,
+          temperature: temperature,
+          maxTokens: maxTokens,
+        ),
+        retries,
+      );
     } catch (e) {
       debugPrint('[OpenRouter] Text generation failed after retries: $e');
       return _mockTextResponse(prompt);
@@ -63,8 +66,10 @@ class OpenRouterService {
       'max_tokens': maxTokens,
     });
 
-    final response = await _postRequest('/chat/completions', body)
-        .timeout(const Duration(seconds: 15));
+    final response = await _postRequest(
+      '/chat/completions',
+      body,
+    ).timeout(const Duration(seconds: 15));
     final data = jsonDecode(response) as Map<String, dynamic>;
     final choices = data['choices'] as List;
     if (choices.isEmpty) throw Exception('No response from AI');
@@ -85,13 +90,16 @@ class OpenRouterService {
     }
 
     try {
-      return await _callWithRetry(() => _doGenerateJson(
-        prompt: prompt,
-        systemPrompt: systemPrompt,
-        model: model,
-        temperature: temperature,
-        maxTokens: maxTokens,
-      ), retries);
+      return await _callWithRetry(
+        () => _doGenerateJson(
+          prompt: prompt,
+          systemPrompt: systemPrompt,
+          model: model,
+          temperature: temperature,
+          maxTokens: maxTokens,
+        ),
+        retries,
+      );
     } catch (e) {
       debugPrint('[OpenRouter] JSON generation failed after retries: $e');
       return _mockJsonResponse(prompt);
@@ -126,8 +134,10 @@ class OpenRouterService {
       'max_tokens': maxTokens,
     });
 
-    final response = await _postRequest('/chat/completions', body)
-        .timeout(const Duration(seconds: 15));
+    final response = await _postRequest(
+      '/chat/completions',
+      body,
+    ).timeout(const Duration(seconds: 15));
     final data = jsonDecode(response) as Map<String, dynamic>;
     final choices = data['choices'] as List;
     if (choices.isEmpty) throw Exception('No response from AI');
@@ -149,7 +159,8 @@ class OpenRouterService {
     } catch (e) {
       if (retries > 0) {
         final msg = e.toString();
-        final isRetryable = msg.contains('HTTP 429') ||
+        final isRetryable =
+            msg.contains('HTTP 429') ||
             msg.contains('HTTP 502') ||
             msg.contains('HTTP 503') ||
             msg.contains('HTTP 504');

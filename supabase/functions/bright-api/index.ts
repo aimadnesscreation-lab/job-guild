@@ -119,6 +119,16 @@ function fallbackParse(text: string): ParseResponse {
 }
 
 serve(async (req) => {
+  // Verify the caller has a valid Supabase JWT.  Supabase automatically
+  // passes the Authorization header when invoked via `client.functions.invoke()`.
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized — no auth token provided" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,

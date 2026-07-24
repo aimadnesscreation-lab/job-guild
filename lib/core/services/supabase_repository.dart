@@ -75,7 +75,14 @@ class SupabaseRepository {
       json.remove('id');
       json.remove('employer_id');
       json.remove('created_at');
-      await client.from('jobs').update(json).eq('id', job.id);
+      // Defense-in-depth: verify job ownership in the query so that even
+      // if the UPDATE RLS policy is misconfigured, one user cannot modify
+      // another user's job by guessing the UUID.
+      var query = client.from('jobs').update(json).eq('id', job.id);
+      if (userId != null) {
+        query = query.eq('employer_id', userId);
+      }
+      await query;
     } else {
       json.remove('id'); // Let the DB generate the UUID.
       await client.from('jobs').insert(json);
@@ -95,7 +102,8 @@ class SupabaseRepository {
       } else {
         await client
             .from('jobs')
-            .update({'status': status.name}).eq('id', jobId);
+            .update({'status': status.name})
+            .eq('id', jobId);
       }
       return true;
     } catch (e) {
@@ -144,7 +152,9 @@ class SupabaseRepository {
       // or race between hasApplied and applyForJob). Treat as success since
       // the application already exists.
       if (e.code == '23505') {
-        debugPrint('[applyForJob] Duplicate application ignored (already applied)');
+        debugPrint(
+          '[applyForJob] Duplicate application ignored (already applied)',
+        );
         return;
       }
       rethrow;
@@ -161,10 +171,7 @@ class SupabaseRepository {
     try {
       final result = await client.rpc(
         'hire_worker',
-        params: {
-          'p_job_id': jobId,
-          'p_worker_id': workerId,
-        },
+        params: {'p_job_id': jobId, 'p_worker_id': workerId},
       );
       return result == true;
     } catch (e) {
@@ -639,9 +646,7 @@ class SupabaseRepository {
     if (client == null) return;
 
     try {
-      await client.rpc('delete_user_data', params: {
-        'p_user_id': userId,
-      });
+      await client.rpc('delete_user_data', params: {'p_user_id': userId});
     } catch (e) {
       debugPrint('[Account] deleteUserData error: $e');
       rethrow;

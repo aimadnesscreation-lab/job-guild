@@ -152,12 +152,8 @@ class WorkerDashboard extends ConsumerWidget {
                   ),
                   subtitle: Text(s.workerOfflineSubtitle),
                   trailing: TextButton(
-                    onPressed: () => _showAvailabilitySheet(
-                      context,
-                      ref,
-                      profile,
-                      s,
-                    ),
+                    onPressed: () =>
+                        _showAvailabilitySheet(context, ref, profile, s),
                     child: Text(s.updateAvailability),
                   ),
                 ),
@@ -251,56 +247,52 @@ class WorkerDashboard extends ConsumerWidget {
               }
 
               final now = DateTime.now();
-                  final sevenDaysAgo = now.subtract(const Duration(days: 7));
+              final sevenDaysAgo = now.subtract(const Duration(days: 7));
 
-                  // Compute the full earnings total over the last 7 days
-                  // first, then only display the 10 most recent entries.
-                  final recentEntries = completed.where((entry) {
+              // Compute the full earnings total over the last 7 days
+              // first, then only display the 10 most recent entries.
+              final recentEntries = completed.where((entry) {
+                final jobData = entry['jobs'] as Map<String, dynamic>? ?? {};
+                final updatedAt = jobData['updated_at'] as String?;
+                final createdAt = jobData['created_at'] as String?;
+                final date =
+                    DateTime.tryParse(updatedAt ?? '') ??
+                    DateTime.tryParse(createdAt ?? '');
+                return date != null &&
+                    date.isAfter(sevenDaysAgo) &&
+                    date.isBefore(now.add(const Duration(days: 1)));
+              }).toList();
+
+              final displayEntries = recentEntries.take(10).toList();
+
+              // Total should match ALL recent entries (not just displayed),
+              // so the user sees accurate weekly earnings.
+              // Prefer proposed_price (agreed amount) over budget_amount.
+              final totalEarnings = recentEntries.fold<int>(0, (sum, entry) {
+                final jobData = entry['jobs'] as Map<String, dynamic>? ?? {};
+                final proposedPrice = entry['proposed_price'] as num?;
+                final budgetAmount = jobData['budget_amount'] as num?;
+                final amount = proposedPrice ?? budgetAmount ?? 0;
+                return sum + amount.toInt();
+              });
+
+              return Column(
+                children: [
+                  ...displayEntries.map((entry) {
                     final jobData =
                         entry['jobs'] as Map<String, dynamic>? ?? {};
+                    final title = jobData['title'] as String? ?? '';
+                    // Prefer proposed_price (agreed amount) over budget_amount.
+                    final proposedPrice = entry['proposed_price'] as num?;
+                    final budgetAmount = jobData['budget_amount'] as num?;
+                    final amount = proposedPrice ?? budgetAmount ?? 0;
                     final updatedAt = jobData['updated_at'] as String?;
                     final createdAt = jobData['created_at'] as String?;
-                    final date = DateTime.tryParse(updatedAt ?? '') ??
-                        DateTime.tryParse(createdAt ?? '');
-                    return date != null &&
-                        date.isAfter(sevenDaysAgo) &&
-                        date.isBefore(now.add(const Duration(days: 1)));
-                  }).toList();
-
-                  final displayEntries = recentEntries.take(10).toList();
-
-                  // Total should match ALL recent entries (not just displayed),
-                  // so the user sees accurate weekly earnings.
-                  // Prefer proposed_price (agreed amount) over budget_amount.
-                  final totalEarnings = recentEntries.fold<int>(
-                    0,
-                    (sum, entry) {
-                      final jobData =
-                          entry['jobs'] as Map<String, dynamic>? ?? {};
-                      final proposedPrice = entry['proposed_price'] as num?;
-                      final budgetAmount = jobData['budget_amount'] as num?;
-                      final amount = proposedPrice ?? budgetAmount ?? 0;
-                      return sum + amount.toInt();
-                    },
-                  );
-
-                  return Column(
-                    children: [
-                      ...displayEntries.map((entry) {
-                        final jobData =
-                            entry['jobs'] as Map<String, dynamic>? ?? {};
-                        final title = jobData['title'] as String? ?? '';
-                        // Prefer proposed_price (agreed amount) over budget_amount.
-                        final proposedPrice = entry['proposed_price'] as num?;
-                        final budgetAmount = jobData['budget_amount'] as num?;
-                        final amount = proposedPrice ?? budgetAmount ?? 0;
-                        final updatedAt = jobData['updated_at'] as String?;
-                        final createdAt = jobData['created_at'] as String?;
-                        final dateStr = _formatDate(
-                          DateTime.tryParse(updatedAt ?? '') ??
-                              DateTime.tryParse(createdAt ?? ''),
-                          s,
-                        );
+                    final dateStr = _formatDate(
+                      DateTime.tryParse(updatedAt ?? '') ??
+                          DateTime.tryParse(createdAt ?? ''),
+                      s,
+                    );
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: _EarningEntry(
@@ -463,7 +455,9 @@ class WorkerDashboard extends ConsumerWidget {
       title: jobData['title'] as String? ?? '',
       description: jobData['description'] as String? ?? '',
       categoryId: jobData['category_id'] as int? ?? 1,
-      budgetAmount: budgetAmount is int ? budgetAmount : (budgetAmount as num?)?.toInt(),
+      budgetAmount: budgetAmount is int
+          ? budgetAmount
+          : (budgetAmount as num?)?.toInt(),
       budgetType: Job.parseBudgetType(jobData['budget_type'] as String?),
       locationText: jobData['location_text'] as String?,
       status: Job.parseJobStatus(jobData['status'] as String?),

@@ -128,7 +128,13 @@ class EmployerDashboard extends ConsumerWidget {
                   ),
                 )
               else
-                ...completed.map((job) => _ActiveJobCard(job: job, showApplicantCount: false, interactive: false)),
+                ...completed.map(
+                  (job) => _ActiveJobCard(
+                    job: job,
+                    showApplicantCount: false,
+                    interactive: false,
+                  ),
+                ),
               const SizedBox(height: 20),
             ],
           ),
@@ -214,7 +220,11 @@ class _ActiveJobCard extends ConsumerWidget {
   final bool showApplicantCount;
   final bool interactive;
 
-  const _ActiveJobCard({required this.job, this.showApplicantCount = true, this.interactive = true});
+  const _ActiveJobCard({
+    required this.job,
+    this.showApplicantCount = true,
+    this.interactive = true,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -42,9 +42,7 @@ class AuthNotifier extends Notifier<void> {
         },
       );
       if (response.session == null && response.user == null) {
-        throw Exception(
-          'Sign-up failed. Please try again.',
-        );
+        throw Exception('Sign-up failed. Please try again.');
       }
       // If user was created but session is null, email confirmation is required.
       if (response.user != null && response.session == null) {

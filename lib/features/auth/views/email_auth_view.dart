@@ -168,8 +168,7 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                textInputAction:
-                    TextInputAction.next,
+                textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: s.emailAuthEmailLabel,
                   prefixIcon: const Icon(Icons.email_outlined),
@@ -187,7 +186,9 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
                 decoration: InputDecoration(
                   labelText: s.emailAuthPasswordLabel,
                   prefixIcon: const Icon(Icons.lock_outlined),
-                  hintText: _isSignUp ? s.emailAuthPasswordHint : s.emailAuthPasswordSignInHint,
+                  hintText: _isSignUp
+                      ? s.emailAuthPasswordHint
+                      : s.emailAuthPasswordSignInHint,
                 ),
               ),
               const SizedBox(height: 8),
@@ -238,7 +239,9 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
                         ),
                       )
                     : Text(
-                        _isSignUp ? s.emailAuthCreateButton : s.emailAuthSignInButton,
+                        _isSignUp
+                            ? s.emailAuthCreateButton
+                            : s.emailAuthSignInButton,
                         style: const TextStyle(fontSize: 16),
                       ),
               ),
@@ -249,9 +252,7 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _isSignUp
-                        ? s.emailAuthHasAccount
-                        : s.emailAuthNoAccount,
+                    _isSignUp ? s.emailAuthHasAccount : s.emailAuthNoAccount,
                     style: const TextStyle(color: AppTheme.textSecondary),
                   ),
                   GestureDetector(
@@ -260,7 +261,9 @@ class _EmailAuthViewState extends ConsumerState<EmailAuthView> {
                       _error = null;
                     }),
                     child: Text(
-                      _isSignUp ? s.emailAuthSignInButton : s.emailAuthToggleSignUp,
+                      _isSignUp
+                          ? s.emailAuthSignInButton
+                          : s.emailAuthToggleSignUp,
                       style: const TextStyle(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
@@ -329,8 +332,7 @@ class _PhoneOtpEntryView extends ConsumerStatefulWidget {
   const _PhoneOtpEntryView({required this.initialRole});
 
   @override
-  ConsumerState<_PhoneOtpEntryView> createState() =>
-      _PhoneOtpEntryViewState();
+  ConsumerState<_PhoneOtpEntryView> createState() => _PhoneOtpEntryViewState();
 }
 
 class _PhoneOtpEntryViewState extends ConsumerState<_PhoneOtpEntryView> {
@@ -360,10 +362,9 @@ class _PhoneOtpEntryViewState extends ConsumerState<_PhoneOtpEntryView> {
     try {
       // Normalize phone for consistent display in OTP view
       final normalizedPhone = AuthNotifier.normalizePhone(phone);
-      await ref.read(authProvider.notifier).sendOtp(
-        phone: phone,
-        initialRole: widget.initialRole,
-      );
+      await ref
+          .read(authProvider.notifier)
+          .sendOtp(phone: phone, initialRole: widget.initialRole);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

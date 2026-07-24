@@ -68,8 +68,13 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Cache of sender profiles keyed by user id, so realtime inserts can be
   /// enriched without refetching the whole thread (realtime payloads don't
   /// include joined relation data). Capped at 100 entries to bound memory.
-  final LinkedHashMap<String, Map<String, dynamic>> _senderCache = LinkedHashMap();
+  final LinkedHashMap<String, Map<String, dynamic>> _senderCache =
+      LinkedHashMap();
   static const int _maxSenderCacheSize = 100;
+
+  /// Guard to ensure retryOfflineQueue is only called once, not on every
+  /// provider rebuild (which happens on every state change).
+  bool _retriedOfflineQueue = false;
 
   /// Localized label for the current user in optimistic chat messages.
   String get _currentUserDisplayName => ref.read(appStringsProvider).you;
@@ -88,13 +93,19 @@ class ChatNotifier extends Notifier<ChatState> {
     // Start loading conversations and blocked list on init
     _initializeChat();
 
-    // Auto-retry queued offline messages on startup
-    Future.microtask(() => retryOfflineQueue());
+    // Auto-retry queued offline messages on startup — only once.
+    if (!_retriedOfflineQueue) {
+      _retriedOfflineQueue = true;
+      Future.microtask(() => retryOfflineQueue());
+    }
 
     ref.onDispose(() {
       _conversationsChannel?.unsubscribe();
       if (_conversationsChannel != null) {
-        Supabase.instance.client.removeChannel(_conversationsChannel!);
+        final disposeClient = _safeClient;
+        if (disposeClient != null) {
+          disposeClient.removeChannel(_conversationsChannel!);
+        }
       }
     });
 
@@ -134,7 +145,10 @@ class ChatNotifier extends Notifier<ChatState> {
   void disposeChannel() {
     if (_messagesChannel != null) {
       _messagesChannel!.unsubscribe();
-      Supabase.instance.client.removeChannel(_messagesChannel!);
+      final disposeClient = _safeClient;
+      if (disposeClient != null) {
+        disposeClient.removeChannel(_messagesChannel!);
+      }
       _messagesChannel = null;
     }
     state = state.copyWith(clearActiveConversation: true);
@@ -311,8 +325,8 @@ class ChatNotifier extends Notifier<ChatState> {
         final otherId = jobIdToOtherId[jobId] ?? '';
         final isEmployer = jobIdToIsEmployer[jobId] ?? false;
 
-        String otherName = nameCache[otherId] ??
-            (isEmployer ? 'Worker' : 'Employer');
+        String otherName =
+            nameCache[otherId] ?? (isEmployer ? 'Worker' : 'Employer');
 
         grouped[jobId] = {
           'id': jobId,
@@ -364,19 +378,16 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Safely parse a Supabase response into a list of row maps.
   List<Map<String, dynamic>> _safeList(dynamic response) {
     if (response is! List) return <Map<String, dynamic>>[];
-    return response
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    return response.whereType<Map<String, dynamic>>().toList();
   }
 
   /// Extract job IDs from a Supabase list response.
   /// [key] defaults to 'id' (for the jobs table) but can be overridden
   /// to 'job_id' when parsing the applications table.
   List<String> _parseJobIds(dynamic response, {String key = 'id'}) {
-    return _safeList(response)
-        .map((j) => j[key] as String?)
-        .whereType<String>()
-        .toList();
+    return _safeList(
+      response,
+    ).map((j) => j[key] as String?).whereType<String>().toList();
   }
 
   // ─── Global Realtime (conversation list) ─────────────────────────
@@ -391,7 +402,10 @@ class ChatNotifier extends Notifier<ChatState> {
     // Unsubscribe and remove previous channel before creating a new one.
     if (_conversationsChannel != null) {
       _conversationsChannel!.unsubscribe();
-      Supabase.instance.client.removeChannel(_conversationsChannel!);
+      final disposeClient = _safeClient;
+      if (disposeClient != null) {
+        disposeClient.removeChannel(_conversationsChannel!);
+      }
     }
 
     _conversationsChannel = client.channel('conversations:$userId');
@@ -427,7 +441,9 @@ class ChatNotifier extends Notifier<ChatState> {
     final content = record['content'] as String? ?? '';
     final contentType = record['content_type'] as String? ?? 'text';
     final sentAtStr = record['sent_at'] as String?;
-    final sentAt = sentAtStr != null ? DateTime.parse(sentAtStr) : DateTime.now();
+    final sentAt = sentAtStr != null
+        ? DateTime.parse(sentAtStr)
+        : DateTime.now();
     final isOwn = senderId == userId;
 
     final existingIdx = state.conversations.indexWhere((c) => c.id == jobId);
@@ -450,9 +466,10 @@ class ChatNotifier extends Notifier<ChatState> {
       state = state.copyWith(conversations: list);
     } else {
       // New conversation — fetch job + user info, then add to list.
+      final realtimeClient = _safeClient;
+      if (realtimeClient == null) return;
       try {
-        final client = Supabase.instance.client;
-        final job = await client
+        final job = await realtimeClient
             .from('jobs')
             .select('title, employer_id')
             .eq('id', jobId)
@@ -463,7 +480,7 @@ class ChatNotifier extends Notifier<ChatState> {
         final otherId = userId == employerId ? senderId : employerId;
         String otherName = 'User';
         try {
-          final user = await client
+          final user = await realtimeClient
               .from('users')
               .select('full_name')
               .eq('id', otherId)
@@ -496,7 +513,8 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Check whether the current user is a participant in the given job.
   Future<bool> _isParticipant(String jobId, String userId) async {
     try {
-      final client = Supabase.instance.client;
+      final client = _safeClient;
+      if (client == null) return false;
       final job = await client
           .from('jobs')
           .select('employer_id')
@@ -555,11 +573,15 @@ class ChatNotifier extends Notifier<ChatState> {
     // Unsubscribe and remove previous channel before creating a new one.
     if (_messagesChannel != null) {
       _messagesChannel!.unsubscribe();
-      Supabase.instance.client.removeChannel(_messagesChannel!);
+      final disposeClient = _safeClient;
+      if (disposeClient != null) {
+        disposeClient.removeChannel(_messagesChannel!);
+      }
       _messagesChannel = null;
     }
 
-    final client = Supabase.instance.client;
+    final client = _safeClient;
+    if (client == null) return;
 
     _messagesChannel = client.channel('messages:$conversationId');
     _messagesChannel!.onPostgresChanges(
@@ -611,7 +633,9 @@ class ChatNotifier extends Notifier<ChatState> {
     Map<String, dynamic>? sender = _senderCache[senderId];
     if (senderId.isNotEmpty && sender == null) {
       try {
-        sender = await Supabase.instance.client
+        final senderClient = _safeClient;
+        if (senderClient == null) return Message.fromJson(record);
+        sender = await senderClient
             .from('users')
             .select('full_name, profile_photo_url')
             .eq('id', senderId)
@@ -652,7 +676,8 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Fetch the full message list for a conversation via the Supabase stream API
   Future<void> _fetchMessages(String conversationId) async {
     try {
-      final client = Supabase.instance.client;
+      final client = _safeClient;
+      if (client == null) return;
 
       final messages = await client
           .from('messages')
@@ -660,9 +685,9 @@ class ChatNotifier extends Notifier<ChatState> {
           .eq('job_id', conversationId)
           .order('sent_at');
 
-      final parsed = _safeList(messages)
-          .map((json) => Message.fromJson(json))
-          .toList();
+      final parsed = _safeList(
+        messages,
+      ).map((json) => Message.fromJson(json)).toList();
 
       // Warm the sender cache so realtime inserts can be enriched cheaply.
       for (final m in parsed) {
@@ -773,7 +798,9 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getString('message_queue');
-      final queue = existing != null ? _safeList(jsonDecode(existing)) : <Map<String, dynamic>>[];
+      final queue = existing != null
+          ? _safeList(jsonDecode(existing))
+          : <Map<String, dynamic>>[];
       // Tag queued messages with the current user so they are not sent on
       // behalf of a different account after logout/login.
       final client = _safeClient;
@@ -825,7 +852,9 @@ class ChatNotifier extends Notifier<ChatState> {
         // Discard messages that have exceeded max retries
         final retryCount = (msg['retry_count'] as num?)?.toInt() ?? 0;
         if (retryCount >= maxRetries) {
-          debugPrint('[OfflineQueue] Discarding message after $maxRetries retries');
+          debugPrint(
+            '[OfflineQueue] Discarding message after $maxRetries retries',
+          );
           continue;
         }
         // SECURITY: never send a queued message on behalf of a different
@@ -858,11 +887,17 @@ class ChatNotifier extends Notifier<ChatState> {
             debugPrint('[OfflineQueue] Discarding message for deleted job');
             continue;
           }
-          remaining.add(Map<String, dynamic>.from(msg)
-            ..['retry_count'] = ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1);
+          remaining.add(
+            Map<String, dynamic>.from(msg)
+              ..['retry_count'] =
+                  ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1,
+          );
         } catch (e) {
-          remaining.add(Map<String, dynamic>.from(msg)
-            ..['retry_count'] = ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1);
+          remaining.add(
+            Map<String, dynamic>.from(msg)
+              ..['retry_count'] =
+                  ((msg['retry_count'] as num?)?.toInt() ?? 0) + 1,
+          );
         }
       }
 
@@ -959,7 +994,8 @@ class ChatNotifier extends Notifier<ChatState> {
 
     // 2. Persist to Supabase — mark all currently-unread messages as read.
     try {
-      final client = Supabase.instance.client;
+      final client = _safeClient;
+      if (client == null) return;
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
       final now = DateTime.now().toIso8601String();
@@ -971,7 +1007,9 @@ class ChatNotifier extends Notifier<ChatState> {
           // Don't mark the user's own messages as read — the done_all
           // icon should only show when the OTHER user has read them.
           .filter('sender_id', 'neq', currentUserId);
-      debugPrint('[Chat] Marked messages as read for conversation $conversationId');
+      debugPrint(
+        '[Chat] Marked messages as read for conversation $conversationId',
+      );
     } catch (e) {
       debugPrint('[Chat] Failed to persist read receipts: $e');
     }

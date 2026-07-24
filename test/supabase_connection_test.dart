@@ -24,7 +24,9 @@ void main() {
 
     _configured = AppConstants.isSupabaseConfigured;
     if (!_configured) {
-      debugPrint('Skipping Supabase connection tests: credentials not configured');
+      debugPrint(
+        'Skipping Supabase connection tests: credentials not configured',
+      );
       return;
     }
 

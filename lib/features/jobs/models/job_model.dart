@@ -80,7 +80,7 @@ class Job {
 
   factory Job.fromJson(Map<String, dynamic> json) {
     final (parsedLat, parsedLng) = _parseCoordinates(json);
-    
+
     // FIX (Bug #14): Use null checks instead of zero-check so valid (0,0)
     // coordinates are not incorrectly treated as missing data.
     final lat = parsedLat ?? 31.5204;
@@ -168,17 +168,20 @@ class Job {
       aiExtractedMetadata: clearAiMetadata
           ? null
           : (aiExtractedMetadata ?? this.aiExtractedMetadata),
-      budgetAmount:
-          clearBudgetAmount ? null : (budgetAmount ?? this.budgetAmount),
+      budgetAmount: clearBudgetAmount
+          ? null
+          : (budgetAmount ?? this.budgetAmount),
       budgetType: budgetType ?? this.budgetType,
-      locationText:
-          clearLocationText ? null : (locationText ?? this.locationText),
+      locationText: clearLocationText
+          ? null
+          : (locationText ?? this.locationText),
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       status: status ?? this.status,
       urgency: urgency ?? this.urgency,
-      scheduledFor:
-          clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
+      scheduledFor: clearScheduledFor
+          ? null
+          : (scheduledFor ?? this.scheduledFor),
       createdAt: createdAt ?? this.createdAt,
     );
   }
